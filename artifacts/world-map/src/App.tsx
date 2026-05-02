@@ -513,6 +513,182 @@ function VisitDetailsPanel({
   );
 }
 
+function buildTravelLog(
+  visitedCountries: Set<string>,
+  visitedStates: Set<string>,
+  visitedProvinces: Set<string>,
+  visitedStadiums: Set<string>,
+  countryDetails: Record<string, VisitDetails>,
+  stateDetails: Record<string, VisitDetails>,
+  provinceDetails: Record<string, VisitDetails>,
+  stadiumDetails: Record<string, VisitDetails>,
+): string {
+  const date = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const div = "═".repeat(52);
+
+  function detailStr(d: VisitDetails | undefined): string {
+    if (!d) return "";
+    const parts: string[] = [];
+    if (d.timesVisited) parts.push(`${d.timesVisited === 10 ? "10+" : d.timesVisited} visit${d.timesVisited === 1 ? "" : "s"}`);
+    if (d.firstYear && d.lastYear && d.firstYear !== d.lastYear) parts.push(`${d.firstYear}–${d.lastYear}`);
+    else if (d.firstYear) parts.push(`${d.firstYear}`);
+    else if (d.lastYear) parts.push(`${d.lastYear}`);
+    return parts.length ? "  ·  " + parts.join("  ·  ") : "";
+  }
+
+  const lines: string[] = [
+    "MY WORLD MAP TRAVEL LOG",
+    `Generated: ${date}`,
+    div,
+    "",
+  ];
+
+  // Countries
+  const visitedCList = Object.entries(COUNTRY_DATA)
+    .filter(([id]) => visitedCountries.has(id))
+    .sort((a, b) => a[1].name.localeCompare(b[1].name));
+  lines.push(`COUNTRIES  (${visitedCList.length} visited / ${Object.keys(COUNTRY_DATA).length} total)`);
+  lines.push(div);
+  if (visitedCList.length === 0) {
+    lines.push("  (none yet)");
+  } else {
+    for (const [id, info] of visitedCList) {
+      const name = info.name.padEnd(28);
+      const continent = `(${info.continent ?? "—"})`.padEnd(16);
+      lines.push(`  ${name}${continent}${detailStr(countryDetails[id])}`);
+    }
+  }
+  lines.push("");
+
+  // US States
+  const visitedSList = Object.entries(US_STATE_DATA)
+    .filter(([fips]) => visitedStates.has(fips))
+    .sort((a, b) => a[1].name.localeCompare(b[1].name));
+  lines.push(`US STATES  (${visitedSList.length} visited / ${Object.keys(US_STATE_DATA).length} total)`);
+  lines.push(div);
+  if (visitedSList.length === 0) {
+    lines.push("  (none yet)");
+  } else {
+    for (const [fips, info] of visitedSList) {
+      lines.push(`  ${info.name.padEnd(32)}${detailStr(stateDetails[fips])}`);
+    }
+  }
+  lines.push("");
+
+  // Canadian Provinces
+  const visitedPList = Object.entries(CA_PROVINCE_DATA)
+    .filter(([name]) => visitedProvinces.has(name))
+    .sort((a, b) => a[1].name.localeCompare(b[1].name));
+  lines.push(`CANADIAN PROVINCES  (${visitedPList.length} visited / ${Object.keys(CA_PROVINCE_DATA).length} total)`);
+  lines.push(div);
+  if (visitedPList.length === 0) {
+    lines.push("  (none yet)");
+  } else {
+    for (const [name, info] of visitedPList) {
+      lines.push(`  ${info.name.padEnd(32)}${detailStr(provinceDetails[name])}`);
+    }
+  }
+  lines.push("");
+
+  // MLB Stadiums
+  const visitedStList = MLB_STADIUMS
+    .filter(s => visitedStadiums.has(s.team))
+    .sort((a, b) => a.team.localeCompare(b.team));
+  lines.push(`MLB STADIUMS  (${visitedStList.length} visited / ${MLB_STADIUMS.length} total)`);
+  lines.push(div);
+  if (visitedStList.length === 0) {
+    lines.push("  (none yet)");
+  } else {
+    for (const s of visitedStList) {
+      const label = `${s.stadium} (${s.team})`.padEnd(44);
+      lines.push(`  ${label}${detailStr(stadiumDetails[s.team])}`);
+    }
+  }
+  lines.push("");
+  lines.push(div);
+  const total = visitedCList.length + visitedSList.length + visitedPList.length + visitedStList.length;
+  lines.push(`TOTAL PLACES VISITED: ${total}`);
+
+  return lines.join("\n");
+}
+
+function ExportModal({
+  onClose,
+  visitedCountries, visitedStates, visitedProvinces, visitedStadiums,
+  countryDetails, stateDetails, provinceDetails, stadiumDetails,
+}: {
+  onClose: () => void;
+  visitedCountries: Set<string>;
+  visitedStates: Set<string>;
+  visitedProvinces: Set<string>;
+  visitedStadiums: Set<string>;
+  countryDetails: Record<string, VisitDetails>;
+  stateDetails: Record<string, VisitDetails>;
+  provinceDetails: Record<string, VisitDetails>;
+  stadiumDetails: Record<string, VisitDetails>;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const log = buildTravelLog(
+    visitedCountries, visitedStates, visitedProvinces, visitedStadiums,
+    countryDetails, stateDetails, provinceDetails, stadiumDetails,
+  );
+
+  function handleCopy() {
+    navigator.clipboard.writeText(log).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  function handleDownload() {
+    const blob = new Blob([log], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `travel-log-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+          <div>
+            <h2 className="text-lg font-bold text-white">Travel Log Export</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Your visited places, ready to save or share</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors text-xl leading-none">✕</button>
+        </div>
+
+        <pre className="flex-1 overflow-y-auto px-6 py-4 text-xs text-slate-300 font-mono leading-relaxed whitespace-pre bg-slate-950/50 rounded-none">
+          {log}
+        </pre>
+
+        <div className="flex items-center gap-3 px-6 py-4 border-t border-slate-800">
+          <button
+            onClick={handleCopy}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${copied ? "bg-emerald-600 text-white" : "bg-slate-700 hover:bg-slate-600 text-white"}`}
+          >
+            {copied ? "✓ Copied!" : "Copy to Clipboard"}
+          </button>
+          <button
+            onClick={handleDownload}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white transition-colors"
+          >
+            Download .txt
+          </button>
+          <span className="ml-auto text-xs text-slate-500">Click outside to close</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const DIVISION_COLORS: Record<string, string> = {
   "AL East": "#1d4ed8",
   "AL Central": "#2563eb",
@@ -532,6 +708,7 @@ export default function App() {
   const [zoom, setZoom] = useState(1);
   const [center, setCenter] = useState<[number, number]>([0, 20]);
   const [listTab, setListTab] = useState<"countries" | "stadiums" | "us-states" | "ca-provinces">("countries");
+  const [showExport, setShowExport] = useState(false);
   const [visitedCountries, setVisitedCountries] = useLocalStorageSet("wm_visited_countries");
   const [visitedStadiums, setVisitedStadiums] = useLocalStorageSet("wm_visited_stadiums");
   const [visitedStates, setVisitedStates] = useLocalStorageSet("wm_visited_states");
@@ -671,6 +848,15 @@ export default function App() {
           <button onClick={() => setZoom(z => Math.min(z * 1.5, 12))} className="px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors font-medium">+</button>
           <button onClick={() => setZoom(z => Math.max(z / 1.5, 0.5))} className="px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors font-medium">−</button>
           <button onClick={() => { setZoom(1); setCenter([0, 20]); setSelected(null); setSelectedStadium(null); }} className="px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors font-medium">Reset</button>
+          <button
+            onClick={() => setShowExport(true)}
+            className="px-3 py-2 text-sm bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors font-medium text-white flex items-center gap-1.5"
+          >
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M6.5 1v7M3.5 5l3 3 3-3M1 9.5v1A1.5 1.5 0 002.5 12h8A1.5 1.5 0 0012 10.5v-1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Export
+          </button>
         </div>
       </header>
 
@@ -1295,6 +1481,20 @@ export default function App() {
           </div>
         )}
       </section>
+
+      {showExport && (
+        <ExportModal
+          onClose={() => setShowExport(false)}
+          visitedCountries={visitedCountries}
+          visitedStates={visitedStates}
+          visitedProvinces={visitedProvinces}
+          visitedStadiums={visitedStadiums}
+          countryDetails={countryDetails}
+          stateDetails={stateDetails}
+          provinceDetails={provinceDetails}
+          stadiumDetails={stadiumDetails}
+        />
+      )}
     </div>
   );
 }

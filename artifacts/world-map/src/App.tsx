@@ -513,7 +513,7 @@ function VisitDetailsPanel({
   );
 }
 
-function buildTravelLog(
+function buildTravelCSV(
   visitedCountries: Set<string>,
   visitedStates: Set<string>,
   visitedProvinces: Set<string>,
@@ -523,93 +523,61 @@ function buildTravelLog(
   provinceDetails: Record<string, VisitDetails>,
   stadiumDetails: Record<string, VisitDetails>,
 ): string {
-  const date = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-  const div = "═".repeat(52);
-
-  function detailStr(d: VisitDetails | undefined): string {
-    if (!d) return "";
-    const parts: string[] = [];
-    if (d.timesVisited) parts.push(`${d.timesVisited === 10 ? "10+" : d.timesVisited} visit${d.timesVisited === 1 ? "" : "s"}`);
-    if (d.firstYear && d.lastYear && d.firstYear !== d.lastYear) parts.push(`${d.firstYear}–${d.lastYear}`);
-    else if (d.firstYear) parts.push(`${d.firstYear}`);
-    else if (d.lastYear) parts.push(`${d.lastYear}`);
-    return parts.length ? "  ·  " + parts.join("  ·  ") : "";
+  function esc(v: string | number | undefined): string {
+    if (v === undefined || v === null) return "";
+    const s = String(v);
+    return s.includes(",") || s.includes('"') || s.includes("\n")
+      ? `"${s.replace(/"/g, '""')}"` : s;
+  }
+  function row(...fields: (string | number | undefined)[]): string {
+    return fields.map(esc).join(",");
+  }
+  function timesLabel(n: number | undefined): string | undefined {
+    if (!n) return undefined;
+    return n === 10 ? "10+" : String(n);
   }
 
-  const lines: string[] = [
-    "MY WORLD MAP TRAVEL LOG",
-    `Generated: ${date}`,
-    div,
-    "",
+  const rows: string[] = [
+    row("Category", "Name", "Region", "Times Visited", "First Year", "Most Recent Year"),
   ];
 
   // Countries
-  const visitedCList = Object.entries(COUNTRY_DATA)
+  Object.entries(COUNTRY_DATA)
     .filter(([id]) => visitedCountries.has(id))
-    .sort((a, b) => a[1].name.localeCompare(b[1].name));
-  lines.push(`COUNTRIES  (${visitedCList.length} visited / ${Object.keys(COUNTRY_DATA).length} total)`);
-  lines.push(div);
-  if (visitedCList.length === 0) {
-    lines.push("  (none yet)");
-  } else {
-    for (const [id, info] of visitedCList) {
-      const name = info.name.padEnd(28);
-      const continent = `(${info.continent ?? "—"})`.padEnd(16);
-      lines.push(`  ${name}${continent}${detailStr(countryDetails[id])}`);
-    }
-  }
-  lines.push("");
+    .sort((a, b) => a[1].name.localeCompare(b[1].name))
+    .forEach(([id, info]) => {
+      const d = countryDetails[id];
+      rows.push(row("Country", info.name, info.continent, timesLabel(d?.timesVisited), d?.firstYear, d?.lastYear));
+    });
 
   // US States
-  const visitedSList = Object.entries(US_STATE_DATA)
+  Object.entries(US_STATE_DATA)
     .filter(([fips]) => visitedStates.has(fips))
-    .sort((a, b) => a[1].name.localeCompare(b[1].name));
-  lines.push(`US STATES  (${visitedSList.length} visited / ${Object.keys(US_STATE_DATA).length} total)`);
-  lines.push(div);
-  if (visitedSList.length === 0) {
-    lines.push("  (none yet)");
-  } else {
-    for (const [fips, info] of visitedSList) {
-      lines.push(`  ${info.name.padEnd(32)}${detailStr(stateDetails[fips])}`);
-    }
-  }
-  lines.push("");
+    .sort((a, b) => a[1].name.localeCompare(b[1].name))
+    .forEach(([fips, info]) => {
+      const d = stateDetails[fips];
+      rows.push(row("US State", info.name, "United States", timesLabel(d?.timesVisited), d?.firstYear, d?.lastYear));
+    });
 
   // Canadian Provinces
-  const visitedPList = Object.entries(CA_PROVINCE_DATA)
+  Object.entries(CA_PROVINCE_DATA)
     .filter(([name]) => visitedProvinces.has(name))
-    .sort((a, b) => a[1].name.localeCompare(b[1].name));
-  lines.push(`CANADIAN PROVINCES  (${visitedPList.length} visited / ${Object.keys(CA_PROVINCE_DATA).length} total)`);
-  lines.push(div);
-  if (visitedPList.length === 0) {
-    lines.push("  (none yet)");
-  } else {
-    for (const [name, info] of visitedPList) {
-      lines.push(`  ${info.name.padEnd(32)}${detailStr(provinceDetails[name])}`);
-    }
-  }
-  lines.push("");
+    .sort((a, b) => a[1].name.localeCompare(b[1].name))
+    .forEach(([name, info]) => {
+      const d = provinceDetails[name];
+      rows.push(row("Canadian Province", info.name, "Canada", timesLabel(d?.timesVisited), d?.firstYear, d?.lastYear));
+    });
 
   // MLB Stadiums
-  const visitedStList = MLB_STADIUMS
+  MLB_STADIUMS
     .filter(s => visitedStadiums.has(s.team))
-    .sort((a, b) => a.team.localeCompare(b.team));
-  lines.push(`MLB STADIUMS  (${visitedStList.length} visited / ${MLB_STADIUMS.length} total)`);
-  lines.push(div);
-  if (visitedStList.length === 0) {
-    lines.push("  (none yet)");
-  } else {
-    for (const s of visitedStList) {
-      const label = `${s.stadium} (${s.team})`.padEnd(44);
-      lines.push(`  ${label}${detailStr(stadiumDetails[s.team])}`);
-    }
-  }
-  lines.push("");
-  lines.push(div);
-  const total = visitedCList.length + visitedSList.length + visitedPList.length + visitedStList.length;
-  lines.push(`TOTAL PLACES VISITED: ${total}`);
+    .sort((a, b) => a.team.localeCompare(b.team))
+    .forEach(s => {
+      const d = stadiumDetails[s.team];
+      rows.push(row("MLB Stadium", s.stadium, `${s.team} (${s.division})`, timesLabel(d?.timesVisited), d?.firstYear, d?.lastYear));
+    });
 
-  return lines.join("\n");
+  return rows.join("\n");
 }
 
 function ExportModal({
@@ -629,24 +597,24 @@ function ExportModal({
 }) {
   const [copied, setCopied] = useState(false);
 
-  const log = buildTravelLog(
+  const csv = buildTravelCSV(
     visitedCountries, visitedStates, visitedProvinces, visitedStadiums,
     countryDetails, stateDetails, provinceDetails, stadiumDetails,
   );
 
   function handleCopy() {
-    navigator.clipboard.writeText(log).then(() => {
+    navigator.clipboard.writeText(csv).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
   }
 
   function handleDownload() {
-    const blob = new Blob([log], { type: "text/plain;charset=utf-8" });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `travel-log-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.download = `travel-log-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -659,14 +627,14 @@ function ExportModal({
       <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh]">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
           <div>
-            <h2 className="text-lg font-bold text-white">Travel Log Export</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Your visited places, ready to save or share</p>
+            <h2 className="text-lg font-bold text-white">Export Travel Log</h2>
+            <p className="text-xs text-slate-400 mt-0.5">CSV format — opens directly in Excel or Google Sheets</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors text-xl leading-none">✕</button>
         </div>
 
         <pre className="flex-1 overflow-y-auto px-6 py-4 text-xs text-slate-300 font-mono leading-relaxed whitespace-pre bg-slate-950/50 rounded-none">
-          {log}
+          {csv}
         </pre>
 
         <div className="flex items-center gap-3 px-6 py-4 border-t border-slate-800">
@@ -680,7 +648,7 @@ function ExportModal({
             onClick={handleDownload}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white transition-colors"
           >
-            Download .txt
+            Download .csv
           </button>
           <span className="ml-auto text-xs text-slate-500">Click outside to close</span>
         </div>

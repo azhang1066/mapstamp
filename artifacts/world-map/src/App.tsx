@@ -24,6 +24,38 @@ function useLocalStorageSet(key: string): [Set<string>, React.Dispatch<React.Set
   return [value, setValue];
 }
 
+interface VisitDetails {
+  timesVisited?: number;
+  firstYear?: number;
+  lastYear?: number;
+}
+
+const CURRENT_YEAR = new Date().getFullYear();
+const YEARS: number[] = Array.from({ length: CURRENT_YEAR - 1950 + 1 }, (_, i) => CURRENT_YEAR - i);
+
+function useLocalStorageRecord(key: string): [Record<string, VisitDetails>, (id: string, details: VisitDetails | null) => void] {
+  const [value, setValue] = useState<Record<string, VisitDetails>>(() => {
+    try {
+      const stored = localStorage.getItem(key);
+      return stored ? (JSON.parse(stored) as Record<string, VisitDetails>) : {};
+    } catch {
+      return {};
+    }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+  }, [key, value]);
+  const setEntry = useCallback((id: string, details: VisitDetails | null) => {
+    setValue(prev => {
+      const next = { ...prev };
+      if (details === null) delete next[id];
+      else next[id] = { ...prev[id], ...details };
+      return next;
+    });
+  }, []);
+  return [value, setEntry];
+}
+
 interface StadiumInfo {
   team: string;
   stadium: string;
@@ -418,6 +450,69 @@ function getProvinceFill(isSelected: boolean, isHovered: boolean, isVisited: boo
   return isHovered ? "#3d4a5c" : "#253040";
 }
 
+function VisitDetailsPanel({
+  locationId,
+  details,
+  onUpdate,
+}: {
+  locationId: string;
+  details: VisitDetails | undefined;
+  onUpdate: (id: string, patch: VisitDetails) => void;
+}) {
+  const d = details ?? {};
+  const showWarning = d.firstYear && d.lastYear && d.firstYear > d.lastYear;
+
+  const selectClass =
+    "w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer";
+
+  return (
+    <div className="mt-5 pt-5 border-t border-slate-800">
+      <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">My Visit</p>
+      <div className="space-y-3">
+        <div>
+          <label className="text-xs text-slate-400 mb-1 block">Times Visited</label>
+          <select
+            className={selectClass}
+            value={d.timesVisited ?? ""}
+            onChange={e => onUpdate(locationId, { timesVisited: e.target.value === "" ? undefined : Number(e.target.value) })}
+          >
+            <option value="">— select —</option>
+            {[1,2,3,4,5,6,7,8,9].map(n => <option key={n} value={n}>{n}</option>)}
+            <option value={10}>10+</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-slate-400 mb-1 block">First Visit</label>
+          <select
+            className={selectClass}
+            value={d.firstYear ?? ""}
+            onChange={e => onUpdate(locationId, { firstYear: e.target.value === "" ? undefined : Number(e.target.value) })}
+          >
+            <option value="">— select year —</option>
+            {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-slate-400 mb-1 block">Most Recent Visit</label>
+          <select
+            className={selectClass}
+            value={d.lastYear ?? ""}
+            onChange={e => onUpdate(locationId, { lastYear: e.target.value === "" ? undefined : Number(e.target.value) })}
+          >
+            <option value="">— select year —</option>
+            {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+        {showWarning && (
+          <p className="text-xs text-amber-400 flex items-center gap-1.5">
+            <span>⚠️</span> First visit year can't be after most recent year
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const DIVISION_COLORS: Record<string, string> = {
   "AL East": "#1d4ed8",
   "AL Central": "#2563eb",
@@ -441,6 +536,10 @@ export default function App() {
   const [visitedStadiums, setVisitedStadiums] = useLocalStorageSet("wm_visited_stadiums");
   const [visitedStates, setVisitedStates] = useLocalStorageSet("wm_visited_states");
   const [visitedProvinces, setVisitedProvinces] = useLocalStorageSet("wm_visited_provinces");
+  const [countryDetails, setCountryDetail] = useLocalStorageRecord("wm_details_countries");
+  const [stadiumDetails, setStadiumDetail] = useLocalStorageRecord("wm_details_stadiums");
+  const [stateDetails, setStateDetail] = useLocalStorageRecord("wm_details_states");
+  const [provinceDetails, setProvinceDetail] = useLocalStorageRecord("wm_details_provinces");
 
   const sortedCountries = Object.entries(COUNTRY_DATA)
     .map(([id, info]) => ({ id, ...info }))
@@ -458,21 +557,37 @@ export default function App() {
 
   const toggleCountryVisited = useCallback((id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    setVisitedCountries(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  }, []);
+    setVisitedCountries(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) { n.delete(id); setCountryDetail(id, null); } else n.add(id);
+      return n;
+    });
+  }, [setCountryDetail]);
 
   const toggleStadiumVisited = useCallback((team: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    setVisitedStadiums(prev => { const n = new Set(prev); if (n.has(team)) n.delete(team); else n.add(team); return n; });
-  }, []);
+    setVisitedStadiums(prev => {
+      const n = new Set(prev);
+      if (n.has(team)) { n.delete(team); setStadiumDetail(team, null); } else n.add(team);
+      return n;
+    });
+  }, [setStadiumDetail]);
 
   const toggleStateVisited = useCallback((fips: string) => {
-    setVisitedStates(prev => { const n = new Set(prev); if (n.has(fips)) n.delete(fips); else n.add(fips); return n; });
-  }, []);
+    setVisitedStates(prev => {
+      const n = new Set(prev);
+      if (n.has(fips)) { n.delete(fips); setStateDetail(fips, null); } else n.add(fips);
+      return n;
+    });
+  }, [setStateDetail]);
 
   const toggleProvinceVisited = useCallback((name: string) => {
-    setVisitedProvinces(prev => { const n = new Set(prev); if (n.has(name)) n.delete(name); else n.add(name); return n; });
-  }, []);
+    setVisitedProvinces(prev => {
+      const n = new Set(prev);
+      if (n.has(name)) { n.delete(name); setProvinceDetail(name, null); } else n.add(name);
+      return n;
+    });
+  }, [setProvinceDetail]);
 
   const handleCountryClick = useCallback((geo: { id: string }) => {
     const code = geo.id;
@@ -769,6 +884,14 @@ export default function App() {
                 </div>
               </div>
 
+              {visitedStadiums.has(selectedStadium.team) && (
+                <VisitDetailsPanel
+                  locationId={selectedStadium.team}
+                  details={stadiumDetails[selectedStadium.team]}
+                  onUpdate={setStadiumDetail}
+                />
+              )}
+
               <div className="mt-5 pt-5 border-t border-slate-800">
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Other Teams in {selectedStadium.division}</p>
                 <div className="space-y-2">
@@ -861,6 +984,27 @@ export default function App() {
                   </div>
                 )}
               </div>
+
+              {(() => {
+                const rawId = selected.key.replace(/^(country|state|province)-/, "");
+                const isVisited = selected.key.startsWith("country-")
+                  ? visitedCountries.has(rawId)
+                  : selected.key.startsWith("state-")
+                  ? visitedStates.has(rawId)
+                  : visitedProvinces.has(rawId);
+                if (!isVisited) return null;
+                const details = selected.key.startsWith("country-")
+                  ? countryDetails[rawId]
+                  : selected.key.startsWith("state-")
+                  ? stateDetails[rawId]
+                  : provinceDetails[rawId];
+                const setter = selected.key.startsWith("country-")
+                  ? setCountryDetail
+                  : selected.key.startsWith("state-")
+                  ? setStateDetail
+                  : setProvinceDetail;
+                return <VisitDetailsPanel locationId={rawId} details={details} onUpdate={setter} />;
+              })()}
             </div>
           ) : (
             <div className="p-6 flex-1">

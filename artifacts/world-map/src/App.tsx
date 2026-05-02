@@ -234,6 +234,7 @@ const COUNTRY_DATA: RegionRecord = {
   "204": { name: "Benin", regionType: "country", capital: "Porto-Novo", population: "13.0M", area: "112,622 km²", continent: "Africa", currency: "West African CFA Franc", language: "French" },
   "854": { name: "Burkina Faso", regionType: "country", capital: "Ouagadougou", population: "22.1M", area: "274,222 km²", continent: "Africa", currency: "West African CFA Franc", language: "French" },
   "108": { name: "Burundi", regionType: "country", capital: "Gitega", population: "12.6M", area: "27,834 km²", continent: "Africa", currency: "Burundian Franc", language: "Kirundi, French" },
+  "072": { name: "Botswana", regionType: "country", capital: "Gaborone", population: "2.6M", area: "581,730 km²", continent: "Africa", currency: "Botswana Pula", language: "Setswana, English" },
   "132": { name: "Cabo Verde", regionType: "country", capital: "Praia", population: "0.6M", area: "4,033 km²", continent: "Africa", currency: "Cape Verdean Escudo", language: "Portuguese" },
   "140": { name: "Central African Republic", regionType: "country", capital: "Bangui", population: "5.5M", area: "622,984 km²", continent: "Africa", currency: "Central African CFA Franc", language: "French, Sango" },
   "148": { name: "Chad", regionType: "country", capital: "N'Djamena", population: "17.4M", area: "1,284,000 km²", continent: "Africa", currency: "Central African CFA Franc", language: "French, Arabic" },
@@ -257,11 +258,13 @@ const COUNTRY_DATA: RegionRecord = {
   "516": { name: "Namibia", regionType: "country", capital: "Windhoek", population: "2.6M", area: "824,292 km²", continent: "Africa", currency: "Namibian Dollar", language: "English" },
   "646": { name: "Rwanda", regionType: "country", capital: "Kigali", population: "13.8M", area: "26,338 km²", continent: "Africa", currency: "Rwandan Franc", language: "Kinyarwanda, French, English" },
   "678": { name: "São Tomé and Príncipe", regionType: "country", capital: "São Tomé", population: "0.2M", area: "964 km²", continent: "Africa", currency: "São Tomé dobra", language: "Portuguese" },
+  "690": { name: "Seychelles", regionType: "country", capital: "Victoria", population: "0.1M", area: "459 km²", continent: "Africa", currency: "Seychellois Rupee", language: "Seychellois Creole, English, French" },
   "694": { name: "Sierra Leone", regionType: "country", capital: "Freetown", population: "8.4M", area: "71,740 km²", continent: "Africa", currency: "Sierra Leonean Leone", language: "English" },
   "728": { name: "South Sudan", regionType: "country", capital: "Juba", population: "11.0M", area: "619,745 km²", continent: "Africa", currency: "South Sudanese Pound", language: "English" },
   "768": { name: "Togo", regionType: "country", capital: "Lomé", population: "8.6M", area: "56,785 km²", continent: "Africa", currency: "West African CFA Franc", language: "French" },
 
   // Additional Asia
+  "158": { name: "Taiwan", regionType: "country", capital: "Taipei", population: "23.6M", area: "36,193 km²", continent: "Asia", currency: "New Taiwan Dollar", language: "Mandarin Chinese" },
   "051": { name: "Armenia", regionType: "country", capital: "Yerevan", population: "2.9M", area: "29,743 km²", continent: "Asia", currency: "Armenian Dram", language: "Armenian" },
   "031": { name: "Azerbaijan", regionType: "country", capital: "Baku", population: "10.2M", area: "86,600 km²", continent: "Asia", currency: "Azerbaijani Manat", language: "Azerbaijani" },
   "048": { name: "Bahrain", regionType: "country", capital: "Manama", population: "1.5M", area: "765 km²", continent: "Asia", currency: "Bahraini Dinar", language: "Arabic" },
@@ -303,10 +306,12 @@ const COUNTRY_DATA: RegionRecord = {
   "705": { name: "Slovenia", regionType: "country", capital: "Ljubljana", population: "2.1M", area: "20,273 km²", continent: "Europe", currency: "Euro", language: "Slovenian" },
 
   // Additional Americas
+  "028": { name: "Antigua and Barbuda", regionType: "country", capital: "Saint John's", population: "0.1M", area: "443 km²", continent: "North America", currency: "East Caribbean Dollar", language: "English" },
   "044": { name: "Bahamas", regionType: "country", capital: "Nassau", population: "0.4M", area: "13,943 km²", continent: "North America", currency: "Bahamian Dollar", language: "English" },
   "052": { name: "Barbados", regionType: "country", capital: "Bridgetown", population: "0.3M", area: "430 km²", continent: "North America", currency: "Barbadian Dollar", language: "English" },
   "084": { name: "Belize", regionType: "country", capital: "Belmopan", population: "0.4M", area: "22,966 km²", continent: "North America", currency: "Belize Dollar", language: "English" },
   "192": { name: "Cuba", regionType: "country", capital: "Havana", population: "11.3M", area: "109,884 km²", continent: "North America", currency: "Cuban Peso", language: "Spanish" },
+  "212": { name: "Dominica", regionType: "country", capital: "Roseau", population: "0.07M", area: "751 km²", continent: "North America", currency: "East Caribbean Dollar", language: "English" },
   "222": { name: "El Salvador", regionType: "country", capital: "San Salvador", population: "6.6M", area: "21,041 km²", continent: "North America", currency: "US Dollar", language: "Spanish" },
   "308": { name: "Grenada", regionType: "country", capital: "St. George's", population: "0.1M", area: "344 km²", continent: "North America", currency: "East Caribbean Dollar", language: "English" },
   "328": { name: "Guyana", regionType: "country", capital: "Georgetown", population: "0.8M", area: "214,969 km²", continent: "South America", currency: "Guyanese Dollar", language: "English" },
@@ -315,6 +320,9 @@ const COUNTRY_DATA: RegionRecord = {
   "388": { name: "Jamaica", regionType: "country", capital: "Kingston", population: "2.8M", area: "10,991 km²", continent: "North America", currency: "Jamaican Dollar", language: "English" },
   "558": { name: "Nicaragua", regionType: "country", capital: "Managua", population: "6.9M", area: "130,373 km²", continent: "North America", currency: "Nicaraguan Córdoba", language: "Spanish" },
   "591": { name: "Panama", regionType: "country", capital: "Panama City", population: "4.4M", area: "75,417 km²", continent: "North America", currency: "Panamanian Balboa", language: "Spanish" },
+  "659": { name: "Saint Kitts and Nevis", regionType: "country", capital: "Basseterre", population: "0.05M", area: "261 km²", continent: "North America", currency: "East Caribbean Dollar", language: "English" },
+  "662": { name: "Saint Lucia", regionType: "country", capital: "Castries", population: "0.18M", area: "616 km²", continent: "North America", currency: "East Caribbean Dollar", language: "English" },
+  "670": { name: "Saint Vincent and the Grenadines", regionType: "country", capital: "Kingstown", population: "0.11M", area: "389 km²", continent: "North America", currency: "East Caribbean Dollar", language: "English" },
   "740": { name: "Suriname", regionType: "country", capital: "Paramaribo", population: "0.6M", area: "163,820 km²", continent: "South America", currency: "Surinamese Dollar", language: "Dutch" },
   "780": { name: "Trinidad and Tobago", regionType: "country", capital: "Port of Spain", population: "1.5M", area: "5,131 km²", continent: "North America", currency: "Trinidad and Tobago Dollar", language: "English" },
 

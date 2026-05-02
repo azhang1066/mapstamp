@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   ComposableMap,
   Geographies,
@@ -6,6 +6,23 @@ import {
   Marker,
   ZoomableGroup,
 } from "react-simple-maps";
+
+function useLocalStorageSet(key: string): [Set<string>, React.Dispatch<React.SetStateAction<Set<string>>>] {
+  const [value, setValue] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem(key);
+      return stored ? new Set(JSON.parse(stored) as string[]) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(key, JSON.stringify([...value]));
+    } catch {}
+  }, [key, value]);
+  return [value, setValue];
+}
 
 interface StadiumInfo {
   team: string;
@@ -408,10 +425,10 @@ export default function App() {
   const [zoom, setZoom] = useState(1);
   const [center, setCenter] = useState<[number, number]>([0, 20]);
   const [listTab, setListTab] = useState<"countries" | "stadiums" | "us-states" | "ca-provinces">("countries");
-  const [visitedCountries, setVisitedCountries] = useState<Set<string>>(new Set());
-  const [visitedStadiums, setVisitedStadiums] = useState<Set<string>>(new Set());
-  const [visitedStates, setVisitedStates] = useState<Set<string>>(new Set());
-  const [visitedProvinces, setVisitedProvinces] = useState<Set<string>>(new Set());
+  const [visitedCountries, setVisitedCountries] = useLocalStorageSet("wm_visited_countries");
+  const [visitedStadiums, setVisitedStadiums] = useLocalStorageSet("wm_visited_stadiums");
+  const [visitedStates, setVisitedStates] = useLocalStorageSet("wm_visited_states");
+  const [visitedProvinces, setVisitedProvinces] = useLocalStorageSet("wm_visited_provinces");
 
   const sortedCountries = Object.entries(COUNTRY_DATA)
     .map(([id, info]) => ({ id, ...info }))

@@ -72,9 +72,20 @@ const MLB_STADIUMS: StadiumInfo[] = [
   { team: "San Francisco Giants", stadium: "Oracle Park", division: "NL West", capacity: "41,915", city: "San Francisco, CA", coordinates: [-122.3893, 37.7786] },
 ];
 
-const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json";
 const US_STATES_URL = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json";
 const CA_PROVINCES_URL = `${import.meta.env.BASE_URL}canada-provinces.geojson`;
+
+// Countries too small to appear as polygons even at 50m resolution — rendered as dot markers
+const MICROSTATE_MARKERS: { id: string; coordinates: [number, number] }[] = [
+  { id: "336", coordinates: [12.4534,  41.9022] }, // Vatican City
+  { id: "492", coordinates: [7.4333,   43.7333] }, // Monaco
+  { id: "674", coordinates: [12.4500,  43.9333] }, // San Marino
+  { id: "438", coordinates: [9.5333,   47.1667] }, // Liechtenstein
+  { id: "520", coordinates: [166.9315, -0.5228] }, // Nauru
+  { id: "798", coordinates: [179.1500, -8.5167] }, // Tuvalu
+  { id: "462", coordinates: [73.2207,  3.2028]  }, // Maldives
+];
 
 interface RegionInfo {
   name: string;
@@ -254,6 +265,7 @@ const COUNTRY_DATA: RegionRecord = {
   "499": { name: "Montenegro", regionType: "country", capital: "Podgorica", population: "0.6M", area: "13,812 km²", continent: "Europe", currency: "Euro", language: "Montenegrin" },
   "807": { name: "North Macedonia", regionType: "country", capital: "Skopje", population: "2.1M", area: "25,713 km²", continent: "Europe", currency: "Macedonian Denar", language: "Macedonian" },
   "674": { name: "San Marino", regionType: "country", capital: "San Marino City", population: "0.03M", area: "61 km²", continent: "Europe", currency: "Euro", language: "Italian" },
+  "336": { name: "Vatican City", regionType: "country", capital: "Vatican City", population: "0.0008M", area: "0.44 km²", continent: "Europe", currency: "Euro", language: "Italian, Latin" },
   "688": { name: "Serbia", regionType: "country", capital: "Belgrade", population: "6.8M", area: "77,474 km²", continent: "Europe", currency: "Serbian Dinar", language: "Serbian" },
   "703": { name: "Slovakia", regionType: "country", capital: "Bratislava", population: "5.5M", area: "49,035 km²", continent: "Europe", currency: "Euro", language: "Slovak" },
   "705": { name: "Slovenia", regionType: "country", capital: "Ljubljana", population: "2.1M", area: "20,273 km²", continent: "Europe", currency: "Euro", language: "Slovenian" },
@@ -498,6 +510,14 @@ export default function App() {
     setSelectedStadium(stadium);
   }, []);
 
+  const handleMicrostateClick = useCallback((id: string) => {
+    const info = COUNTRY_DATA[id];
+    if (!info) return;
+    setSelectedStadium(null);
+    setVisitedCountries(prev => { const n = new Set(prev); n.add(id); return n; });
+    setSelected({ key: `country-${id}`, info });
+  }, []);
+
   const handleMouseEnter = useCallback((name: string, evt: React.MouseEvent) => {
     setHovered(name);
     setTooltipName(name);
@@ -633,6 +653,34 @@ export default function App() {
                   })
                 }
               </Geographies>
+              {/* Microstate Dot Markers */}
+              {MICROSTATE_MARKERS.map(({ id, coordinates }) => {
+                const info = COUNTRY_DATA[id];
+                if (!info) return null;
+                const isSelected = selected?.key === `country-${id}`;
+                const isVisited = visitedCountries.has(id);
+                const isHov = hovered === info.name;
+                const s = 1 / zoom;
+                const continentColor = CONTINENT_COLORS[info.continent] ?? "#94a3b8";
+                const fillColor = isSelected ? SELECTED_COLOR : isVisited ? continentColor : (isHov ? "#475569" : "#334155");
+                const ringColor = isSelected ? "#f59e0b" : isVisited ? continentColor : "#475569";
+                return (
+                  <Marker key={id} coordinates={coordinates}>
+                    <g
+                      transform={`scale(${s})`}
+                      style={{ cursor: "pointer" }}
+                      onClick={(e) => { e.stopPropagation(); handleMicrostateClick(id); }}
+                      onMouseEnter={(e) => handleMouseEnter(info.name, e)}
+                      onMouseMove={handleMouseMove}
+                      onMouseLeave={handleMouseLeave}
+                    >
+                      <circle r={isHov || isSelected ? 5 : 4} fill={ringColor} opacity={0.35} />
+                      <circle r={isHov || isSelected ? 3 : 2.5} fill={fillColor} stroke={ringColor} strokeWidth={1} />
+                    </g>
+                  </Marker>
+                );
+              })}
+
               {/* MLB Stadium Markers */}
               {MLB_STADIUMS.map((stadium) => {
                 const isSelected = selectedStadium?.team === stadium.team;

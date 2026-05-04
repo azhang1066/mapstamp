@@ -828,6 +828,236 @@ function downloadTemplate() {
 
 // ─── End Excel helpers ────────────────────────────────────────────────────────
 
+// ─── Search coordinates ───────────────────────────────────────────────────────
+
+const COUNTRY_CENTROIDS: Record<string, [number, number]> = {
+  "4":[-67.7,33.9],"8":[20.2,41.2],"12":[2.6,28.0],"20":[1.6,42.5],"24":[17.5,-11.2],
+  "28":[-61.8,17.1],"31":[47.6,40.1],"32":[-63.6,-38.4],"36":[133.8,-25.3],"40":[14.6,47.7],
+  "44":[-77.4,24.8],"48":[50.5,26.0],"50":[90.4,23.7],"52":[-59.6,13.2],"56":[4.5,50.5],
+  "64":[90.4,27.5],"68":[-64.7,-17.0],"70":[17.7,44.2],"72":[24.7,-22.3],"76":[-51.9,-14.2],
+  "84":[-88.5,17.2],"90":[160.2,-9.6],"96":[114.7,4.5],"100":[25.5,42.7],"104":[95.9,21.9],
+  "108":[29.9,-3.4],"112":[28.0,53.5],"116":[104.9,12.6],"120":[12.3,5.7],"132":[-23.6,15.1],
+  "140":[20.9,6.6],"144":[80.7,7.9],"148":[18.7,15.5],"152":[-71.5,-35.7],"156":[104.2,35.9],
+  "158":[121.0,23.7],"170":[-74.3,4.1],"174":[43.3,-11.9],"178":[15.8,-0.7],"180":[23.7,-2.9],
+  "188":[-84.0,9.7],"191":[15.7,45.2],"192":[-79.5,22.0],"196":[33.2,35.1],"203":[15.5,49.8],
+  "204":[2.3,9.3],"208":[10.0,56.3],"212":[-61.4,15.4],"214":[-70.2,18.7],"218":[-78.1,-1.8],
+  "222":[-88.9,13.8],"226":[10.3,1.7],"231":[39.6,8.6],"232":[39.8,15.2],"233":[25.0,58.7],
+  "242":[178.1,-18.1],"246":[26.3,64.0],"250":[2.2,46.2],"262":[42.6,11.8],"266":[11.6,-0.8],
+  "268":[43.4,42.0],"270":[-15.3,13.4],"275":[35.2,31.9],"276":[10.5,51.2],"288":[-1.0,7.9],
+  "296":[174.0,1.4],"300":[21.8,39.1],"308":[-61.7,12.1],"320":[-90.2,15.8],"324":[-11.8,10.9],
+  "328":[-58.9,4.8],"332":[-72.3,19.1],"340":[-86.6,15.1],"344":[114.2,22.3],"348":[19.5,47.2],
+  "356":[78.9,20.6],"360":[113.9,-0.8],"364":[53.7,32.4],"368":[43.7,33.2],"372":[-8.0,53.4],
+  "376":[34.9,31.5],"380":[12.6,42.8],"388":[-77.3,18.1],"392":[138.3,36.2],"398":[66.9,48.0],
+  "400":[36.2,31.2],"404":[37.9,0.0],"408":[127.5,40.3],"410":[127.8,36.5],"414":[47.5,29.5],
+  "417":[74.8,41.5],"418":[103.8,18.2],"422":[35.8,33.9],"426":[28.2,-29.6],"428":[25.0,56.9],
+  "430":[-9.4,6.4],"434":[17.2,27.0],"438":[9.6,47.1],"440":[23.9,55.9],"442":[6.1,49.8],
+  "450":[46.9,-19.4],"454":[34.3,-13.3],"458":[109.7,4.2],"462":[73.5,3.2],"466":[-2.0,17.6],
+  "470":[14.4,35.9],"478":[-11.8,20.3],"480":[57.6,-20.3],"484":[-102.6,23.6],"492":[7.4,43.7],
+  "496":[103.8,46.9],"498":[28.5,47.4],"499":[19.4,42.7],"500":[-62.2,17.1],"504":[-7.1,31.8],
+  "508":[35.5,-18.7],"512":[56.0,21.5],"516":[18.5,-22.0],"520":[166.9,-0.5],"524":[84.1,28.4],
+  "528":[5.3,52.1],"548":[167.0,-15.4],"554":[172.5,-41.5],"558":[-85.0,12.9],"562":[8.1,17.6],
+  "566":[8.7,9.1],"578":[8.5,60.5],"583":[158.3,6.9],"584":[168.7,9.6],"585":[134.5,7.5],
+  "586":[69.3,30.4],"591":[-80.1,8.5],"598":[143.9,-6.3],"600":[-58.4,-23.4],"604":[-75.0,-9.2],
+  "608":[121.8,12.9],"616":[20.0,51.9],"620":[-8.2,39.6],"624":[-15.2,12.0],"626":[125.7,-8.9],
+  "634":[51.2,25.4],"642":[24.9,45.9],"643":[99.1,61.5],"646":[29.9,-2.0],"659":[-62.7,17.3],
+  "662":[-60.9,13.9],"670":[-61.2,13.3],"674":[12.5,43.9],"678":[6.6,0.2],"682":[45.1,24.2],
+  "686":[-14.5,14.5],"688":[21.0,44.0],"690":[55.5,-4.7],"694":[-11.8,8.5],"703":[19.7,48.7],
+  "704":[108.3,14.1],"705":[14.8,46.1],"706":[45.3,6.1],"710":[25.1,-28.7],"716":[29.2,-20.0],
+  "724":[-3.7,40.2],"729":[29.9,15.6],"740":[-56.0,4.0],"752":[17.0,62.0],"756":[8.2,46.8],
+  "760":[38.3,35.0],"762":[71.3,38.9],"764":[101.0,15.9],"768":[1.2,8.6],"776":[-175.2,-21.2],
+  "780":[-61.2,10.5],"784":[53.8,24.0],"788":[9.6,33.9],"792":[35.2,38.9],"795":[58.4,40.1],
+  "798":[178.1,-8.5],"800":[32.3,1.4],"804":[31.2,49.0],"818":[30.8,26.8],"826":[-3.4,55.4],
+  "834":[35.0,-6.4],"836":[-14.5,14.5],"854":[-1.6,12.4],"858":[-55.8,-32.5],"860":[63.9,41.4],
+  "862":[-66.6,8.0],"882":[-172.5,-13.6],"887":[48.5,16.0],"894":[27.8,-14.0],
+  "336":[12.5,41.9],
+};
+
+const COUNTRY_ZOOM: Record<string, number> = {
+  "36":2,"643":2,"156":2,"076":2,"840":2,"124":2,"356":3,"484":3,"036":2,
+  "520":8,"798":8,"492":8,"438":8,"674":7,"336":8,"462":8,"028":7,"212":7,
+  "659":7,"662":7,"670":7,"308":7,
+};
+
+const US_STATE_CENTROIDS: Record<string, [number, number]> = {
+  "01":[-86.8,32.8],"02":[-153.4,64.2],"04":[-111.6,34.3],"05":[-92.4,34.9],
+  "06":[-119.5,37.2],"08":[-105.5,39.0],"09":[-72.7,41.6],"10":[-75.5,38.9],
+  "11":[-77.0,38.9],"12":[-82.5,28.1],"13":[-83.4,32.7],"15":[-157.5,21.1],
+  "16":[-114.5,44.0],"17":[-89.3,40.0],"18":[-86.3,40.3],"19":[-93.5,42.0],
+  "20":[-98.4,38.5],"21":[-84.8,37.7],"22":[-91.8,31.1],"23":[-69.2,45.2],
+  "24":[-76.6,39.0],"25":[-71.5,42.4],"26":[-84.7,44.3],"27":[-94.3,46.4],
+  "28":[-89.7,32.8],"29":[-92.5,38.4],"30":[-110.4,46.8],"31":[-99.7,41.5],
+  "32":[-117.1,38.5],"33":[-71.6,43.8],"34":[-74.5,40.1],"35":[-106.2,34.5],
+  "36":[-75.4,42.9],"37":[-79.4,35.5],"38":[-100.5,47.5],"39":[-82.9,40.4],
+  "40":[-97.5,35.6],"41":[-120.6,44.0],"42":[-77.2,40.9],"44":[-71.5,41.6],
+  "45":[-81.0,33.9],"46":[-100.2,44.5],"47":[-86.7,35.9],"48":[-99.3,31.4],
+  "49":[-111.1,39.3],"50":[-72.7,44.0],"51":[-78.7,37.5],"53":[-120.5,47.5],
+  "54":[-80.5,38.7],"55":[-89.7,44.5],"56":[-107.3,43.0],
+};
+
+const CA_PROVINCE_CENTROIDS: Record<string, [number, number]> = {
+  "Alberta":[-115.0,55.0],"British Columbia":[-124.0,54.0],"Manitoba":[-98.0,55.0],
+  "New Brunswick":[-66.5,46.5],"Newfoundland and Labrador":[-60.0,53.0],
+  "Northwest Territories":[-120.0,65.0],"Nova Scotia":[-63.0,45.0],
+  "Nunavut":[-85.0,70.0],"Ontario":[-85.0,50.0],"Prince Edward Island":[-63.1,46.5],
+  "Quebec":[-72.0,52.0],"Saskatchewan":[-105.0,54.0],"Yukon Territory":[-135.0,63.0],
+};
+
+interface SearchItem {
+  id: string;
+  label: string;
+  sublabel: string;
+  category: "country" | "us-state" | "ca-province" | "stadium";
+  coordinates: [number, number];
+  zoom: number;
+}
+
+function buildSearchIndex(): SearchItem[] {
+  const items: SearchItem[] = [];
+  for (const [id, info] of Object.entries(COUNTRY_DATA)) {
+    const coords = COUNTRY_CENTROIDS[id];
+    if (!coords) continue;
+    items.push({
+      id, label: info.name,
+      sublabel: (info as RegionInfo & { continent?: string }).continent ?? "Country",
+      category: "country",
+      coordinates: coords,
+      zoom: COUNTRY_ZOOM[id] ?? 3,
+    });
+  }
+  for (const [fips, info] of Object.entries(US_STATE_DATA)) {
+    const coords = US_STATE_CENTROIDS[fips];
+    if (!coords) continue;
+    items.push({ id: fips, label: info.name, sublabel: "U.S. State", category: "us-state", coordinates: coords, zoom: 5 });
+  }
+  for (const [key, info] of Object.entries(CA_PROVINCE_DATA)) {
+    const coords = CA_PROVINCE_CENTROIDS[key];
+    if (!coords) continue;
+    items.push({ id: key, label: info.name, sublabel: "CA Province", category: "ca-province", coordinates: coords, zoom: 4 });
+  }
+  for (const s of MLB_STADIUMS) {
+    items.push({
+      id: s.team, label: s.stadium, sublabel: s.team,
+      category: "stadium", coordinates: s.coordinates as [number, number], zoom: 8,
+    });
+  }
+  return items;
+}
+
+const SEARCH_INDEX = buildSearchIndex();
+
+const CATEGORY_BADGE: Record<SearchItem["category"], string> = {
+  "country": "bg-blue-900 text-blue-300",
+  "us-state": "bg-red-900 text-red-300",
+  "ca-province": "bg-orange-900 text-orange-300",
+  "stadium": "bg-violet-900 text-violet-300",
+};
+const CATEGORY_LABEL: Record<SearchItem["category"], string> = {
+  "country": "Country",
+  "us-state": "US State",
+  "ca-province": "Province",
+  "stadium": "Stadium",
+};
+
+function SearchBar({ onSelect }: { onSelect: (item: SearchItem) => void }) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  const suggestions = query.trim().length < 1 ? [] : (() => {
+    const q = query.toLowerCase();
+    const starts: SearchItem[] = [];
+    const contains: SearchItem[] = [];
+    for (const item of SEARCH_INDEX) {
+      const l = item.label.toLowerCase();
+      if (l.startsWith(q)) starts.push(item);
+      else if (l.includes(q) || item.sublabel.toLowerCase().includes(q)) contains.push(item);
+      if (starts.length + contains.length >= 10) break;
+    }
+    return [...starts, ...contains].slice(0, 8);
+  })();
+
+  const commit = (item: SearchItem) => {
+    setQuery("");
+    setOpen(false);
+    setActiveIdx(-1);
+    onSelect(item);
+    inputRef.current?.blur();
+  };
+
+  const handleKey = (e: React.KeyboardEvent) => {
+    if (!open || suggestions.length === 0) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setActiveIdx(i => Math.min(i + 1, suggestions.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setActiveIdx(i => Math.max(i - 1, 0)); }
+    else if (e.key === "Enter" && activeIdx >= 0) { e.preventDefault(); commit(suggestions[activeIdx]); }
+    else if (e.key === "Escape") { setOpen(false); setActiveIdx(-1); }
+  };
+
+  useEffect(() => {
+    if (activeIdx >= 0 && listRef.current) {
+      const el = listRef.current.children[activeIdx] as HTMLElement;
+      el?.scrollIntoView({ block: "nearest" });
+    }
+  }, [activeIdx]);
+
+  return (
+    <div className="relative flex-1 max-w-sm">
+      <div className="relative">
+        <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" width="15" height="15" viewBox="0 0 15 15" fill="none">
+          <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" strokeWidth="1.5"/>
+          <path d="M10.5 10.5l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          placeholder="Search countries, states, stadiums…"
+          className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg pl-9 pr-8 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+          onChange={e => { setQuery(e.target.value); setOpen(true); setActiveIdx(-1); }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          onKeyDown={handleKey}
+        />
+        {query && (
+          <button
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+            onMouseDown={e => { e.preventDefault(); setQuery(""); setOpen(false); }}
+          >
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 2l9 9M11 2L2 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+          </button>
+        )}
+      </div>
+      {open && suggestions.length > 0 && (
+        <ul
+          ref={listRef}
+          className="absolute top-full mt-1.5 w-full bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-auto max-h-72 py-1"
+        >
+          {suggestions.map((item, i) => (
+            <li key={`${item.category}-${item.id}`}>
+              <button
+                className={`w-full text-left px-3 py-2.5 flex items-center gap-3 hover:bg-slate-700 transition-colors ${i === activeIdx ? "bg-slate-700" : ""}`}
+                onMouseDown={e => { e.preventDefault(); commit(item); }}
+                onMouseEnter={() => setActiveIdx(i)}
+              >
+                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md shrink-0 uppercase tracking-wide ${CATEGORY_BADGE[item.category]}`}>
+                  {CATEGORY_LABEL[item.category]}
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm text-white font-medium truncate">{item.label}</span>
+                  <span className="block text-xs text-slate-400 truncate">{item.sublabel}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ─── End search ───────────────────────────────────────────────────────────────
+
 const DIVISION_COLORS: Record<string, string> = {
   "AL East": "#1d4ed8",
   "AL Central": "#2563eb",
@@ -995,6 +1225,40 @@ export default function App() {
     setSelected({ key: `country-${id}`, info });
   }, []);
 
+  const handleSearchSelect = useCallback((item: SearchItem) => {
+    setCenter(item.coordinates);
+    setZoom(item.zoom);
+    if (item.category === "country") {
+      const info = COUNTRY_DATA[item.id];
+      if (info) {
+        setSelectedStadium(null);
+        setVisitedCountries(prev => { const n = new Set(prev); n.add(item.id); return n; });
+        setSelected({ key: `country-${item.id}`, info });
+      }
+    } else if (item.category === "us-state") {
+      const info = US_STATE_DATA[item.id];
+      if (info) {
+        setSelectedStadium(null);
+        setVisitedStates(prev => { const n = new Set(prev); n.add(item.id); return n; });
+        setSelected({ key: `state-${item.id}`, info });
+      }
+    } else if (item.category === "ca-province") {
+      const info = CA_PROVINCE_DATA[item.id];
+      if (info) {
+        setSelectedStadium(null);
+        setVisitedProvinces(prev => { const n = new Set(prev); n.add(item.id); return n; });
+        setSelected({ key: `province-${item.id}`, info });
+      }
+    } else if (item.category === "stadium") {
+      const stadium = MLB_STADIUMS.find(s => s.team === item.id);
+      if (stadium) {
+        setSelected(null);
+        setVisitedStadiums(prev => { const n = new Set(prev); n.add(stadium.team); return n; });
+        setSelectedStadium(stadium);
+      }
+    }
+  }, [setVisitedCountries, setVisitedStates, setVisitedProvinces, setVisitedStadiums]);
+
   const handleMouseEnter = useCallback((name: string, evt: React.MouseEvent) => {
     setHovered(name);
     setTooltipName(name);
@@ -1024,12 +1288,13 @@ export default function App() {
 
   return (
     <div className="flex flex-col bg-slate-950 text-white">
-      <header className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/80 backdrop-blur-sm">
-        <div>
+      <header className="flex items-center gap-4 px-6 py-4 border-b border-slate-800 bg-slate-900/80 backdrop-blur-sm flex-wrap">
+        <div className="shrink-0">
           <h1 className="text-2xl font-bold tracking-tight text-white">World Map</h1>
           <p className="text-sm text-slate-400 mt-0.5">Click any country, U.S. state, Canadian province, or MLB stadium to explore</p>
         </div>
-        <div className="flex gap-2 flex-wrap justify-end">
+        <SearchBar onSelect={handleSearchSelect} />
+        <div className="flex gap-2 flex-wrap justify-end ml-auto">
           <button onClick={() => setZoom(z => Math.min(z * 1.5, 12))} className="px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors font-medium">+</button>
           <button onClick={() => setZoom(z => Math.max(z / 1.5, 0.5))} className="px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors font-medium">−</button>
           <button onClick={() => { setZoom(1); setCenter([0, 20]); setSelected(null); setSelectedStadium(null); }} className="px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors font-medium">Reset</button>

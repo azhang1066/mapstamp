@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import * as XLSX from "xlsx";
 import {
   ComposableMap,
   Geographies,
@@ -665,6 +666,168 @@ function ExportModal({
   );
 }
 
+// ─── Excel import / template helpers ─────────────────────────────────────────
+
+interface ImportResult {
+  matched: number;
+  unmatched: string[];
+}
+
+interface ParsedRow {
+  name: string;
+  type: string;
+  timesVisited?: number;
+  firstYear?: number;
+  lastYear?: number;
+}
+
+function buildLookupMaps() {
+  const countryByName = new Map<string, string>();
+  for (const [id, info] of Object.entries(COUNTRY_DATA)) {
+    countryByName.set(info.name.toLowerCase().trim(), id);
+  }
+  const stateByName = new Map<string, string>();
+  for (const [fips, info] of Object.entries(US_STATE_DATA)) {
+    stateByName.set(info.name.toLowerCase().trim(), fips);
+  }
+  const provinceByName = new Map<string, string>();
+  for (const [key, info] of Object.entries(CA_PROVINCE_DATA)) {
+    provinceByName.set(info.name.toLowerCase().trim(), key);
+  }
+  const stadiumByName = new Map<string, string>();
+  for (const s of MLB_STADIUMS) {
+    stadiumByName.set(s.stadium.toLowerCase().trim(), s.team);
+    stadiumByName.set(s.team.toLowerCase().trim(), s.team);
+  }
+  return { countryByName, stateByName, provinceByName, stadiumByName };
+}
+
+function parseTimesVisited(raw: unknown): number | undefined {
+  if (raw === undefined || raw === null || raw === "") return undefined;
+  const s = String(raw).trim();
+  if (s === "10+") return 10;
+  const n = parseInt(s, 10);
+  return Number.isFinite(n) && n >= 1 ? Math.min(n, 10) : undefined;
+}
+
+function parseYear(raw: unknown): number | undefined {
+  if (raw === undefined || raw === null || raw === "") return undefined;
+  const n = parseInt(String(raw).trim(), 10);
+  return Number.isFinite(n) && n >= 1900 && n <= 2100 ? n : undefined;
+}
+
+function parseExcelRows(wb: XLSX.WorkBook): ParsedRow[] {
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
+  return raw.map(r => {
+    const key = (k: string) => {
+      const match = Object.keys(r).find(rk => rk.toLowerCase().trim() === k);
+      return match ? r[match] : undefined;
+    };
+    return {
+      name: String(key("name") ?? "").trim(),
+      type: String(key("type") ?? "").toLowerCase().trim(),
+      timesVisited: parseTimesVisited(key("times visited")),
+      firstYear: parseYear(key("first year")),
+      lastYear: parseYear(key("most recent year")),
+    };
+  }).filter(r => r.name.length > 0);
+}
+
+function processImport(
+  rows: ParsedRow[],
+  lookups: ReturnType<typeof buildLookupMaps>,
+  setVisitedCountries: React.Dispatch<React.SetStateAction<Set<string>>>,
+  setVisitedStates: React.Dispatch<React.SetStateAction<Set<string>>>,
+  setVisitedProvinces: React.Dispatch<React.SetStateAction<Set<string>>>,
+  setVisitedStadiums: React.Dispatch<React.SetStateAction<Set<string>>>,
+  setCountryDetail: (id: string, d: VisitDetails | null) => void,
+  setStateDetail: (id: string, d: VisitDetails | null) => void,
+  setProvinceDetail: (id: string, d: VisitDetails | null) => void,
+  setStadiumDetail: (id: string, d: VisitDetails | null) => void,
+): ImportResult {
+  const { countryByName, stateByName, provinceByName, stadiumByName } = lookups;
+  const unmatched: string[] = [];
+  let matched = 0;
+
+  const detail = (row: ParsedRow): VisitDetails => ({
+    ...(row.timesVisited !== undefined ? { timesVisited: row.timesVisited } : {}),
+    ...(row.firstYear !== undefined ? { firstYear: row.firstYear } : {}),
+    ...(row.lastYear !== undefined ? { lastYear: row.lastYear } : {}),
+  });
+
+  for (const row of rows) {
+    const name = row.name.toLowerCase();
+    const t = row.type;
+
+    const tryCountry = () => {
+      const id = countryByName.get(name);
+      if (!id) return false;
+      setVisitedCountries(prev => { const n = new Set(prev); n.add(id); return n; });
+      const d = detail(row);
+      if (Object.keys(d).length > 0) setCountryDetail(id, d);
+      matched++;
+      return true;
+    };
+    const tryState = () => {
+      const fips = stateByName.get(name);
+      if (!fips) return false;
+      setVisitedStates(prev => { const n = new Set(prev); n.add(fips); return n; });
+      const d = detail(row);
+      if (Object.keys(d).length > 0) setStateDetail(fips, d);
+      matched++;
+      return true;
+    };
+    const tryProvince = () => {
+      const key = provinceByName.get(name);
+      if (!key) return false;
+      setVisitedProvinces(prev => { const n = new Set(prev); n.add(key); return n; });
+      const d = detail(row);
+      if (Object.keys(d).length > 0) setProvinceDetail(key, d);
+      matched++;
+      return true;
+    };
+    const tryStadium = () => {
+      const team = stadiumByName.get(name);
+      if (!team) return false;
+      setVisitedStadiums(prev => { const n = new Set(prev); n.add(team); return n; });
+      const d = detail(row);
+      if (Object.keys(d).length > 0) setStadiumDetail(team, d);
+      matched++;
+      return true;
+    };
+
+    let found = false;
+    if (t === "country") found = tryCountry();
+    else if (t === "state") found = tryState();
+    else if (t === "province") found = tryProvince();
+    else if (t === "stadium") found = tryStadium();
+    else {
+      found = tryCountry() || tryState() || tryProvince() || tryStadium();
+    }
+
+    if (!found) unmatched.push(row.name);
+  }
+
+  return { matched, unmatched };
+}
+
+function downloadTemplate() {
+  const headers = ["Name", "Type", "Times Visited", "First Year", "Most Recent Year"];
+  const examples = [
+    ["France", "country", 3, 2010, 2023],
+    ["California", "state", 5, 2005, 2024],
+    ["Yankee Stadium", "stadium", 1, 2019, 2019],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...examples]);
+  ws["!cols"] = [{ wch: 30 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 18 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Travel Tracker");
+  XLSX.writeFile(wb, "travel_tracker_template.xlsx");
+}
+
+// ─── End Excel helpers ────────────────────────────────────────────────────────
+
 const DIVISION_COLORS: Record<string, string> = {
   "AL East": "#1d4ed8",
   "AL Central": "#2563eb",
@@ -685,6 +848,9 @@ export default function App() {
   const [center, setCenter] = useState<[number, number]>([0, 20]);
   const [listTab, setListTab] = useState<"countries" | "stadiums" | "us-states" | "ca-provinces">("countries");
   const [showExport, setShowExport] = useState(false);
+  const [toast, setToast] = useState<{ message: string; kind: "success" | "warning" } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [visitedCountries, setVisitedCountries] = useLocalStorageSet("wm_visited_countries");
   const [visitedStadiums, setVisitedStadiums] = useLocalStorageSet("wm_visited_stadiums");
   const [visitedStates, setVisitedStates] = useLocalStorageSet("wm_visited_states");
@@ -741,6 +907,49 @@ export default function App() {
       return n;
     });
   }, [setProvinceDetail]);
+
+  const showToast = useCallback((message: string, kind: "success" | "warning") => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ message, kind });
+    toastTimerRef.current = setTimeout(() => setToast(null), 5000);
+  }, []);
+
+  const handleFileImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = ev.target?.result;
+        const wb = XLSX.read(data, { type: "array" });
+        const rows = parseExcelRows(wb);
+        if (rows.length === 0) {
+          showToast("No data rows found in the file.", "warning");
+          return;
+        }
+        const lookups = buildLookupMaps();
+        const result = processImport(
+          rows, lookups,
+          setVisitedCountries, setVisitedStates, setVisitedProvinces, setVisitedStadiums,
+          setCountryDetail, setStateDetail, setProvinceDetail, setStadiumDetail,
+        );
+        if (result.unmatched.length > 0) {
+          showToast(
+            `Imported ${result.matched} location${result.matched !== 1 ? "s" : ""} successfully. ` +
+            `${result.unmatched.length} couldn't be matched — check spelling: ${result.unmatched.slice(0, 3).join(", ")}${result.unmatched.length > 3 ? "…" : ""}`,
+            "warning",
+          );
+        } else {
+          showToast(`Imported ${result.matched} location${result.matched !== 1 ? "s" : ""} successfully`, "success");
+        }
+      } catch {
+        showToast("Failed to read the file. Make sure it's a valid .xlsx file.", "warning");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }, [setVisitedCountries, setVisitedStates, setVisitedProvinces, setVisitedStadiums,
+      setCountryDetail, setStateDetail, setProvinceDetail, setStadiumDetail, showToast]);
 
   const handleCountryClick = useCallback((geo: { id: string }) => {
     const code = geo.id;
@@ -820,10 +1029,27 @@ export default function App() {
           <h1 className="text-2xl font-bold tracking-tight text-white">World Map</h1>
           <p className="text-sm text-slate-400 mt-0.5">Click any country, U.S. state, Canadian province, or MLB stadium to explore</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap justify-end">
           <button onClick={() => setZoom(z => Math.min(z * 1.5, 12))} className="px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors font-medium">+</button>
           <button onClick={() => setZoom(z => Math.max(z / 1.5, 0.5))} className="px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors font-medium">−</button>
           <button onClick={() => { setZoom(1); setCenter([0, 20]); setSelected(null); setSelectedStadium(null); }} className="px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors font-medium">Reset</button>
+          <div className="w-px bg-slate-700 self-stretch mx-1" />
+          <button
+            onClick={downloadTemplate}
+            className="px-3 py-2 text-sm bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors font-medium text-white flex items-center gap-1.5"
+            title="Download a blank .xlsx template"
+          >
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 9.5v1.5a1 1 0 001 1h8a1 1 0 001-1V9.5M6.5 1v7M3.5 5.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            Template
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="px-3 py-2 text-sm bg-emerald-700 hover:bg-emerald-600 rounded-lg transition-colors font-medium text-white flex items-center gap-1.5"
+            title="Import visited locations from an .xlsx file"
+          >
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 9V2M3.5 5l3-3 3 3M1 9.5v1A1.5 1.5 0 002.5 12h8A1.5 1.5 0 0012 10.5v-1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            Import Excel
+          </button>
           <button
             onClick={() => setShowExport(true)}
             className="px-3 py-2 text-sm bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors font-medium text-white flex items-center gap-1.5"
@@ -1470,6 +1696,38 @@ export default function App() {
           provinceDetails={provinceDetails}
           stadiumDetails={stadiumDetails}
         />
+      )}
+
+      {/* Hidden file input for Excel import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls"
+        className="hidden"
+        onChange={handleFileImport}
+      />
+
+      {/* Toast notification */}
+      {toast && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 max-w-sm px-4 py-3 rounded-xl shadow-2xl text-sm font-medium flex items-start gap-3 transition-all animate-fade-in ${
+            toast.kind === "success"
+              ? "bg-emerald-800 border border-emerald-600 text-emerald-50"
+              : "bg-amber-800 border border-amber-600 text-amber-50"
+          }`}
+        >
+          <span className="flex-shrink-0 mt-0.5">
+            {toast.kind === "success" ? (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5"/><path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5"/><path d="M8 5v3.5M8 11h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            )}
+          </span>
+          <span className="flex-1 leading-snug">{toast.message}</span>
+          <button onClick={() => setToast(null)} className="flex-shrink-0 opacity-70 hover:opacity-100 ml-1">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+          </button>
+        </div>
       )}
     </div>
   );

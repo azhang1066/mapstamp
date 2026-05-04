@@ -1,0 +1,30 @@
+Feature: Excel Import for Visited Locations
+Add an "Import from Excel" button to the app that lets users upload an Excel file (.xlsx) to bulk-mark locations as visited and populate their visit details.
+
+UI
+
+Add an "Import Excel" button in the top navigation/header area, next to any existing controls
+Clicking it opens a native file picker filtered to .xlsx files only
+After a successful import, show a brief success toast: "Imported X locations successfully"
+If there are any unrecognized location names, show a warning: "X locations couldn't be matched — check spelling"
+
+EXPECTED EXCEL FORMAT
+The spreadsheet should have the following columns (row 1 = headers):
+ColumnValuesNameCountry/state/province/stadium name (e.g. "France", "California", "Yankee Stadium")Type"country", "state", "province", or "stadium"Times VisitedNumber 1–10, or "10+"First Year4-digit year (e.g. 2005)Most Recent Year4-digit year (e.g. 2023)
+
+Name matching should be case-insensitive and trim whitespace
+Type column is optional — if omitted, attempt to auto-detect by matching the name across all four categories
+Times Visited, First Year, and Most Recent Year are optional — if blank, mark as visited with no detail data
+
+BEHAVIOR
+
+Parse the Excel file client-side using the SheetJS library (xlsx npm package) — no file should ever be sent to a server
+Match each row's Name to the existing location data across countries, states, provinces, and stadiums
+For each matched location: mark as visited, populate timesVisited/firstYear/lastYear, light it up on the map, and persist to localStorage immediately
+Unmatched rows should be logged and surfaced in the warning message — do not silently drop them
+Import should merge with existing data, not overwrite it — if a location is already visited, update only the fields that are present in the imported row
+
+ALSO: ADD A TEMPLATE DOWNLOAD BUTTON
+
+Next to the Import button, add a "Download Template" button
+Clicking it generates and downloads a pre-formatted Excel file called travel_tracker_template.xlsx with the correct headers and 3 example rows (one country, one state, one stadium) so users know exactly how to format their data

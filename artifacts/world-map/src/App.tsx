@@ -673,6 +673,116 @@ function ExportModal({
   );
 }
 
+// ─── Share helpers ────────────────────────────────────────────────────────────
+
+interface ShareData {
+  vc: string[]; vt: string[]; vs: string[]; vp: string[];
+  bc: string[]; bt: string[]; bs: string[]; bp: string[];
+}
+
+function encodeShareData(data: ShareData): string {
+  const b64 = btoa(JSON.stringify(data));
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+}
+
+function decodeShareData(encoded: string): ShareData | null {
+  try {
+    const b64 = encoded.replace(/-/g, "+").replace(/_/g, "/");
+    const pad = (4 - (b64.length % 4)) % 4;
+    return JSON.parse(atob(b64 + "=".repeat(pad))) as ShareData;
+  } catch { return null; }
+}
+
+function buildShareUrl(data: ShareData): string {
+  return `${window.location.origin}${window.location.pathname}?share=${encodeShareData(data)}`;
+}
+
+function ShareModal({
+  onClose, visitedCountries, visitedStates, visitedProvinces, visitedStadiums,
+  bucketCountries, bucketStates, bucketProvinces, bucketStadiums,
+}: {
+  onClose: () => void;
+  visitedCountries: Set<string>; visitedStates: Set<string>;
+  visitedProvinces: Set<string>; visitedStadiums: Set<string>;
+  bucketCountries: Set<string>; bucketStates: Set<string>;
+  bucketProvinces: Set<string>; bucketStadiums: Set<string>;
+}) {
+  const [copied, setCopied] = useState(false);
+  const data: ShareData = {
+    vc: [...visitedCountries], vt: [...visitedStadiums],
+    vs: [...visitedStates],   vp: [...visitedProvinces],
+    bc: [...bucketCountries], bt: [...bucketStadiums],
+    bs: [...bucketStates],    bp: [...bucketProvinces],
+  };
+  const url = buildShareUrl(data);
+  const totalVisited = visitedCountries.size + visitedStates.size + visitedProvinces.size + visitedStadiums.size;
+  const totalBucket  = bucketCountries.size  + bucketStates.size  + bucketProvinces.size  + bucketStadiums.size;
+
+  function handleCopy() {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+         onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+          <div>
+            <h2 className="text-lg font-bold text-white">Share Your Travel Map</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Anyone with the link sees a read-only snapshot of your map</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors text-xl leading-none">✕</button>
+        </div>
+
+        <div className="px-6 py-5 space-y-5">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-emerald-900/30 border border-emerald-700/40 rounded-xl p-3 text-center">
+              <p className="text-2xl font-bold text-emerald-300">{totalVisited}</p>
+              <p className="text-xs text-slate-400 mt-0.5">Places visited</p>
+            </div>
+            <div className="bg-amber-900/30 border border-amber-700/40 rounded-xl p-3 text-center">
+              <p className="text-2xl font-bold text-amber-300">{totalBucket}</p>
+              <p className="text-xs text-slate-400 mt-0.5">On bucket list</p>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Shareable Link</p>
+            <div className="flex gap-2">
+              <input
+                type="text" value={url} readOnly
+                className="flex-1 min-w-0 px-3 py-2 text-xs bg-slate-800 border border-slate-700 rounded-lg text-slate-300 font-mono"
+                onFocus={e => e.target.select()}
+              />
+              <button
+                onClick={handleCopy}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                  copied ? "bg-emerald-600 text-white" : "bg-blue-600 hover:bg-blue-500 text-white"
+                }`}
+              >
+                {copied ? "✓ Copied!" : "Copy Link"}
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-slate-800/60 rounded-xl p-4 space-y-2.5">
+            <p className="text-xs font-semibold text-slate-300 uppercase tracking-widest mb-1">How to post</p>
+            <p className="text-sm text-slate-400">🐦 <span className="text-slate-300 font-medium">X / Twitter · Facebook · WhatsApp:</span> paste the link directly</p>
+            <p className="text-sm text-slate-400">📸 <span className="text-slate-300 font-medium">Instagram:</span> go to your profile → <span className="text-amber-300">Edit Profile → Add link</span>, or share in a Story using the <span className="text-amber-300">Link sticker</span></p>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-slate-800 flex justify-end">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-white transition-colors">Done</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Excel import / template helpers ─────────────────────────────────────────
 
 interface ImportResult {
@@ -1086,17 +1196,39 @@ export default function App() {
   const [listTab, setListTab] = useState<"countries" | "stadiums" | "us-states" | "ca-provinces" | "bucket-list">("countries");
   const [confirmBucket, setConfirmBucket] = useState<string | null>(null);
   const [showExport, setShowExport] = useState(false);
+  const [showShare, setShowShare] = useState(false);
+  const [sharedData, setSharedData] = useState<ShareData | null>(null);
   const [toast, setToast] = useState<{ message: string; kind: "success" | "warning" } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [visitedCountries, setVisitedCountries] = useLocalStorageSet("wm_visited_countries");
-  const [visitedStadiums, setVisitedStadiums] = useLocalStorageSet("wm_visited_stadiums");
-  const [visitedStates, setVisitedStates] = useLocalStorageSet("wm_visited_states");
-  const [visitedProvinces, setVisitedProvinces] = useLocalStorageSet("wm_visited_provinces");
-  const [bucketCountries, setBucketCountries] = useLocalStorageSet("wm_bucket_countries");
-  const [bucketStadiums, setBucketStadiums] = useLocalStorageSet("wm_bucket_stadiums");
-  const [bucketStates, setBucketStates] = useLocalStorageSet("wm_bucket_states");
-  const [bucketProvinces, setBucketProvinces] = useLocalStorageSet("wm_bucket_provinces");
+  const [rawVisitedCountries, setVisitedCountries] = useLocalStorageSet("wm_visited_countries");
+  const [rawVisitedStadiums, setVisitedStadiums] = useLocalStorageSet("wm_visited_stadiums");
+  const [rawVisitedStates, setVisitedStates] = useLocalStorageSet("wm_visited_states");
+  const [rawVisitedProvinces, setVisitedProvinces] = useLocalStorageSet("wm_visited_provinces");
+  const [rawBucketCountries, setBucketCountries] = useLocalStorageSet("wm_bucket_countries");
+  const [rawBucketStadiums, setBucketStadiums] = useLocalStorageSet("wm_bucket_stadiums");
+  const [rawBucketStates, setBucketStates] = useLocalStorageSet("wm_bucket_states");
+  const [rawBucketProvinces, setBucketProvinces] = useLocalStorageSet("wm_bucket_provinces");
+
+  // Detect ?share= URL param on first load
+  useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get("share");
+    if (param) {
+      const decoded = decodeShareData(param);
+      if (decoded) setSharedData(decoded);
+    }
+  }, []);
+
+  // In read-only (shared) mode, display the shared data instead of own localStorage data
+  const isReadOnly = sharedData !== null;
+  const visitedCountries = isReadOnly ? new Set<string>(sharedData!.vc) : rawVisitedCountries;
+  const visitedStadiums  = isReadOnly ? new Set<string>(sharedData!.vt) : rawVisitedStadiums;
+  const visitedStates    = isReadOnly ? new Set<string>(sharedData!.vs) : rawVisitedStates;
+  const visitedProvinces = isReadOnly ? new Set<string>(sharedData!.vp) : rawVisitedProvinces;
+  const bucketCountries  = isReadOnly ? new Set<string>(sharedData!.bc) : rawBucketCountries;
+  const bucketStadiums   = isReadOnly ? new Set<string>(sharedData!.bt) : rawBucketStadiums;
+  const bucketStates     = isReadOnly ? new Set<string>(sharedData!.bs) : rawBucketStates;
+  const bucketProvinces  = isReadOnly ? new Set<string>(sharedData!.bp) : rawBucketProvinces;
   const [countryDetails, setCountryDetail] = useLocalStorageRecord("wm_details_countries");
   const [stadiumDetails, setStadiumDetail] = useLocalStorageRecord("wm_details_stadiums");
   const [stateDetails, setStateDetail] = useLocalStorageRecord("wm_details_states");
@@ -1341,6 +1473,21 @@ export default function App() {
 
   return (
     <div className="flex flex-col bg-slate-950 text-white">
+      {isReadOnly && (
+        <div className="flex items-center justify-between gap-3 px-6 py-2.5 bg-blue-950/80 border-b border-blue-800/60 text-sm">
+          <div className="flex items-center gap-2 text-blue-200">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 1a6.5 6.5 0 100 13A6.5 6.5 0 007.5 1zM7.5 4.5v4M7.5 10.5h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            <span>You're viewing a <span className="font-semibold">shared travel map</span> — read-only</span>
+          </div>
+          <button
+            onClick={() => { window.location.href = window.location.pathname; }}
+            className="px-3 py-1 rounded-lg bg-blue-700 hover:bg-blue-600 text-white text-xs font-medium transition-colors whitespace-nowrap"
+          >
+            Open My Map →
+          </button>
+        </div>
+      )}
+
       <header className="flex items-center gap-4 px-6 py-4 border-b border-slate-800 bg-slate-900/80 backdrop-blur-sm flex-wrap relative z-10">
         <div className="shrink-0">
           <h1 className="text-2xl font-bold tracking-tight text-white">World Map</h1>
@@ -1352,30 +1499,37 @@ export default function App() {
           <button onClick={() => setZoom(z => Math.max(z / 1.5, 0.5))} className="px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors font-medium">−</button>
           <button onClick={() => { setZoom(1); setCenter([0, 20]); setSelected(null); setSelectedStadium(null); }} className="px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors font-medium">Reset</button>
           <div className="w-px bg-slate-700 self-stretch mx-1" />
+          {!isReadOnly && <>
+            <button
+              onClick={downloadTemplate}
+              className="px-3 py-2 text-sm bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors font-medium text-white flex items-center gap-1.5"
+              title="Download a blank .xlsx template"
+            >
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 9.5v1.5a1 1 0 001 1h8a1 1 0 001-1V9.5M6.5 1v7M3.5 5.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Template
+            </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="px-3 py-2 text-sm bg-emerald-700 hover:bg-emerald-600 rounded-lg transition-colors font-medium text-white flex items-center gap-1.5"
+              title="Import visited locations from an .xlsx file"
+            >
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 9V2M3.5 5l3-3 3 3M1 9.5v1A1.5 1.5 0 002.5 12h8A1.5 1.5 0 0012 10.5v-1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Import Excel
+            </button>
+            <button
+              onClick={() => setShowExport(true)}
+              className="px-3 py-2 text-sm bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors font-medium text-white flex items-center gap-1.5"
+            >
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v7M3.5 5l3 3 3-3M1 9.5v1A1.5 1.5 0 002.5 12h8A1.5 1.5 0 0012 10.5v-1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Export
+            </button>
+          </>}
           <button
-            onClick={downloadTemplate}
-            className="px-3 py-2 text-sm bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors font-medium text-white flex items-center gap-1.5"
-            title="Download a blank .xlsx template"
+            onClick={() => setShowShare(true)}
+            className="px-3 py-2 text-sm bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors font-medium text-white flex items-center gap-1.5"
           >
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 9.5v1.5a1 1 0 001 1h8a1 1 0 001-1V9.5M6.5 1v7M3.5 5.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            Template
-          </button>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="px-3 py-2 text-sm bg-emerald-700 hover:bg-emerald-600 rounded-lg transition-colors font-medium text-white flex items-center gap-1.5"
-            title="Import visited locations from an .xlsx file"
-          >
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 9V2M3.5 5l3-3 3 3M1 9.5v1A1.5 1.5 0 002.5 12h8A1.5 1.5 0 0012 10.5v-1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            Import Excel
-          </button>
-          <button
-            onClick={() => setShowExport(true)}
-            className="px-3 py-2 text-sm bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors font-medium text-white flex items-center gap-1.5"
-          >
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M6.5 1v7M3.5 5l3 3 3-3M1 9.5v1A1.5 1.5 0 002.5 12h8A1.5 1.5 0 0012 10.5v-1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Export
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="10.5" cy="2.5" r="1.5" stroke="currentColor" strokeWidth="1.3"/><circle cx="10.5" cy="10.5" r="1.5" stroke="currentColor" strokeWidth="1.3"/><circle cx="2.5" cy="6.5" r="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M4 6l5-3M4 7l5 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+            Share
           </button>
         </div>
       </header>
@@ -1596,7 +1750,7 @@ export default function App() {
                 </div>
               </div>
 
-              {(() => {
+              {!isReadOnly && (() => {
                 const team = selectedStadium.team;
                 const isVisited = visitedStadiums.has(team);
                 const isBucketList = !isVisited && bucketStadiums.has(team);
@@ -1724,7 +1878,7 @@ export default function App() {
                 )}
               </div>
 
-              {(() => {
+              {!isReadOnly && (() => {
                 const rawId = selected.key.replace(/^(country|state|province)-/, "");
                 const isCountry = selected.key.startsWith("country-");
                 const isState = selected.key.startsWith("state-");
@@ -1934,12 +2088,12 @@ export default function App() {
                         : "bg-slate-800/40 hover:bg-slate-700/60 border border-transparent"
                     }`}
                   >
-                    <input
+                    {!isReadOnly && <input
                       type="checkbox"
                       checked={isVisited}
                       onChange={() => toggleCountryVisited(country.id)}
                       className="w-3.5 h-3.5 flex-shrink-0 accent-emerald-500 cursor-pointer"
-                    />
+                    />}
                     <button
                       onClick={() => {
                         setSelectedStadium(null);
@@ -1953,11 +2107,11 @@ export default function App() {
                     >
                       {country.name}
                     </button>
-                    <button
+                    {!isReadOnly && <button
                       onClick={(e) => { e.stopPropagation(); toggleCountryBucket(country.id, isVisited); }}
                       className={`flex-shrink-0 text-sm leading-none transition-colors ${isBucket ? "text-amber-400 hover:text-slate-400" : "text-slate-600 hover:text-amber-400"}`}
                       title={isBucket ? "Remove from bucket list" : "Add to bucket list"}
-                    >★</button>
+                    >★</button>}
                   </div>
                 );
               })}
@@ -1986,12 +2140,12 @@ export default function App() {
                         : "bg-slate-800/40 hover:bg-slate-700/60 border border-transparent"
                     }`}
                   >
-                    <input
+                    {!isReadOnly && <input
                       type="checkbox"
                       checked={isVisited}
                       onChange={() => toggleStateVisited(state.fips)}
                       className="w-3.5 h-3.5 flex-shrink-0 accent-red-500 cursor-pointer"
-                    />
+                    />}
                     <button
                       onClick={() => {
                         setSelectedStadium(null);
@@ -2005,11 +2159,11 @@ export default function App() {
                     >
                       {state.name}
                     </button>
-                    <button
+                    {!isReadOnly && <button
                       onClick={(e) => { e.stopPropagation(); toggleStateBucket(state.fips, isVisited); }}
                       className={`flex-shrink-0 text-sm leading-none transition-colors ${isBucket ? "text-amber-400 hover:text-slate-400" : "text-slate-600 hover:text-amber-400"}`}
                       title={isBucket ? "Remove from bucket list" : "Add to bucket list"}
-                    >★</button>
+                    >★</button>}
                   </div>
                 );
               })}
@@ -2038,12 +2192,12 @@ export default function App() {
                         : "bg-slate-800/40 hover:bg-slate-700/60 border border-transparent"
                     }`}
                   >
-                    <input
+                    {!isReadOnly && <input
                       type="checkbox"
                       checked={isVisited}
                       onChange={() => toggleProvinceVisited(province.key)}
                       className="w-3.5 h-3.5 flex-shrink-0 accent-orange-500 cursor-pointer"
-                    />
+                    />}
                     <button
                       onClick={() => {
                         setSelectedStadium(null);
@@ -2057,11 +2211,11 @@ export default function App() {
                     >
                       {province.name}
                     </button>
-                    <button
+                    {!isReadOnly && <button
                       onClick={(e) => { e.stopPropagation(); toggleProvinceBucket(province.key, isVisited); }}
                       className={`flex-shrink-0 text-sm leading-none transition-colors ${isBucket ? "text-amber-400 hover:text-slate-400" : "text-slate-600 hover:text-amber-400"}`}
                       title={isBucket ? "Remove from bucket list" : "Add to bucket list"}
-                    >★</button>
+                    >★</button>}
                   </div>
                 );
               })}
@@ -2090,12 +2244,12 @@ export default function App() {
                         : "bg-slate-800/40 hover:bg-slate-700/60 border border-transparent"
                     }`}
                   >
-                    <input
+                    {!isReadOnly && <input
                       type="checkbox"
                       checked={isVisited}
                       onChange={() => toggleStadiumVisited(stadium.team)}
                       className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 accent-blue-500 cursor-pointer"
-                    />
+                    />}
                     <button
                       onClick={() => {
                         setSelected(null);
@@ -2108,11 +2262,11 @@ export default function App() {
                       <p className={`font-medium truncate ${isActive ? "text-yellow-300" : isVisited ? "text-blue-300" : isBucket ? "text-amber-300" : "text-slate-300 hover:text-white"}`}>{stadium.team}</p>
                       <p className="text-xs text-slate-400 truncate mt-0.5">{stadium.stadium}</p>
                     </button>
-                    <button
+                    {!isReadOnly && <button
                       onClick={(e) => { e.stopPropagation(); toggleStadiumBucket(stadium.team, isVisited); }}
                       className={`flex-shrink-0 text-sm leading-none transition-colors mt-0.5 ${isBucket ? "text-amber-400 hover:text-slate-400" : "text-slate-600 hover:text-amber-400"}`}
                       title={isBucket ? "Remove from bucket list" : "Add to bucket list"}
-                    >★</button>
+                    >★</button>}
                   </div>
                 );
               })}
@@ -2162,7 +2316,7 @@ export default function App() {
                       <p className="font-medium truncate text-amber-300 hover:text-amber-200">{item.name}</p>
                       {item.sub && <p className="text-xs text-slate-400 truncate mt-0.5">{item.sub}</p>}
                     </button>
-                    <button
+                    {!isReadOnly && <button
                       onClick={() => {
                         if (item.cat === "country") toggleCountryBucket(item.id, false);
                         else if (item.cat === "state") toggleStateBucket(item.id, false);
@@ -2171,7 +2325,7 @@ export default function App() {
                       }}
                       className="text-amber-500 hover:text-slate-400 shrink-0 text-sm leading-none mt-0.5"
                       title="Remove from bucket list"
-                    >★</button>
+                    >★</button>}
                   </div>
                 ))}
               </div>
@@ -2191,6 +2345,20 @@ export default function App() {
           stateDetails={stateDetails}
           provinceDetails={provinceDetails}
           stadiumDetails={stadiumDetails}
+        />
+      )}
+
+      {showShare && (
+        <ShareModal
+          onClose={() => setShowShare(false)}
+          visitedCountries={isReadOnly ? visitedCountries : rawVisitedCountries}
+          visitedStates={isReadOnly ? visitedStates : rawVisitedStates}
+          visitedProvinces={isReadOnly ? visitedProvinces : rawVisitedProvinces}
+          visitedStadiums={isReadOnly ? visitedStadiums : rawVisitedStadiums}
+          bucketCountries={isReadOnly ? bucketCountries : rawBucketCountries}
+          bucketStates={isReadOnly ? bucketStates : rawBucketStates}
+          bucketProvinces={isReadOnly ? bucketProvinces : rawBucketProvinces}
+          bucketStadiums={isReadOnly ? bucketStadiums : rawBucketStadiums}
         />
       )}
 

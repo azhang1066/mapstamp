@@ -2277,32 +2277,47 @@ export default function App() {
               <div className="mb-6">
                 <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Legend</h3>
                 <div className="space-y-2">
-                  {[
-                    { label: "Africa", color: "#f59e0b" },
-                    { label: "Asia", color: "#10b981" },
-                    { label: "Europe", color: "#3b82f6" },
-                    { label: "North America", color: "#ef4444" },
-                    { label: "South America", color: "#8b5cf6" },
-                    { label: "Oceania", color: "#06b6d4" },
-                    { label: "U.S. States", color: US_STATE_COLOR },
-                    { label: "Canadian Provinces", color: CA_PROVINCE_COLOR },
-                  ].map(({ label, color }) => (
-                    <div key={label} className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                      <span className="text-sm text-slate-300">{label}</span>
-                    </div>
-                  ))}
+                  {([
+                    { label: "Africa", color: "#f59e0b", continent: "Africa" },
+                    { label: "Asia", color: "#10b981", continent: "Asia" },
+                    { label: "Europe", color: "#3b82f6", continent: "Europe" },
+                    { label: "North America", color: "#ef4444", continent: "North America" },
+                    { label: "South America", color: "#8b5cf6", continent: "South America" },
+                    { label: "Oceania", color: "#06b6d4", continent: "Oceania" },
+                  ]).map(({ label, color, continent }) => {
+                    const totalInContinent = sortedCountries.filter(c => c.continent === continent).length;
+                    const visitedInContinent = sortedCountries.filter(c => c.continent === continent && visitedCountries.has(c.id)).length;
+                    return (
+                      <div key={label} className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                        <span className="text-sm text-slate-300 flex-1">{label}</span>
+                        <span className="text-xs font-mono text-slate-500">{visitedInContinent}/{totalInContinent}</span>
+                      </div>
+                    );
+                  })}
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: US_STATE_COLOR }} />
+                    <span className="text-sm text-slate-300 flex-1">U.S. States</span>
+                    <span className="text-xs font-mono text-slate-500">{visitedStates.size}/{sortedStates.length}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: CA_PROVINCE_COLOR }} />
+                    <span className="text-sm text-slate-300 flex-1">Canadian Provinces</span>
+                    <span className="text-xs font-mono text-slate-500">{visitedProvinces.size}/{sortedProvinces.length}</span>
+                  </div>
                   <div className="flex items-center gap-2">
                     <svg width="14" height="14" viewBox="-2 -14 14 14" fill="none" className="flex-shrink-0">
                       <line x1="0" y1="0" x2="0" y2="-12" stroke="#93c5fd" strokeWidth="1.5"/>
                       <polygon points="0,-12 8,-9 0,-6" fill="#2563eb"/>
                       <circle cy="0" r="2.5" fill="#1d4ed8"/>
                     </svg>
-                    <span className="text-sm text-slate-300">MLB Stadium</span>
+                    <span className="text-sm text-slate-300 flex-1">MLB Stadium</span>
+                    <span className="text-xs font-mono text-slate-500">{visitedStadiums.size}/{sortedStadiums.length}</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 pt-2 mt-2 border-t border-slate-800">
                     <div className="w-3 h-3 rounded-sm flex-shrink-0 border-2" style={{ backgroundColor: BUCKET_LIST_COLOR, borderColor: BUCKET_LIST_STROKE, borderStyle: "dashed" }} />
-                    <span className="text-sm text-slate-300">Bucket List</span>
+                    <span className="text-sm text-slate-300 flex-1">Bucket List</span>
+                    <span className="text-xs font-mono text-slate-500">{bucketCountries.size + bucketStates.size + bucketProvinces.size + bucketStadiums.size}</span>
                   </div>
                 </div>
               </div>

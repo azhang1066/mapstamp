@@ -504,12 +504,349 @@ function getProvinceFill(isSelected: boolean, isHovered: boolean, isVisited: boo
   return isHovered ? "#3d4a5c" : "#253040";
 }
 
+// ─── Photos ──────────────────────────────────────────────────────────────────
+
+type PhotoCategory = "country" | "state" | "province" | "stadium" | "tcc";
+
+interface VisitPhoto {
+  id: string;
+  base64: string;
+  caption: string;
+  uploadedAt: number;
+}
+
+const photoKey = (cat: PhotoCategory, id: string) => `photos:${cat}:${id}`;
+const MAX_PHOTOS_PER_DEST = 3;
+const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+const ACCEPTED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const STORAGE_WARN_BYTES = 4 * 1024 * 1024; // ~4MB → near typical 5MB origin quota
+
+function loadPhotos(cat: PhotoCategory, id: string): VisitPhoto[] {
+  try {
+    const raw = localStorage.getItem(photoKey(cat, id));
+    return raw ? (JSON.parse(raw) as VisitPhoto[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePhotos(cat: PhotoCategory, id: string, photos: VisitPhoto[]): { ok: boolean; warning?: string; error?: string } {
+  try {
+    if (photos.length === 0) localStorage.removeItem(photoKey(cat, id));
+    else localStorage.setItem(photoKey(cat, id), JSON.stringify(photos));
+  } catch {
+    return { ok: false, error: "Storage is full — couldn't save photo. Try removing existing photos." };
+  }
+  let total = 0;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      const v = localStorage.getItem(k) ?? "";
+      total += k.length + v.length;
+    }
+  } catch { /* ignore */ }
+  return { ok: true, warning: total > STORAGE_WARN_BYTES ? "Storage nearly full — consider removing some photos" : undefined };
+}
+
+async function resizeImageToBase64(file: File): Promise<string> {
+  const dataUrl: string = await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = () => reject(new Error("read failed"));
+    r.readAsDataURL(file);
+  });
+  const img: HTMLImageElement = await new Promise((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = () => reject(new Error("decode failed"));
+    i.src = dataUrl;
+  });
+  const MAX = 1200;
+  let w = img.width, h = img.height;
+  if (w >= h && w > MAX) { h = Math.round((h * MAX) / w); w = MAX; }
+  else if (h > w && h > MAX) { w = Math.round((w * MAX) / h); h = MAX; }
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("canvas context unavailable");
+  ctx.drawImage(img, 0, 0, w, h);
+  return canvas.toDataURL("image/jpeg", 0.8);
+}
+
+function usePhotos(category: PhotoCategory, locationId: string) {
+  const [photos, setPhotos] = useState<VisitPhoto[]>(() => loadPhotos(category, locationId));
+  useEffect(() => {
+    setPhotos(loadPhotos(category, locationId));
+  }, [category, locationId]);
+  const update = useCallback((next: VisitPhoto[]): { ok: boolean; warning?: string; error?: string } => {
+    const result = savePhotos(category, locationId, next);
+    if (result.ok) setPhotos(next);
+    return result;
+  }, [category, locationId]);
+  return { photos, update };
+}
+
+function PhotoLightbox({
+  photos, index, onClose, onPrev, onNext, onCaptionChange, isReadOnly,
+}: {
+  photos: VisitPhoto[];
+  index: number;
+  onClose: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+  onCaptionChange: (id: string, caption: string) => void;
+  isReadOnly: boolean;
+}) {
+  const photo = photos[index];
+  const [draftCaption, setDraftCaption] = useState(photo?.caption ?? "");
+  const draftRef = useRef(draftCaption);
+  draftRef.current = draftCaption;
+  useEffect(() => { setDraftCaption(photo?.caption ?? ""); }, [photo?.id, photo?.caption]);
+  const flushCaption = useCallback(() => {
+    if (!photo) return;
+    if (draftRef.current !== photo.caption) onCaptionChange(photo.id, draftRef.current);
+  }, [photo, onCaptionChange]);
+  const closeWithFlush = useCallback(() => { flushCaption(); onClose(); }, [flushCaption, onClose]);
+  const prevWithFlush = useCallback(() => { flushCaption(); onPrev(); }, [flushCaption, onPrev]);
+  const nextWithFlush = useCallback(() => { flushCaption(); onNext(); }, [flushCaption, onNext]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeWithFlush();
+      else if (e.key === "ArrowLeft" && photos.length > 1) prevWithFlush();
+      else if (e.key === "ArrowRight" && photos.length > 1) nextWithFlush();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [closeWithFlush, prevWithFlush, nextWithFlush, photos.length]);
+  if (!photo) return null;
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-md flex items-center justify-center p-6"
+         onClick={(e) => { if (e.target === e.currentTarget) closeWithFlush(); }}>
+      <button
+        onClick={closeWithFlush}
+        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-slate-800/80 hover:bg-slate-700 text-white text-xl flex items-center justify-center transition-colors"
+        aria-label="Close lightbox"
+      >✕</button>
+      {photos.length > 1 && (
+        <>
+          <button onClick={prevWithFlush} className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-slate-800/80 hover:bg-slate-700 text-white text-2xl flex items-center justify-center" aria-label="Previous">‹</button>
+          <button onClick={nextWithFlush} className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-slate-800/80 hover:bg-slate-700 text-white text-2xl flex items-center justify-center" aria-label="Next">›</button>
+        </>
+      )}
+      <div className="flex flex-col items-center max-w-full max-h-full gap-4">
+        <div className="bg-black rounded-lg overflow-hidden flex items-center justify-center"
+             style={{ width: "min(800px, 90vw)", height: "min(600px, 65vh)" }}>
+          <img src={photo.base64} alt={photo.caption || "Visit photo"} className="max-w-full max-h-full object-contain" />
+        </div>
+        <div className="w-full max-w-[800px]">
+          {isReadOnly ? (
+            photo.caption ? <p className="text-sm text-slate-200 text-center">{photo.caption}</p> : null
+          ) : (
+            <input
+              type="text"
+              maxLength={120}
+              placeholder="Add a caption…"
+              value={draftCaption}
+              onChange={(e) => setDraftCaption(e.target.value)}
+              onBlur={() => { if (draftCaption !== photo.caption) onCaptionChange(photo.id, draftCaption); }}
+              className="w-full bg-slate-800/80 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          )}
+          {photos.length > 1 && (
+            <p className="text-xs text-slate-500 text-center mt-2">{index + 1} / {photos.length}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PhotoGrid({ category, locationId, isReadOnly }: { category: PhotoCategory; locationId: string; isReadOnly: boolean }) {
+  const { photos, update } = usePhotos(category, locationId);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const flashError = (m: string) => { setError(m); setTimeout(() => setError(null), 4000); };
+  const flashWarning = (m: string) => { setWarning(m); setTimeout(() => setWarning(null), 5000); };
+
+  const onPickFile = async (file: File | undefined) => {
+    if (!file) return;
+    setError(null);
+    if (!ACCEPTED_PHOTO_TYPES.includes(file.type)) {
+      flashError("Only JPEG, PNG, and WebP images are supported");
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      flashError(`File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max 5MB.`);
+      return;
+    }
+    if (photos.length >= MAX_PHOTOS_PER_DEST) {
+      flashError(`Up to ${MAX_PHOTOS_PER_DEST} photos per destination`);
+      return;
+    }
+    setUploading(true);
+    try {
+      const base64 = await resizeImageToBase64(file);
+      const newPhoto: VisitPhoto = {
+        id: `p${Date.now()}${Math.random().toString(36).slice(2, 7)}`,
+        base64,
+        caption: "",
+        uploadedAt: Date.now(),
+      };
+      const next = [...photos, newPhoto];
+      const result = update(next);
+      if (!result.ok) flashError(result.error ?? "Failed to save photo");
+      else if (result.warning) flashWarning(result.warning);
+    } catch {
+      flashError("Couldn't process that image");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = (id: string) => {
+    const next = photos.filter(p => p.id !== id);
+    const result = update(next);
+    if (!result.ok) flashError(result.error ?? "Failed to remove photo");
+    if (lightboxIndex !== null && lightboxIndex >= next.length) {
+      setLightboxIndex(next.length === 0 ? null : next.length - 1);
+    }
+  };
+
+  const handleEditCaption = (id: string) => {
+    const photo = photos.find(p => p.id === id);
+    if (!photo) return;
+    const updated = window.prompt("Caption (max 120 chars):", photo.caption);
+    if (updated === null) return;
+    handleCaptionChange(id, updated.slice(0, 120));
+  };
+
+  const handleCaptionChange = (id: string, caption: string) => {
+    const next = photos.map(p => p.id === id ? { ...p, caption: caption.slice(0, 120) } : p);
+    const result = update(next);
+    if (!result.ok) flashError(result.error ?? "Failed to save caption");
+  };
+
+  const slots: (VisitPhoto | null)[] = [];
+  for (let i = 0; i < MAX_PHOTOS_PER_DEST; i++) slots.push(photos[i] ?? null);
+
+  return (
+    <div className="mt-5 pt-5 border-t border-slate-800">
+      <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Photos</p>
+      <div className="grid grid-cols-3 gap-2">
+        {slots.map((photo, idx) => {
+          if (photo) {
+            return (
+              <div key={photo.id} className="group relative">
+                <button
+                  type="button"
+                  onClick={() => setLightboxIndex(idx)}
+                  className="block w-full aspect-square rounded-lg overflow-hidden bg-slate-800 border border-slate-700 hover:border-slate-500 transition-colors"
+                  style={{ width: "120px", height: "120px" }}
+                >
+                  <img src={photo.base64} alt={photo.caption || "Visit photo"} className="w-full h-full object-cover" />
+                </button>
+                {!isReadOnly && (
+                  <div className="absolute inset-0 rounded-lg bg-black/0 group-hover:bg-black/50 transition-colors pointer-events-none flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100"
+                       style={{ width: "120px", height: "120px" }}>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleEditCaption(photo.id); }}
+                      className="w-8 h-8 rounded-full bg-slate-900/90 hover:bg-slate-700 text-white text-sm flex items-center justify-center pointer-events-auto"
+                      title="Edit caption"
+                    >✏️</button>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleDelete(photo.id); }}
+                      className="w-8 h-8 rounded-full bg-red-700/90 hover:bg-red-600 text-white text-sm flex items-center justify-center pointer-events-auto"
+                      title="Delete photo"
+                    >🗑</button>
+                  </div>
+                )}
+                {photo.caption && (
+                  <p className="mt-1 text-[10px] text-slate-400 truncate" style={{ width: "120px" }} title={photo.caption}>{photo.caption}</p>
+                )}
+              </div>
+            );
+          }
+          if (isReadOnly) {
+            return (
+              <div key={`empty-${idx}`} className="rounded-lg border border-dashed border-slate-800 bg-slate-900/40"
+                   style={{ width: "120px", height: "120px" }} />
+            );
+          }
+          return (
+            <button
+              key={`add-${idx}`}
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="rounded-lg border-2 border-dashed border-slate-700 hover:border-slate-500 hover:bg-slate-800/40 text-slate-500 hover:text-slate-300 transition-colors flex flex-col items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-wait"
+              style={{ width: "120px", height: "120px" }}
+            >
+              {uploading && idx === photos.length ? (
+                <>
+                  <span className="text-2xl animate-spin">⏳</span>
+                  <span className="text-[10px]">Uploading…</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-2xl">📷</span>
+                  <span className="text-[10px]">+ Add Photo</span>
+                </>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      {!isReadOnly && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            onPickFile(file);
+            e.target.value = "";
+          }}
+        />
+      )}
+      {error && (
+        <p className="mt-2 text-xs text-red-400 bg-red-950/40 border border-red-900/50 rounded-md px-2 py-1.5">{error}</p>
+      )}
+      {warning && (
+        <p className="mt-2 text-xs text-amber-300 bg-amber-950/40 border border-amber-900/50 rounded-md px-2 py-1.5">⚠ {warning}</p>
+      )}
+      {lightboxIndex !== null && photos[lightboxIndex] && (
+        <PhotoLightbox
+          photos={photos}
+          index={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onPrev={() => setLightboxIndex((i) => (i === null ? null : (i - 1 + photos.length) % photos.length))}
+          onNext={() => setLightboxIndex((i) => (i === null ? null : (i + 1) % photos.length))}
+          onCaptionChange={handleCaptionChange}
+          isReadOnly={isReadOnly}
+        />
+      )}
+    </div>
+  );
+}
+
 function VisitDetailsPanel({
   locationId,
+  category,
+  isReadOnly,
   details,
   onUpdate,
 }: {
   locationId: string;
+  category: PhotoCategory;
+  isReadOnly: boolean;
   details: VisitDetails | undefined;
   onUpdate: (id: string, patch: VisitDetails) => void;
 }) {
@@ -563,6 +900,7 @@ function VisitDetailsPanel({
           </p>
         )}
       </div>
+      <PhotoGrid category={category} locationId={locationId} isReadOnly={isReadOnly} />
     </div>
   );
 }
@@ -809,6 +1147,8 @@ function ShareModal({
               </button>
             </div>
           </div>
+
+          <p className="text-xs text-slate-500 italic">📷 Photos are not included in shared links</p>
 
           <div className="bg-slate-800/60 rounded-xl p-4 space-y-2.5">
             <p className="text-xs font-semibold text-slate-300 uppercase tracking-widest mb-1">How to post</p>
@@ -2573,7 +2913,7 @@ export default function App() {
                             </div>
                           </div>
                         )}
-                        {isVisited && <VisitDetailsPanel locationId={selectedTcc.name} details={tccDetails[selectedTcc.name]} onUpdate={setTccDetail} />}
+                        {isVisited && <VisitDetailsPanel locationId={selectedTcc.name} category="tcc" isReadOnly={isReadOnly} details={tccDetails[selectedTcc.name]} onUpdate={setTccDetail} />}
                       </>
                     )}
                   </>
@@ -2656,7 +2996,7 @@ export default function App() {
                         </div>
                       </div>
                     )}
-                    {isVisited && <VisitDetailsPanel locationId={team} details={stadiumDetails[team]} onUpdate={setStadiumDetail} />}
+                    {isVisited && <VisitDetailsPanel locationId={team} category="stadium" isReadOnly={isReadOnly} details={stadiumDetails[team]} onUpdate={setStadiumDetail} />}
                   </>
                 );
               })()}
@@ -2805,7 +3145,7 @@ export default function App() {
                         </div>
                       </div>
                     )}
-                    {isVisited && <VisitDetailsPanel locationId={rawId} details={details} onUpdate={setter} />}
+                    {isVisited && <VisitDetailsPanel locationId={rawId} category={isCountry ? "country" : isState ? "state" : "province"} isReadOnly={isReadOnly} details={details} onUpdate={setter} />}
                   </>
                 );
               })()}

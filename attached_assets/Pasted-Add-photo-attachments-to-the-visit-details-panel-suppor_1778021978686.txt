@@ -1,0 +1,53 @@
+Add photo attachments to the visit details panel, supporting up to 3 photos per destination.
+
+Photo Storage
+
+Store photos as base64 strings in localStorage, namespaced by destination ID (e.g. photos:country:FR, photos:state:CA, photos:stadium:NYY)
+Each destination stores an array of up to 3 photo objects: { id, base64, caption, uploadedAt }
+If localStorage is getting large, warn the user gracefully ("Storage nearly full — consider removing some photos") but never silently fail
+
+
+UI — Photo Grid in Visit Details Panel
+
+Below the existing dates/notes fields in the visit details panel, add a Photos section
+Display uploaded photos in a 3-column thumbnail grid, each thumbnail square-cropped at a fixed size of 120×120px
+Each thumbnail shows a subtle hover overlay with two icon buttons: ✏️ Edit caption and 🗑 Delete
+If fewer than 3 photos are uploaded, show an "+ Add Photo" placeholder tile in the remaining slot(s) — dashed border, camera icon, muted text
+Clicking a placeholder or a thumbnail opens a lightbox modal (full-screen overlay) with:
+
+The full image displayed centered, max 800×600px, letterboxed if needed
+An editable caption field below the image (inline, saves on blur)
+Prev / Next arrows if multiple photos exist
+A close (✕) button in the top-right corner
+
+
+
+
+Upload behavior
+
+Clicking an "Add Photo" tile triggers a native file input (accept="image/*")
+On file select, resize/compress the image client-side to a max of 1200px on the longest side and quality 0.8 JPEG before converting to base64 — use a canvas element, no extra library needed
+Show a brief uploading... spinner on the tile while processing
+Reject files over 5MB original size with a friendly inline error toast
+Only JPEG, PNG, and WebP are accepted — reject others with an inline error
+
+
+Caption behavior
+
+Each photo has an optional caption (max 120 characters)
+Captions render as a single truncated line beneath each thumbnail in the grid
+Full caption is shown in the lightbox
+
+
+Read-only / Share URL mode
+
+When the app is in read-only mode (viewing a shared URL), the photo grid is visible but all add/edit/delete controls are hidden
+Photos must be included in the Share URL compression if feasible — if base64 makes the URL too large, gracefully omit photos from the share payload and show a small note: "📷 Photos are not included in shared links"
+
+
+Scope & Constraints
+
+Pure frontend — no backend, no cloud storage, no new image libraries
+Canvas-based resize must happen before base64 storage to keep localStorage lean
+The feature must work for all destination types: countries, states, provinces, stadiums, and TCC territories
+Fully reactive — adding or deleting a photo updates the grid instantly without a page reload

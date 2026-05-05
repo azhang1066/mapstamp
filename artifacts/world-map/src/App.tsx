@@ -1237,44 +1237,45 @@ export default function App() {
     const code = geo.id;
     const info = COUNTRY_DATA[code];
     setSelectedStadium(null);
-    if (info) {
-      setVisitedCountries(prev => { const n = new Set(prev); n.add(code); return n; });
-      setSelected({ key: `country-${code}`, info });
-    } else setSelected(null);
+    setConfirmBucket(null);
+    if (!info) { setSelected(null); return; }
+    const key = `country-${code}`;
+    setSelected(prev => prev?.key === key ? null : { key, info });
   }, []);
 
   const handleStateClick = useCallback((geo: { id: string }) => {
     const fips = String(geo.id).padStart(2, "0");
     const info = US_STATE_DATA[fips];
     setSelectedStadium(null);
-    if (info) {
-      setVisitedStates(prev => { const n = new Set(prev); n.add(fips); return n; });
-      setSelected({ key: `state-${fips}`, info });
-    }
+    setConfirmBucket(null);
+    if (!info) return;
+    const key = `state-${fips}`;
+    setSelected(prev => prev?.key === key ? null : { key, info });
   }, []);
 
   const handleProvinceClick = useCallback((geo: { properties: Record<string, string> }) => {
     const name = geo.properties.name || geo.properties.NAME_1 || geo.properties.NAME;
     const info = CA_PROVINCE_DATA[name];
     setSelectedStadium(null);
-    if (info) {
-      setVisitedProvinces(prev => { const n = new Set(prev); n.add(name); return n; });
-      setSelected({ key: `province-${name}`, info });
-    }
+    setConfirmBucket(null);
+    if (!info) return;
+    const key = `province-${name}`;
+    setSelected(prev => prev?.key === key ? null : { key, info });
   }, []);
 
   const handleStadiumClick = useCallback((stadium: StadiumInfo) => {
     setSelected(null);
-    setVisitedStadiums(prev => { const n = new Set(prev); n.add(stadium.team); return n; });
-    setSelectedStadium(stadium);
+    setConfirmBucket(null);
+    setSelectedStadium(prev => prev?.team === stadium.team ? null : stadium);
   }, []);
 
   const handleMicrostateClick = useCallback((id: string) => {
     const info = COUNTRY_DATA[id];
     if (!info) return;
     setSelectedStadium(null);
-    setVisitedCountries(prev => { const n = new Set(prev); n.add(id); return n; });
-    setSelected({ key: `country-${id}`, info });
+    setConfirmBucket(null);
+    const key = `country-${id}`;
+    setSelected(prev => prev?.key === key ? null : { key, info });
   }, []);
 
   const handleSearchSelect = useCallback((item: SearchItem) => {
@@ -1942,8 +1943,9 @@ export default function App() {
                     <button
                       onClick={() => {
                         setSelectedStadium(null);
-                        setVisitedCountries(prev => { const n = new Set(prev); n.add(country.id); return n; });
-                        setSelected({ key: `country-${country.id}`, info: country });
+                        setConfirmBucket(null);
+                        const key = `country-${country.id}`;
+                        setSelected(prev => prev?.key === key ? null : { key, info: country });
                         window.scrollTo({ top: 0, behavior: "smooth" });
                       }}
                       className={`text-left truncate flex-1 min-w-0 ${isActive ? "text-yellow-300" : isVisited ? "text-emerald-300" : isBucket ? "text-amber-300" : "text-slate-300 hover:text-white"}`}
@@ -1993,8 +1995,9 @@ export default function App() {
                     <button
                       onClick={() => {
                         setSelectedStadium(null);
-                        setVisitedStates(prev => { const n = new Set(prev); n.add(state.fips); return n; });
-                        setSelected({ key: `state-${state.fips}`, info: state });
+                        setConfirmBucket(null);
+                        const key = `state-${state.fips}`;
+                        setSelected(prev => prev?.key === key ? null : { key, info: state });
                         window.scrollTo({ top: 0, behavior: "smooth" });
                       }}
                       className={`text-left truncate flex-1 min-w-0 ${isActive ? "text-yellow-300" : isVisited ? "text-red-300" : isBucket ? "text-amber-300" : "text-slate-300 hover:text-white"}`}
@@ -2044,8 +2047,9 @@ export default function App() {
                     <button
                       onClick={() => {
                         setSelectedStadium(null);
-                        setVisitedProvinces(prev => { const n = new Set(prev); n.add(province.key); return n; });
-                        setSelected({ key: `province-${province.key}`, info: province });
+                        setConfirmBucket(null);
+                        const key = `province-${province.key}`;
+                        setSelected(prev => prev?.key === key ? null : { key, info: province });
                         window.scrollTo({ top: 0, behavior: "smooth" });
                       }}
                       className={`text-left truncate flex-1 min-w-0 ${isActive ? "text-yellow-300" : isVisited ? "text-orange-300" : isBucket ? "text-amber-300" : "text-slate-300 hover:text-white"}`}
@@ -2095,8 +2099,8 @@ export default function App() {
                     <button
                       onClick={() => {
                         setSelected(null);
-                        setVisitedStadiums(prev => { const n = new Set(prev); n.add(stadium.team); return n; });
-                        setSelectedStadium(stadium);
+                        setConfirmBucket(null);
+                        setSelectedStadium(prev => prev?.team === stadium.team ? null : stadium);
                         window.scrollTo({ top: 0, behavior: "smooth" });
                       }}
                       className="text-left flex-1 min-w-0"

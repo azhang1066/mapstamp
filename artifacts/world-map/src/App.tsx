@@ -46,6 +46,31 @@ interface VisitDetails {
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS: number[] = Array.from({ length: CURRENT_YEAR - 1950 + 1 }, (_, i) => CURRENT_YEAR - i);
 
+interface YearFilterState {
+  enabled: boolean;
+  mode: "range" | "snapshot";
+  min: number;
+  max: number;
+  snapshot: number;
+}
+
+function detailYearRange(d: VisitDetails | undefined): { min?: number; max?: number } {
+  if (!d) return {};
+  const f = d.firstYear, l = d.lastYear;
+  if (f && l) return { min: Math.min(f, l), max: Math.max(f, l) };
+  if (f) return { min: f, max: f };
+  if (l) return { min: l, max: l };
+  return {};
+}
+
+function detailMatchesFilter(d: VisitDetails | undefined, f: YearFilterState): boolean {
+  if (!f.enabled) return true;
+  const { min, max } = detailYearRange(d);
+  if (min === undefined || max === undefined) return true;
+  if (f.mode === "snapshot") return min <= f.snapshot;
+  return max >= f.min && min <= f.max;
+}
+
 function useLocalStorageRecord(key: string): [Record<string, VisitDetails>, (id: string, details: VisitDetails | null) => void] {
   const [value, setValue] = useState<Record<string, VisitDetails>>(() => {
     try {
@@ -1228,6 +1253,24 @@ export default function App() {
   const [rawTccVisited, setTccVisited] = useLocalStorageSet("wm_tcc_visited");
   const [rawTccBucket,  setTccBucket]  = useLocalStorageSet("wm_tcc_bucket");
 
+  // Year filter state (persisted)
+  const [yearFilter, setYearFilterRaw] = useState<YearFilterState>(() => {
+    try {
+      const v = localStorage.getItem("wm_year_filter");
+      if (v) return JSON.parse(v) as YearFilterState;
+    } catch { /* ignore */ }
+    return { enabled: false, mode: "range", min: CURRENT_YEAR - 10, max: CURRENT_YEAR, snapshot: CURRENT_YEAR };
+  });
+  const setYearFilter = useCallback((updater: YearFilterState | ((p: YearFilterState) => YearFilterState)) => {
+    setYearFilterRaw(prev => {
+      const next = typeof updater === "function" ? (updater as (p: YearFilterState) => YearFilterState)(prev) : updater;
+      try { localStorage.setItem("wm_year_filter", JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+  const [filterExpanded, setFilterExpanded] = useState(false);
+  const [filterPlaying, setFilterPlaying] = useState(false);
+
   // Map mode: "world" (countries / states / stadiums) or "tcc" (TCC list)
   const [mapMode, setMapModeRaw] = useState<MapMode>(() => {
     try {
@@ -1251,21 +1294,74 @@ export default function App() {
 
   // In read-only (shared) mode, display the shared data instead of own localStorage data
   const isReadOnly = sharedData !== null;
-  const visitedCountries = isReadOnly ? new Set<string>(sharedData!.vc) : rawVisitedCountries;
-  const visitedStadiums  = isReadOnly ? new Set<string>(sharedData!.vt) : rawVisitedStadiums;
-  const visitedStates    = isReadOnly ? new Set<string>(sharedData!.vs) : rawVisitedStates;
-  const visitedProvinces = isReadOnly ? new Set<string>(sharedData!.vp) : rawVisitedProvinces;
-  const bucketCountries  = isReadOnly ? new Set<string>(sharedData!.bc) : rawBucketCountries;
-  const bucketStadiums   = isReadOnly ? new Set<string>(sharedData!.bt) : rawBucketStadiums;
-  const bucketStates     = isReadOnly ? new Set<string>(sharedData!.bs) : rawBucketStates;
-  const bucketProvinces  = isReadOnly ? new Set<string>(sharedData!.bp) : rawBucketProvinces;
-  const tccVisited       = isReadOnly ? new Set<string>(sharedData!.tv ?? []) : rawTccVisited;
-  const tccBucket        = isReadOnly ? new Set<string>(sharedData!.tb ?? []) : rawTccBucket;
+  const baseVisitedCountries = isReadOnly ? new Set<string>(sharedData!.vc) : rawVisitedCountries;
+  const baseVisitedStadiums  = isReadOnly ? new Set<string>(sharedData!.vt) : rawVisitedStadiums;
+  const baseVisitedStates    = isReadOnly ? new Set<string>(sharedData!.vs) : rawVisitedStates;
+  const baseVisitedProvinces = isReadOnly ? new Set<string>(sharedData!.vp) : rawVisitedProvinces;
+  const bucketCountries      = isReadOnly ? new Set<string>(sharedData!.bc) : rawBucketCountries;
+  const bucketStadiums       = isReadOnly ? new Set<string>(sharedData!.bt) : rawBucketStadiums;
+  const bucketStates         = isReadOnly ? new Set<string>(sharedData!.bs) : rawBucketStates;
+  const bucketProvinces      = isReadOnly ? new Set<string>(sharedData!.bp) : rawBucketProvinces;
+  const baseTccVisited       = isReadOnly ? new Set<string>(sharedData!.tv ?? []) : rawTccVisited;
+  const tccBucket            = isReadOnly ? new Set<string>(sharedData!.tb ?? []) : rawTccBucket;
   const [countryDetails, setCountryDetail] = useLocalStorageRecord("wm_details_countries");
   const [stadiumDetails, setStadiumDetail] = useLocalStorageRecord("wm_details_stadiums");
   const [stateDetails, setStateDetail] = useLocalStorageRecord("wm_details_states");
   const [provinceDetails, setProvinceDetail] = useLocalStorageRecord("wm_details_provinces");
   const [tccDetails, setTccDetail] = useLocalStorageRecord("wm_details_tcc");
+
+  // Apply year filter to visited sets (bucket sets are NOT filtered per spec)
+  function filterVisited(base: Set<string>, details: Record<string, VisitDetails>): Set<string> {
+    if (!yearFilter.enabled) return base;
+    const out = new Set<string>();
+    base.forEach(id => { if (detailMatchesFilter(details[id], yearFilter)) out.add(id); });
+    return out;
+  }
+  const visitedCountries = filterVisited(baseVisitedCountries, countryDetails);
+  const visitedStadiums  = filterVisited(baseVisitedStadiums,  stadiumDetails);
+  const visitedStates    = filterVisited(baseVisitedStates,    stateDetails);
+  const visitedProvinces = filterVisited(baseVisitedProvinces, provinceDetails);
+  const tccVisited       = filterVisited(baseTccVisited,       tccDetails);
+
+  // Earliest visit year across all categories (for slider min)
+  const earliestYear = (() => {
+    let m = CURRENT_YEAR;
+    for (const r of [countryDetails, stateDetails, provinceDetails, stadiumDetails, tccDetails]) {
+      for (const k in r) {
+        const d = r[k];
+        if (d.firstYear && d.firstYear < m) m = d.firstYear;
+        if (d.lastYear  && d.lastYear  < m) m = d.lastYear;
+      }
+    }
+    return Math.min(m, CURRENT_YEAR);
+  })();
+
+  // Clamp filter values when earliestYear changes
+  useEffect(() => {
+    setYearFilter(p => {
+      const min = Math.max(p.min, earliestYear);
+      const max = Math.min(Math.max(p.max, min), CURRENT_YEAR);
+      const snapshot = Math.min(Math.max(p.snapshot, earliestYear), CURRENT_YEAR);
+      if (min === p.min && max === p.max && snapshot === p.snapshot) return p;
+      return { ...p, min, max, snapshot };
+    });
+  }, [earliestYear, setYearFilter]);
+
+  // Snapshot playback: advance year every second
+  useEffect(() => {
+    if (!filterPlaying || !yearFilter.enabled || yearFilter.mode !== "snapshot") return;
+    const id = setInterval(() => {
+      setYearFilter(p => {
+        if (p.snapshot >= CURRENT_YEAR) return p;
+        return { ...p, snapshot: p.snapshot + 1 };
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [filterPlaying, yearFilter.enabled, yearFilter.mode, yearFilter.snapshot, setYearFilter]);
+  // Stop playback when reaching the end
+  useEffect(() => {
+    if (filterPlaying && yearFilter.snapshot >= CURRENT_YEAR) setFilterPlaying(false);
+  }, [filterPlaying, yearFilter.snapshot]);
 
   const sortedTcc: TccEntry[] = [...TCC_DATA].sort((a, b) => a.name.localeCompare(b.name));
   const [selectedTcc, setSelectedTcc] = useState<TccEntry | null>(null);
@@ -1623,6 +1719,19 @@ export default function App() {
           <button onClick={() => setZoom(z => Math.min(z * 1.5, 12))} className="px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors font-medium">+</button>
           <button onClick={() => setZoom(z => Math.max(z / 1.5, 0.5))} className="px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors font-medium">−</button>
           <button onClick={() => { setZoom(1); setCenter([0, 20]); setSelected(null); setSelectedStadium(null); }} className="px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors font-medium">Reset</button>
+          <button
+            onClick={() => setFilterExpanded(v => !v)}
+            className={`px-3 py-2 text-sm rounded-lg transition-colors font-medium flex items-center gap-1.5 ${
+              yearFilter.enabled
+                ? "bg-amber-600 hover:bg-amber-500 text-white"
+                : "bg-slate-800 hover:bg-slate-700 text-slate-300"
+            }`}
+            title="Filter map by year"
+          >
+            📅 {yearFilter.enabled
+              ? (yearFilter.mode === "snapshot" ? `As of ${yearFilter.snapshot}` : `${yearFilter.min}–${yearFilter.max}`)
+              : "Filter by Year"}
+          </button>
           <div className="w-px bg-slate-700 self-stretch mx-1" />
           {!isReadOnly && <>
             <button
@@ -1658,6 +1767,106 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {filterExpanded && (
+        <div className="px-6 py-3 border-b border-slate-800 bg-slate-900/60 flex items-center gap-4 flex-wrap relative z-10">
+          <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={yearFilter.enabled}
+              onChange={e => setYearFilter(p => ({ ...p, enabled: e.target.checked }))}
+              className="w-4 h-4 accent-amber-500"
+            />
+            <span>Enable year filter</span>
+          </label>
+          <div className="flex items-center gap-0.5 bg-slate-800/80 rounded-lg p-0.5 border border-slate-700">
+            <button
+              onClick={() => { setYearFilter(p => ({ ...p, mode: "range" })); setFilterPlaying(false); }}
+              className={`px-3 py-1 text-xs rounded font-medium transition-colors ${yearFilter.mode === "range" ? "bg-amber-600 text-white" : "text-slate-400 hover:text-white"}`}
+            >Range</button>
+            <button
+              onClick={() => setYearFilter(p => ({ ...p, mode: "snapshot" }))}
+              className={`px-3 py-1 text-xs rounded font-medium transition-colors ${yearFilter.mode === "snapshot" ? "bg-amber-600 text-white" : "text-slate-400 hover:text-white"}`}
+            >Snapshot</button>
+          </div>
+          <div className="flex-1 min-w-[280px] flex flex-col gap-1">
+            <div className="text-xs text-amber-300 font-mono">
+              {yearFilter.mode === "snapshot" ? `As of ${yearFilter.snapshot}` : `${yearFilter.min} – ${yearFilter.max}`}
+              <span className="text-slate-500 ml-2">({earliestYear} – {CURRENT_YEAR})</span>
+            </div>
+            {yearFilter.mode === "range" ? (
+              <div className="flex flex-col gap-1">
+                <div className="flex gap-3 items-center">
+                  <span className="text-[10px] text-slate-400 w-8 text-right">From</span>
+                  <input
+                    type="range"
+                    min={earliestYear}
+                    max={CURRENT_YEAR}
+                    value={yearFilter.min}
+                    onChange={e => setYearFilter(p => ({ ...p, min: Math.min(Number(e.target.value), p.max) }))}
+                    disabled={!yearFilter.enabled}
+                    className="flex-1 accent-amber-500 disabled:opacity-40"
+                  />
+                  <span className="text-xs text-slate-300 font-mono w-10">{yearFilter.min}</span>
+                </div>
+                <div className="flex gap-3 items-center">
+                  <span className="text-[10px] text-slate-400 w-8 text-right">To</span>
+                  <input
+                    type="range"
+                    min={earliestYear}
+                    max={CURRENT_YEAR}
+                    value={yearFilter.max}
+                    onChange={e => setYearFilter(p => ({ ...p, max: Math.max(Number(e.target.value), p.min) }))}
+                    disabled={!yearFilter.enabled}
+                    className="flex-1 accent-amber-500 disabled:opacity-40"
+                  />
+                  <span className="text-xs text-slate-300 font-mono w-10">{yearFilter.max}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-3 items-center">
+                <span className="text-xs text-slate-500 w-10 text-right">{earliestYear}</span>
+                <input
+                  type="range"
+                  min={earliestYear}
+                  max={CURRENT_YEAR}
+                  value={yearFilter.snapshot}
+                  onChange={e => setYearFilter(p => ({ ...p, snapshot: Number(e.target.value) }))}
+                  disabled={!yearFilter.enabled}
+                  className="flex-1 accent-amber-500 disabled:opacity-40"
+                />
+                <span className="text-xs text-slate-500 w-10">{CURRENT_YEAR}</span>
+              </div>
+            )}
+          </div>
+          {yearFilter.mode === "snapshot" && (
+            <button
+              onClick={() => setFilterPlaying(p => !p)}
+              disabled={!yearFilter.enabled}
+              className="px-3 py-1.5 text-sm bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-white font-medium transition-colors"
+              title="Auto-advance the snapshot year"
+            >
+              {filterPlaying ? "⏸ Pause" : "▶ Play"}
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setFilterPlaying(false);
+              setYearFilter({ enabled: false, mode: "range", min: earliestYear, max: CURRENT_YEAR, snapshot: CURRENT_YEAR });
+            }}
+            className="px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-600 rounded-lg text-white font-medium transition-colors"
+          >
+            Reset
+          </button>
+          <button
+            onClick={() => setFilterExpanded(false)}
+            className="px-2 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
+            title="Hide filter bar"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <div className="flex overflow-hidden" style={{ height: "calc(100vh - 72px - 260px)", minHeight: "400px" }}>
         <div className="flex-1 relative overflow-hidden bg-slate-950">

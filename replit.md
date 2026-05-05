@@ -30,7 +30,8 @@ Interactive travel tracker built with React + Vite + TypeScript, react-simple-ma
 - **Bucket List mode** — golden dashed-border map styling; ★ toggle on every list item; dedicated ★ Bucket List tab aggregating all categories
 - Visit details panel (dates, notes, times visited) — shown only for visited items
 - Progress counters + progress bars for all 4 categories + bucket list count
-- localStorage persistence (wm_visited_*, wm_bucket_*, wm_details_*)
+- localStorage persistence (wm_visited_*, wm_bucket_*, wm_details_*, wm_year_filter)
+- **Year filter / time slider** — collapsible 📅 header toggle; Range mode (dual sliders, one per row) or Snapshot mode (single slider + ▶ Play / ⏸ Pause auto-advance, 1 yr/sec); destinations with no recorded year are always visible per spec; bucket list unaffected; sidebar counts and bottom list tabs reactively reflect filtered visited counts
 - CSV export and Excel import (xlsx) with download template
 - Search bar with autocomplete + fly-to (zoom + pan) behavior
 - Tooltip on hover, zoom controls, reset

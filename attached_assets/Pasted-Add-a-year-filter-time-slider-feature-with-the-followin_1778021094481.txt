@@ -1,0 +1,30 @@
+Add a year filter / time slider feature with the following behavior:
+Data assumptions
+
+Each visit entry may have one or more dates stored as strings (e.g. "2019-06", "2023-03-15"). Parse the year from whichever date format is present.
+If a visit has no date, treat it as always visible regardless of the active filter.
+
+UI — Time Slider
+
+Add a horizontal time slider component that sits above the map, collapsed by default behind a small "📅 Filter by Year" toggle button in the header or toolbar area.
+When expanded, show a dual-handle range slider (min year ↔ max year) that spans from the earliest recorded visit year to the current year.
+Also show a single "snapshot" mode toggle — when active, only the slider's left handle is shown and the map displays the state of the map as of that year (i.e. only visits on or before that year are shown).
+Display the active range (e.g. "2018 – 2023" or "As of 2021") as a label above the slider.
+Include a "Reset" button that clears the filter and returns to showing all visits.
+
+Map behavior
+
+When a year filter is active, only destinations with at least one visit date falling within the selected range should appear as "visited" (color-coded). Destinations outside the range revert to their unvisited styling.
+Bucket list items are unaffected by the year filter — always show as bucket list.
+The sidebar live counts (e.g. "X/195 countries") should update reactively to reflect the filtered visit count, not the total.
+The bottom list tabs should also filter — only showing visited items whose dates fall in range.
+
+Snapshot / Playback mode
+
+Add an optional "▶ Play" button that auto-advances the snapshot year from the earliest visit year to the current year, one year per second, animating the map filling in over time. A "⏸ Pause" button stops it.
+
+Scope
+
+This is a pure frontend change — no backend, no new dependencies if possible (use a lightweight range slider lib only if necessary, otherwise implement with native HTML range inputs).
+Persist the last-used filter range to localStorage so it survives page refresh.
+The feature should work identically in both World mode and TCC mode.

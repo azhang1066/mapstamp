@@ -36,6 +36,7 @@ Interactive travel tracker built with React + Vite + TypeScript, react-simple-ma
 - Search bar with autocomplete + fly-to (zoom + pan) behavior
 - Tooltip on hover, zoom controls, reset
 - Share URL — encodes visited/bucket sets (incl. TCC) into a compressed URL hash for read-only sharing
+- **Statistics Dashboard** (📊 Stats header button) — full-screen overlay with 5 sections: headline tiles (countries/TCC/MLB/states/provinces/bucket), continent bar chart (uses CONTINENT_COLORS), travel timeline (visits grouped by year with Undated section + relative-volume bars), fun-facts cards (gracefully hidden when data insufficient), and shareable summary card with editable profile name (`wm_profile_name`) and 📋 Copy as Image via dynamic html-to-image (clipboard with download fallback). Uses BASE/raw sets so stats reflect lifetime data, not year-filtered shadows.
 - **TCC mode** (Travelers' Century Club) — second map mode tracking 330 countries/territories across 12 regions:
   - Header toggle: 🌍 World ↔ ✈️ TCC X/330
   - Map repaints with TCC region colors (full-saturation = visited, muted = unvisited, amber-dashed = bucket)

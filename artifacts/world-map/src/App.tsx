@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import * as XLSX from "xlsx";
+import { toPng } from "html-to-image";
 import {
   ComposableMap,
   Geographies,
@@ -824,6 +825,387 @@ function ShareModal({
   );
 }
 
+// ─── Stats Dashboard ─────────────────────────────────────────────────────────
+
+interface StatsDashboardProps {
+  onClose: () => void;
+  visitedCountries: Set<string>;
+  visitedStates: Set<string>;
+  visitedProvinces: Set<string>;
+  visitedStadiums: Set<string>;
+  tccVisited: Set<string>;
+  bucketCountries: Set<string>;
+  bucketStates: Set<string>;
+  bucketProvinces: Set<string>;
+  bucketStadiums: Set<string>;
+  tccBucket: Set<string>;
+  countryDetails: Record<string, VisitDetails>;
+  stateDetails: Record<string, VisitDetails>;
+  provinceDetails: Record<string, VisitDetails>;
+  stadiumDetails: Record<string, VisitDetails>;
+  tccDetails: Record<string, VisitDetails>;
+}
+
+interface VisitedItem {
+  id: string;
+  name: string;
+  category: "country" | "state" | "province" | "stadium" | "tcc";
+  continent?: string;
+  year?: number;
+}
+
+function StatsDashboard(props: StatsDashboardProps) {
+  const {
+    onClose,
+    visitedCountries, visitedStates, visitedProvinces, visitedStadiums, tccVisited,
+    bucketCountries, bucketStates, bucketProvinces, bucketStadiums, tccBucket,
+    countryDetails, stateDetails, provinceDetails, stadiumDetails, tccDetails,
+  } = props;
+
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [profileName, setProfileName] = useState<string>(() => {
+    try { return localStorage.getItem("wm_profile_name") || "My Travels"; } catch { return "My Travels"; }
+  });
+  const updateProfileName = (n: string) => {
+    setProfileName(n);
+    try { localStorage.setItem("wm_profile_name", n); } catch { /* ignore */ }
+  };
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copying" | "copied" | "downloaded" | "error">("idle");
+
+  // Build flat visited items list with year extracted
+  const items: VisitedItem[] = useMemo(() => {
+    const out: VisitedItem[] = [];
+    const yearOf = (d: VisitDetails | undefined): number | undefined => d?.firstYear ?? d?.lastYear;
+    visitedCountries.forEach(id => {
+      const info = COUNTRY_DATA[id];
+      if (info) out.push({ id, name: info.name, category: "country", continent: info.continent, year: yearOf(countryDetails[id]) });
+    });
+    visitedStates.forEach(fips => {
+      const info = US_STATE_DATA[fips];
+      if (info) out.push({ id: fips, name: info.name, category: "state", year: yearOf(stateDetails[fips]) });
+    });
+    visitedProvinces.forEach(name => {
+      out.push({ id: name, name, category: "province", year: yearOf(provinceDetails[name]) });
+    });
+    visitedStadiums.forEach(team => {
+      out.push({ id: team, name: team, category: "stadium", year: yearOf(stadiumDetails[team]) });
+    });
+    tccVisited.forEach(name => {
+      out.push({ id: name, name, category: "tcc", year: yearOf(tccDetails[name]) });
+    });
+    return out;
+  }, [visitedCountries, visitedStates, visitedProvinces, visitedStadiums, tccVisited, countryDetails, stateDetails, provinceDetails, stadiumDetails, tccDetails]);
+
+  // Continent breakdown (countries only)
+  const continents: { name: string; visited: number; total: number; color: string }[] = useMemo(() => {
+    const buckets = ["Africa", "Asia", "Europe", "North America", "South America", "Oceania"];
+    const totals = new Map<string, number>();
+    const visits = new Map<string, number>();
+    for (const [id, info] of Object.entries(COUNTRY_DATA)) {
+      const c = info.continent;
+      if (!c) continue;
+      totals.set(c, (totals.get(c) ?? 0) + 1);
+      if (visitedCountries.has(id)) visits.set(c, (visits.get(c) ?? 0) + 1);
+    }
+    return buckets.map(c => ({
+      name: c,
+      total: totals.get(c) ?? 0,
+      visited: visits.get(c) ?? 0,
+      color: CONTINENT_COLORS[c] || "#94a3b8",
+    }));
+  }, [visitedCountries]);
+
+  // Timeline: group items by year (or "Undated")
+  const timeline = useMemo(() => {
+    const byYear = new Map<number | "undated", VisitedItem[]>();
+    items.forEach(it => {
+      const k: number | "undated" = it.year ?? "undated";
+      if (!byYear.has(k)) byYear.set(k, []);
+      byYear.get(k)!.push(it);
+    });
+    const years = [...byYear.keys()].filter((k): k is number => typeof k === "number").sort((a, b) => b - a);
+    const undated = byYear.get("undated") ?? [];
+    const max = Math.max(1, ...years.map(y => byYear.get(y)!.length));
+    return { years: years.map(y => ({ year: y, items: byYear.get(y)! })), undated, max };
+  }, [items]);
+
+  // Fun facts
+  const facts = useMemo(() => {
+    const dated = items.filter(i => i.year !== undefined) as (VisitedItem & { year: number })[];
+    const earliest = dated.length ? dated.reduce((a, b) => a.year < b.year ? a : b) : null;
+    const latest = dated.length ? dated.reduce((a, b) => a.year > b.year ? a : b) : null;
+    // Busiest year
+    const yearCounts = new Map<number, number>();
+    dated.forEach(d => yearCounts.set(d.year, (yearCounts.get(d.year) ?? 0) + 1));
+    let busiestYear: number | null = null, busiestCount = 0;
+    yearCounts.forEach((c, y) => { if (c > busiestCount) { busiestCount = c; busiestYear = y; } });
+    // Most-visited continent
+    const contCounts = continents.filter(c => c.visited > 0).sort((a, b) => b.visited - a.visited);
+    const topContinent = contCounts[0] ?? null;
+    // Combined completion
+    const totalVisited = visitedCountries.size + visitedStates.size + visitedProvinces.size + visitedStadiums.size + tccVisited.size;
+    const totalAvail = 195 + 51 + 13 + 30 + TCC_TOTAL;
+    const completionPct = totalAvail > 0 ? (totalVisited / totalAvail) * 100 : 0;
+    // TCC distance
+    const tccGap = TCC_MEMBERSHIP_THRESHOLD - tccVisited.size;
+    // Avg per year
+    let avgPerYear: number | null = null;
+    if (dated.length >= 2) {
+      const span = Math.max(1, (latest!.year - earliest!.year + 1));
+      avgPerYear = dated.length / span;
+    }
+    return { earliest, latest, busiestYear, busiestCount, topContinent, totalVisited, totalAvail, completionPct, tccGap, avgPerYear };
+  }, [items, continents, visitedCountries.size, visitedStates.size, visitedProvinces.size, visitedStadiums.size, tccVisited.size]);
+
+  const totalBucket = bucketCountries.size + bucketStates.size + bucketProvinces.size + bucketStadiums.size + tccBucket.size;
+
+  const headlineTiles = [
+    { icon: "🌍", label: "Countries", visited: visitedCountries.size, total: 195, color: "from-blue-600 to-blue-800" },
+    { icon: "🗺", label: "TCC Territories", visited: tccVisited.size, total: TCC_TOTAL, color: "from-purple-600 to-purple-800" },
+    { icon: "🏟", label: "MLB Stadiums", visited: visitedStadiums.size, total: 30, color: "from-sky-600 to-sky-800" },
+    { icon: "🇺🇸", label: "US States", visited: visitedStates.size, total: 51, color: "from-red-600 to-red-800" },
+    { icon: "🍁", label: "CA Provinces", visited: visitedProvinces.size, total: 13, color: "from-orange-600 to-orange-800" },
+    { icon: "⭐", label: "Bucket List", visited: totalBucket, total: null, color: "from-amber-600 to-amber-800" },
+  ];
+
+  const handleCopyImage = async () => {
+    if (!cardRef.current) return;
+    setCopyStatus("copying");
+    try {
+      const dataUrl = await toPng(cardRef.current, { pixelRatio: 2, backgroundColor: "#0f172a", cacheBust: true });
+      try {
+        const blob = await (await fetch(dataUrl)).blob();
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+        setCopyStatus("copied");
+      } catch {
+        // Fallback to download
+        const a = document.createElement("a");
+        a.href = dataUrl;
+        a.download = `${profileName.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-travel-stats.png`;
+        a.click();
+        setCopyStatus("downloaded");
+      }
+      setTimeout(() => setCopyStatus("idle"), 2500);
+    } catch {
+      setCopyStatus("error");
+      setTimeout(() => setCopyStatus("idle"), 2500);
+    }
+  };
+
+  const factCards: { key: string; icon: string; title: string; value: React.ReactNode; sub?: string }[] = [];
+  if (facts.earliest) factCards.push({ key: "first", icon: "🥇", title: "First destination", value: facts.earliest.name, sub: `${facts.earliest.year}` });
+  if (facts.latest && facts.latest !== facts.earliest) factCards.push({ key: "latest", icon: "🆕", title: "Most recent", value: facts.latest.name, sub: `${facts.latest.year}` });
+  if (facts.busiestYear) factCards.push({ key: "busy", icon: "📅", title: "Busiest year", value: facts.busiestYear, sub: `${facts.busiestCount} new ${facts.busiestCount === 1 ? "destination" : "destinations"}` });
+  if (facts.topContinent) factCards.push({ key: "cont", icon: "🌐", title: "Top continent", value: facts.topContinent.name, sub: `${facts.topContinent.visited} of ${facts.topContinent.total} countries` });
+  factCards.push({ key: "comp", icon: "🏆", title: "Total completion", value: `${facts.completionPct.toFixed(1)}%`, sub: `${facts.totalVisited} of ${facts.totalAvail} destinations` });
+  factCards.push({
+    key: "tcc",
+    icon: "✈️",
+    title: "TCC membership",
+    value: facts.tccGap <= 0 ? "🎉 Achieved!" : `${facts.tccGap} to go`,
+    sub: facts.tccGap <= 0 ? `${tccVisited.size} of ${TCC_TOTAL}` : `${tccVisited.size} of 100 needed`,
+  });
+  if (facts.avgPerYear !== null) factCards.push({ key: "avg", icon: "🗓", title: "Average per year", value: facts.avgPerYear.toFixed(1), sub: "new destinations" });
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm overflow-y-auto" onClick={onClose}>
+      <div
+        className="min-h-full max-w-6xl mx-auto p-6 md:p-10"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl">
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 md:px-8 py-5 border-b border-slate-800 sticky top-0 bg-slate-900/95 backdrop-blur-sm rounded-t-2xl z-10">
+            <div>
+              <h2 className="text-2xl font-bold text-white flex items-center gap-2">📊 Travel Statistics</h2>
+              <p className="text-sm text-slate-400 mt-0.5">A snapshot of your journey so far</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition-colors"
+            >
+              ✕ Close
+            </button>
+          </div>
+
+          <div className="p-6 md:p-8 space-y-10">
+            {/* Section 1: Headline Numbers */}
+            <section>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Headline numbers</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {headlineTiles.map(t => (
+                  <div key={t.label} className={`p-4 rounded-xl bg-gradient-to-br ${t.color} shadow-md`}>
+                    <div className="text-2xl mb-1">{t.icon}</div>
+                    <div className="text-2xl font-bold text-white">
+                      {t.visited}{t.total !== null && <span className="text-sm font-normal text-white/70"> / {t.total}</span>}
+                    </div>
+                    <div className="text-xs text-white/80 mt-0.5">{t.label}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Section 2: Continent Breakdown */}
+            <section>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Continent breakdown</h3>
+              <div className="space-y-2.5">
+                {continents.map(c => {
+                  const pct = c.total > 0 ? (c.visited / c.total) * 100 : 0;
+                  return (
+                    <div key={c.name}>
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-slate-300 font-medium flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: c.color }} />
+                          {c.name}
+                        </span>
+                        <span className="text-slate-400 font-mono">{c.visited}/{c.total}</span>
+                      </div>
+                      <div className="h-6 bg-slate-800 rounded-md overflow-hidden relative">
+                        <div
+                          className="h-full transition-all duration-500 flex items-center justify-end px-2"
+                          style={{ width: `${Math.max(pct, 3)}%`, backgroundColor: c.color, opacity: pct > 0 ? 1 : 0.2 }}
+                        >
+                          {pct >= 8 && <span className="text-[10px] font-bold text-slate-900">{pct.toFixed(0)}%</span>}
+                        </div>
+                        {pct < 8 && (
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">{pct.toFixed(0)}%</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* Section 3: Travel Timeline */}
+            <section>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Travel timeline</h3>
+              {timeline.years.length === 0 && timeline.undated.length === 0 ? (
+                <p className="text-sm text-slate-500 italic">No visits recorded yet. Start marking destinations to build your timeline.</p>
+              ) : (
+                <div className="space-y-3">
+                  {timeline.years.map(({ year, items: yearItems }) => {
+                    const pct = (yearItems.length / timeline.max) * 100;
+                    const previewNames = yearItems.slice(0, 6).map(i => i.name).join(", ");
+                    const more = yearItems.length > 6 ? ` +${yearItems.length - 6} more` : "";
+                    return (
+                      <div key={year} className="flex gap-4 items-start">
+                        <div className="w-16 shrink-0 text-right">
+                          <div className="text-lg font-bold text-white">{year}</div>
+                          <div className="text-xs text-slate-500">{yearItems.length} new</div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="h-2 bg-slate-800 rounded-full overflow-hidden mb-1.5">
+                            <div className="h-full bg-gradient-to-r from-amber-500 to-amber-300" style={{ width: `${pct}%` }} />
+                          </div>
+                          <p className="text-xs text-slate-400 leading-snug">{previewNames}{more}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {timeline.undated.length > 0 && (
+                    <div className="flex gap-4 items-start pt-3 mt-3 border-t border-slate-800">
+                      <div className="w-16 shrink-0 text-right">
+                        <div className="text-sm font-semibold text-slate-400">Undated</div>
+                        <div className="text-xs text-slate-500">{timeline.undated.length}</div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-slate-500 leading-snug">
+                          {timeline.undated.slice(0, 8).map(i => i.name).join(", ")}
+                          {timeline.undated.length > 8 ? ` +${timeline.undated.length - 8} more` : ""}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+
+            {/* Section 4: Fun Facts */}
+            <section>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Fun facts</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {factCards.map(f => (
+                  <div key={f.key} className="p-4 rounded-xl bg-slate-800/60 border border-slate-700/50">
+                    <div className="text-xl mb-1">{f.icon}</div>
+                    <div className="text-xs text-slate-400 uppercase tracking-wide">{f.title}</div>
+                    <div className="text-lg font-bold text-white mt-1 leading-tight">{f.value}</div>
+                    {f.sub && <div className="text-xs text-slate-500 mt-0.5">{f.sub}</div>}
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Section 5: Shareable Summary Card */}
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Shareable summary</h3>
+                <button
+                  onClick={handleCopyImage}
+                  disabled={copyStatus === "copying"}
+                  className="px-3 py-1.5 text-sm bg-violet-600 hover:bg-violet-500 disabled:opacity-60 rounded-lg text-white font-medium flex items-center gap-1.5 transition-colors"
+                >
+                  {copyStatus === "copying" && "⏳ Generating…"}
+                  {copyStatus === "copied" && "✅ Copied to clipboard"}
+                  {copyStatus === "downloaded" && "💾 Downloaded"}
+                  {copyStatus === "error" && "⚠️ Failed"}
+                  {copyStatus === "idle" && "📋 Copy as Image"}
+                </button>
+              </div>
+              <div
+                ref={cardRef}
+                className="p-8 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-slate-700"
+              >
+                <div className="flex items-baseline justify-between mb-6 flex-wrap gap-2">
+                  <input
+                    type="text"
+                    value={profileName}
+                    onChange={e => updateProfileName(e.target.value)}
+                    maxLength={40}
+                    className="text-3xl font-bold text-white bg-transparent border-b border-transparent hover:border-slate-700 focus:border-amber-500 outline-none transition-colors flex-1 min-w-[200px]"
+                  />
+                  <span className="text-sm text-slate-400">🌍 World Map</span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+                  {headlineTiles.slice(0, 6).map(t => (
+                    <div key={t.label} className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/40">
+                      <div className="text-lg">{t.icon}</div>
+                      <div className="text-xl font-bold text-white">
+                        {t.visited}{t.total !== null && <span className="text-xs font-normal text-slate-500"> / {t.total}</span>}
+                      </div>
+                      <div className="text-[10px] text-slate-400 uppercase tracking-wide mt-0.5">{t.label}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="space-y-2">
+                  {headlineTiles.filter(t => t.total !== null).map(t => {
+                    const pct = t.total ? (t.visited / t.total) * 100 : 0;
+                    return (
+                      <div key={t.label}>
+                        <div className="flex items-center justify-between text-[10px] text-slate-400 mb-0.5">
+                          <span>{t.icon} {t.label}</span>
+                          <span className="font-mono">{pct.toFixed(0)}%</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-amber-500 to-amber-300" style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-6 pt-4 border-t border-slate-700/50 flex items-center justify-between text-xs text-slate-500">
+                  <span>Total completion</span>
+                  <span className="font-mono text-amber-400">{facts.completionPct.toFixed(1)}%</span>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Excel import / template helpers ─────────────────────────────────────────
 
 interface ImportResult {
@@ -1238,6 +1620,7 @@ export default function App() {
   const [confirmBucket, setConfirmBucket] = useState<string | null>(null);
   const [showExport, setShowExport] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   const [sharedData, setSharedData] = useState<ShareData | null>(null);
   const [toast, setToast] = useState<{ message: string; kind: "success" | "warning" } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1758,6 +2141,13 @@ export default function App() {
               Export
             </button>
           </>}
+          <button
+            onClick={() => setShowStats(true)}
+            className="px-3 py-2 text-sm bg-fuchsia-700 hover:bg-fuchsia-600 rounded-lg transition-colors font-medium text-white flex items-center gap-1.5"
+            title="View travel statistics dashboard"
+          >
+            📊 Stats
+          </button>
           <button
             onClick={() => setShowShare(true)}
             className="px-3 py-2 text-sm bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors font-medium text-white flex items-center gap-1.5"
@@ -2997,6 +3387,26 @@ export default function App() {
         />
       )}
 
+      {showStats && (
+        <StatsDashboard
+          onClose={() => setShowStats(false)}
+          visitedCountries={baseVisitedCountries}
+          visitedStates={baseVisitedStates}
+          visitedProvinces={baseVisitedProvinces}
+          visitedStadiums={baseVisitedStadiums}
+          tccVisited={baseTccVisited}
+          bucketCountries={bucketCountries}
+          bucketStates={bucketStates}
+          bucketProvinces={bucketProvinces}
+          bucketStadiums={bucketStadiums}
+          tccBucket={tccBucket}
+          countryDetails={countryDetails}
+          stateDetails={stateDetails}
+          provinceDetails={provinceDetails}
+          stadiumDetails={stadiumDetails}
+          tccDetails={tccDetails}
+        />
+      )}
       {showShare && (
         <ShareModal
           onClose={() => setShowShare(false)}

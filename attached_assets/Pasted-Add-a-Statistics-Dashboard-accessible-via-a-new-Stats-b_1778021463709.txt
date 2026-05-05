@@ -1,0 +1,48 @@
+Add a Statistics Dashboard accessible via a new "📊 Stats" button in the header toolbar. It should open as a full-panel overlay (or slide-in from the right, replacing the sidebar) rather than a separate route.
+
+Section 1 — Headline Numbers
+A top row of large stat tiles:
+
+🌍 Countries visited (X / 195)
+🗺 TCC territories (X / 330)
+🏟 MLB stadiums (X / 30)
+🇺🇸 US states (X / 51)
+🍁 Canadian provinces (X / 13)
+⭐ Bucket list items (total across all categories)
+
+
+Section 2 — Continent Breakdown
+A horizontal bar chart (built with SVG or CSS, no charting lib required) showing visited vs. total per continent. Each bar should be colored by continent color (matching the map legend). Show percentage label at the end of each bar.
+
+Section 3 — Travel Timeline
+A vertical or horizontal timeline showing visits grouped by year. For each year, show:
+
+Number of new destinations added
+A compact list of destination names (truncated if long)
+A small horizontal bar representing relative volume vs. the busiest year
+
+If a visit has no date recorded, group it under an "Undated" section at the bottom.
+
+Section 4 — Fun Facts
+A card grid of auto-generated insights derived from the data:
+
+🥇 First destination ever visited (earliest date)
+🆕 Most recent visit
+📅 Busiest travel year (most new destinations)
+🌐 Most-visited continent (by count)
+🏆 Completion percentage across all categories combined
+✈️ Distance to TCC membership (100 territory threshold) — "X more to go" or a celebration if already there
+🗓 Average new destinations per year (based on dated visits)
+
+If data is insufficient to compute a fact (e.g. no dates recorded at all), gracefully hide that card rather than showing zeroes or errors.
+
+Section 5 — Shareable Summary Card
+A styled card at the bottom of the dashboard that visually summarizes the user's travel profile — name/handle (editable inline), headline counts, and a progress bar per category. Include a "📋 Copy as Image" button that uses html-to-image (add as a dependency) to rasterize just that card so users can share it on social media.
+
+Scope & Constraints
+
+Pure frontend, no backend or new data requirements
+Derive all stats directly from existing localStorage state
+No heavy charting libraries — use SVG or CSS-based visuals
+Dashboard should work correctly whether the user has 0 or 300+ visits recorded
+Fully reactive — if the user closes the dashboard, marks a new visit, and reopens it, the stats should reflect the update

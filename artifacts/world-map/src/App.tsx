@@ -7,6 +7,18 @@ import {
   Marker,
   ZoomableGroup,
 } from "react-simple-maps";
+import {
+  TCC_DATA,
+  TCC_REGIONS,
+  TCC_BY_NAME,
+  TCC_BY_GEO_ID,
+  TCC_TOTAL,
+  TCC_MEMBERSHIP_THRESHOLD,
+  type TccEntry,
+  type TccRegionKey,
+} from "./tccData";
+
+type MapMode = "world" | "tcc";
 
 function useLocalStorageSet(key: string): [Set<string>, React.Dispatch<React.SetStateAction<Set<string>>>] {
   const [value, setValue] = useState<Set<string>>(() => {
@@ -678,6 +690,7 @@ function ExportModal({
 interface ShareData {
   vc: string[]; vt: string[]; vs: string[]; vp: string[];
   bc: string[]; bt: string[]; bs: string[]; bp: string[];
+  tv?: string[]; tb?: string[]; // TCC visited / TCC bucket-list (entry names)
 }
 
 function encodeShareData(data: ShareData): string {
@@ -700,12 +713,14 @@ function buildShareUrl(data: ShareData): string {
 function ShareModal({
   onClose, visitedCountries, visitedStates, visitedProvinces, visitedStadiums,
   bucketCountries, bucketStates, bucketProvinces, bucketStadiums,
+  tccVisited, tccBucket,
 }: {
   onClose: () => void;
   visitedCountries: Set<string>; visitedStates: Set<string>;
   visitedProvinces: Set<string>; visitedStadiums: Set<string>;
   bucketCountries: Set<string>; bucketStates: Set<string>;
   bucketProvinces: Set<string>; bucketStadiums: Set<string>;
+  tccVisited: Set<string>; tccBucket: Set<string>;
 }) {
   const [copied, setCopied] = useState(false);
   const data: ShareData = {
@@ -713,10 +728,11 @@ function ShareModal({
     vs: [...visitedStates],   vp: [...visitedProvinces],
     bc: [...bucketCountries], bt: [...bucketStadiums],
     bs: [...bucketStates],    bp: [...bucketProvinces],
+    tv: [...tccVisited],      tb: [...tccBucket],
   };
   const url = buildShareUrl(data);
-  const totalVisited = visitedCountries.size + visitedStates.size + visitedProvinces.size + visitedStadiums.size;
-  const totalBucket  = bucketCountries.size  + bucketStates.size  + bucketProvinces.size  + bucketStadiums.size;
+  const totalVisited = visitedCountries.size + visitedStates.size + visitedProvinces.size + visitedStadiums.size + tccVisited.size;
+  const totalBucket  = bucketCountries.size  + bucketStates.size  + bucketProvinces.size  + bucketStadiums.size  + tccBucket.size;
 
   function handleCopy() {
     navigator.clipboard.writeText(url).then(() => {
@@ -1193,7 +1209,7 @@ export default function App() {
   const [tooltipName, setTooltipName] = useState<string>("");
   const [zoom, setZoom] = useState(1);
   const [center, setCenter] = useState<[number, number]>([0, 20]);
-  const [listTab, setListTab] = useState<"countries" | "stadiums" | "us-states" | "ca-provinces" | "bucket-list">("countries");
+  const [listTab, setListTab] = useState<"countries" | "stadiums" | "us-states" | "ca-provinces" | "tcc" | "bucket-list">("countries");
   const [confirmBucket, setConfirmBucket] = useState<string | null>(null);
   const [showExport, setShowExport] = useState(false);
   const [showShare, setShowShare] = useState(false);
@@ -1209,6 +1225,20 @@ export default function App() {
   const [rawBucketStadiums, setBucketStadiums] = useLocalStorageSet("wm_bucket_stadiums");
   const [rawBucketStates, setBucketStates] = useLocalStorageSet("wm_bucket_states");
   const [rawBucketProvinces, setBucketProvinces] = useLocalStorageSet("wm_bucket_provinces");
+  const [rawTccVisited, setTccVisited] = useLocalStorageSet("wm_tcc_visited");
+  const [rawTccBucket,  setTccBucket]  = useLocalStorageSet("wm_tcc_bucket");
+
+  // Map mode: "world" (countries / states / stadiums) or "tcc" (TCC list)
+  const [mapMode, setMapModeRaw] = useState<MapMode>(() => {
+    try {
+      const v = localStorage.getItem("wm_map_mode");
+      return v === "tcc" ? "tcc" : "world";
+    } catch { return "world"; }
+  });
+  const setMapMode = useCallback((m: MapMode) => {
+    setMapModeRaw(m);
+    try { localStorage.setItem("wm_map_mode", m); } catch { /* ignore */ }
+  }, []);
 
   // Detect ?share= URL param on first load
   useEffect(() => {
@@ -1229,10 +1259,17 @@ export default function App() {
   const bucketStadiums   = isReadOnly ? new Set<string>(sharedData!.bt) : rawBucketStadiums;
   const bucketStates     = isReadOnly ? new Set<string>(sharedData!.bs) : rawBucketStates;
   const bucketProvinces  = isReadOnly ? new Set<string>(sharedData!.bp) : rawBucketProvinces;
+  const tccVisited       = isReadOnly ? new Set<string>(sharedData!.tv ?? []) : rawTccVisited;
+  const tccBucket        = isReadOnly ? new Set<string>(sharedData!.tb ?? []) : rawTccBucket;
   const [countryDetails, setCountryDetail] = useLocalStorageRecord("wm_details_countries");
   const [stadiumDetails, setStadiumDetail] = useLocalStorageRecord("wm_details_stadiums");
   const [stateDetails, setStateDetail] = useLocalStorageRecord("wm_details_states");
   const [provinceDetails, setProvinceDetail] = useLocalStorageRecord("wm_details_provinces");
+  const [tccDetails, setTccDetail] = useLocalStorageRecord("wm_details_tcc");
+
+  const sortedTcc: TccEntry[] = [...TCC_DATA].sort((a, b) => a.name.localeCompare(b.name));
+  const [selectedTcc, setSelectedTcc] = useState<TccEntry | null>(null);
+  const [hoveredTcc, setHoveredTcc] = useState<string | null>(null);
 
   const sortedCountries = Object.entries(COUNTRY_DATA)
     .map(([id, info]) => ({ id, ...info }))
@@ -1257,6 +1294,39 @@ export default function App() {
       return n;
     });
   }, [setCountryDetail, setBucketCountries]);
+
+  const toggleTccVisited = useCallback((name: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (isReadOnly) return;
+    setTccVisited(prev => {
+      const n = new Set(prev);
+      if (n.has(name)) { n.delete(name); setTccDetail(name, null); }
+      else { n.add(name); setTccBucket(b => { const nb = new Set(b); nb.delete(name); return nb; }); }
+      return n;
+    });
+  }, [isReadOnly, setTccVisited, setTccBucket, setTccDetail]);
+
+  const toggleTccBucket = useCallback((name: string, removeFromVisited: boolean, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (isReadOnly) return;
+    setTccBucket(prev => {
+      const n = new Set(prev);
+      if (n.has(name)) n.delete(name);
+      else {
+        n.add(name);
+        if (removeFromVisited) {
+          setTccVisited(v => { const nv = new Set(v); nv.delete(name); return nv; });
+          setTccDetail(name, null);
+        }
+      }
+      return n;
+    });
+  }, [isReadOnly, setTccBucket, setTccVisited, setTccDetail]);
+
+  const handleTccGeoClick = useCallback((entry: TccEntry) => {
+    setSelectedTcc(prev => prev?.name === entry.name ? null : entry);
+    setConfirmBucket(null);
+  }, []);
 
   const toggleStadiumVisited = useCallback((team: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -1488,11 +1558,65 @@ export default function App() {
         </div>
       )}
 
+      {mapMode === "tcc" && tccVisited.size >= TCC_MEMBERSHIP_THRESHOLD && (
+        <div className="flex items-center justify-center gap-2 px-6 py-2.5 bg-gradient-to-r from-purple-900/80 via-fuchsia-900/80 to-purple-900/80 border-b border-purple-700/60 text-sm">
+          <span className="text-2xl leading-none">🏆</span>
+          <span className="text-purple-100 font-semibold">
+            You qualify for TCC membership!
+          </span>
+          <span className="text-purple-300/80">
+            {tccVisited.size} / {TCC_TOTAL} countries &amp; territories visited
+          </span>
+        </div>
+      )}
+
       <header className="flex items-center gap-4 px-6 py-4 border-b border-slate-800 bg-slate-900/80 backdrop-blur-sm flex-wrap relative z-10">
         <div className="shrink-0">
           <h1 className="text-2xl font-bold tracking-tight text-white">World Map</h1>
-          <p className="text-sm text-slate-400 mt-0.5">Click any country, U.S. state, Canadian province, or MLB stadium to explore</p>
+          <p className="text-sm text-slate-400 mt-0.5">
+            {mapMode === "tcc"
+              ? "Track your progress toward Travelers' Century Club membership"
+              : "Click any country, U.S. state, Canadian province, or MLB stadium to explore"}
+          </p>
         </div>
+
+        {/* Map mode switcher */}
+        <div className="flex items-center gap-0.5 bg-slate-800/80 rounded-lg p-0.5 border border-slate-700">
+          <button
+            onClick={() => {
+              setMapMode("world");
+              setSelectedTcc(null);
+              if (listTab === "tcc") setListTab("countries");
+            }}
+            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              mapMode === "world"
+                ? "bg-blue-600 text-white shadow-sm"
+                : "text-slate-300 hover:text-white hover:bg-slate-700/60"
+            }`}
+            title="Show countries, US states, Canadian provinces and MLB stadiums"
+          >
+            🌍 World
+          </button>
+          <button
+            onClick={() => {
+              setMapMode("tcc");
+              setSelected(null);
+              setSelectedStadium(null);
+            }}
+            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-1.5 ${
+              mapMode === "tcc"
+                ? "bg-purple-600 text-white shadow-sm"
+                : "text-slate-300 hover:text-white hover:bg-slate-700/60"
+            }`}
+            title="Travelers' Century Club: 330 countries & territories"
+          >
+            ✈️ TCC
+            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+              mapMode === "tcc" ? "bg-purple-800/80 text-purple-100" : "bg-slate-900 text-slate-400"
+            }`}>{tccVisited.size}/{TCC_TOTAL}</span>
+          </button>
+        </div>
+
         <SearchBar onSelect={handleSearchSelect} />
         <div className="flex gap-2 flex-wrap justify-end ml-auto">
           <button onClick={() => setZoom(z => Math.min(z * 1.5, 12))} className="px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors font-medium">+</button>
@@ -1542,6 +1666,73 @@ export default function App() {
             projectionConfig={{ scale: 130, center: [0, 20] }}
           >
             <ZoomableGroup zoom={zoom} center={center} onMoveEnd={({ zoom: z, coordinates }) => { setZoom(z); setCenter(coordinates); }}>
+              {mapMode === "tcc" && (
+                <>
+                  {/* TCC: world geographies tinted by region */}
+                  <Geographies geography={WORLD_URL}>
+                    {({ geographies }) =>
+                      geographies.map((geo) => {
+                        const tcc = TCC_BY_GEO_ID.get(String(geo.id));
+                        const tccName = tcc?.name;
+                        const isSelected = !!tccName && selectedTcc?.name === tccName;
+                        const isVisited = !!tccName && tccVisited.has(tccName);
+                        const isBucketList = !!tccName && !isVisited && tccBucket.has(tccName);
+                        const isHov = !!tccName && hoveredTcc === tccName;
+                        const region = tcc ? TCC_REGIONS[tcc.region] : null;
+                        const baseFill = region
+                          ? (isVisited ? region.color : (isBucketList ? BUCKET_LIST_COLOR : region.fillUnvisited))
+                          : "#1f2937";
+                        const fill = isSelected ? SELECTED_COLOR : (isHov && tcc ? region!.color : baseFill);
+                        const stroke = isBucketList ? BUCKET_LIST_STROKE : (tcc ? "#0f172a" : "#1e293b");
+                        return (
+                          <Geography
+                            key={geo.rsmKey}
+                            geography={geo}
+                            onClick={() => { if (tcc) handleTccGeoClick(tcc); }}
+                            onMouseEnter={(evt) => { if (tccName) { setHoveredTcc(tccName); setTooltipName(tccName); setTooltipPos({ x: evt.clientX, y: evt.clientY }); } }}
+                            onMouseMove={(evt) => setTooltipPos({ x: evt.clientX, y: evt.clientY })}
+                            onMouseLeave={() => { setHoveredTcc(null); setTooltipName(""); }}
+                            style={{
+                              default: { fill, stroke, strokeWidth: isBucketList ? 0.9 : (tcc ? 0.5 : 0.3), strokeDasharray: isBucketList ? "3 2" : undefined, outline: "none", cursor: tcc ? "pointer" : "default", transition: "fill 0.15s" },
+                              hover:   { fill: isSelected ? SELECTED_COLOR : (region ? region.color : "#1f2937"), stroke: isBucketList ? BUCKET_LIST_STROKE : (tcc ? "#334155" : "#1e293b"), strokeWidth: isBucketList ? 1 : (tcc ? 0.7 : 0.3), outline: "none", cursor: tcc ? "pointer" : "default" },
+                              pressed: { fill: SELECTED_COLOR, outline: "none" },
+                            }}
+                          />
+                        );
+                      })
+                    }
+                  </Geographies>
+
+                  {/* TCC: marker dots for entries without a geoId (small islands etc.) */}
+                  {TCC_DATA.filter(e => e.lng !== undefined && e.lat !== undefined).map((entry) => {
+                    const isSelected = selectedTcc?.name === entry.name;
+                    const isVisited = tccVisited.has(entry.name);
+                    const isBucketList = !isVisited && tccBucket.has(entry.name);
+                    const isHov = hoveredTcc === entry.name;
+                    const region = TCC_REGIONS[entry.region];
+                    const s = 1 / zoom;
+                    const dotFill = isSelected ? SELECTED_COLOR : isVisited ? region.color : isBucketList ? BUCKET_LIST_COLOR : region.fillUnvisited;
+                    const ringColor = isSelected ? "#f59e0b" : isVisited ? region.color : isBucketList ? BUCKET_LIST_STROKE : region.color;
+                    return (
+                      <Marker key={`tcc-${entry.name}`} coordinates={[entry.lng!, entry.lat!]}>
+                        <g
+                          transform={`scale(${s})`}
+                          style={{ cursor: "pointer" }}
+                          onClick={(e) => { e.stopPropagation(); handleTccGeoClick(entry); }}
+                          onMouseEnter={(e) => { setHoveredTcc(entry.name); setTooltipName(entry.name); setTooltipPos({ x: e.clientX, y: e.clientY }); }}
+                          onMouseMove={(e) => setTooltipPos({ x: e.clientX, y: e.clientY })}
+                          onMouseLeave={() => { setHoveredTcc(null); setTooltipName(""); }}
+                        >
+                          <circle r={isHov || isSelected ? 5 : 3.5} fill={ringColor} opacity={0.4} />
+                          <circle r={isHov || isSelected ? 3 : 2.2} fill={dotFill} stroke={ringColor} strokeWidth={1} />
+                        </g>
+                      </Marker>
+                    );
+                  })}
+                </>
+              )}
+
+              {mapMode === "world" && (<>
               {/* World countries — excluding US (840) and Canada (124) */}
               <Geographies geography={WORLD_URL}>
                 {({ geographies }) =>
@@ -1688,6 +1879,7 @@ export default function App() {
                   </Marker>
                 );
               })}
+              </>)}
             </ZoomableGroup>
           </ComposableMap>
 
@@ -1704,7 +1896,91 @@ export default function App() {
 
         {/* Sidebar */}
         <aside className="w-80 border-l border-slate-800 bg-slate-900 flex flex-col overflow-y-auto">
-          {selectedStadium ? (
+          {selectedTcc ? (
+            <div className="p-6 flex-1">
+              <button onClick={() => setSelectedTcc(null)} className="text-slate-400 hover:text-white text-sm mb-4 flex items-center gap-1 transition-colors">
+                ← Back
+              </button>
+              {(() => {
+                const region = TCC_REGIONS[selectedTcc.region];
+                const isVisited = tccVisited.has(selectedTcc.name);
+                const isBucketList = !isVisited && tccBucket.has(selectedTcc.name);
+                const confirmKey = `tcc-${selectedTcc.name}`;
+                return (
+                  <>
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold mb-3 text-white" style={{ backgroundColor: region.color }}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-white/80" />
+                      {region.name}
+                    </div>
+                    <h2 className="text-2xl font-bold text-white mb-1">{selectedTcc.name}</h2>
+                    <p className="text-slate-400 text-sm mb-5">Travelers' Century Club entry</p>
+
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-800/60">
+                        <span className="text-xl">🌐</span>
+                        <div>
+                          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">TCC Region</p>
+                          <p className="text-sm font-medium text-white mt-0.5">{region.name}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-800/60">
+                        <span className="text-xl">{selectedTcc.geoId ? "🗺" : "📍"}</span>
+                        <div>
+                          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Map Location</p>
+                          <p className="text-sm font-medium text-white mt-0.5">
+                            {selectedTcc.geoId
+                              ? "Highlighted on the world map"
+                              : "Marker dot on the world map"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-800/60">
+                        <span className="text-xl">🏆</span>
+                        <div>
+                          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">TCC Membership</p>
+                          <p className="text-sm font-medium text-white mt-0.5">
+                            {tccVisited.size} / {TCC_TOTAL} visited
+                            {tccVisited.size >= TCC_MEMBERSHIP_THRESHOLD
+                              ? " — qualified ✓"
+                              : ` — ${TCC_MEMBERSHIP_THRESHOLD - tccVisited.size} to go`}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {!isReadOnly && (
+                      <>
+                        <div className="flex gap-2 mt-5 pt-5 border-t border-slate-800">
+                          <button
+                            onClick={() => { toggleTccVisited(selectedTcc.name); setConfirmBucket(null); }}
+                            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isVisited ? "bg-purple-700 hover:bg-purple-600 text-white" : "bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white"}`}
+                          >
+                            <span>{isVisited ? "✓" : "○"}</span>{isVisited ? "Visited" : "Mark Visited"}
+                          </button>
+                          <button
+                            onClick={() => { if (!isBucketList && isVisited) { setConfirmBucket(confirmKey); } else { toggleTccBucket(selectedTcc.name, false); } }}
+                            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isBucketList ? "bg-amber-700 hover:bg-amber-600 text-white" : "bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white"}`}
+                          >
+                            <span>★</span>{isBucketList ? "On Bucket List" : "Bucket List"}
+                          </button>
+                        </div>
+                        {confirmBucket === confirmKey && (
+                          <div className="mt-2 p-3 bg-amber-900/40 border border-amber-700/60 rounded-lg text-sm">
+                            <p className="text-amber-200 mb-2">Remove from visited and add to bucket list?</p>
+                            <div className="flex gap-2">
+                              <button onClick={() => toggleTccBucket(selectedTcc.name, true)} className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium">Confirm</button>
+                              <button onClick={() => setConfirmBucket(null)} className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium">Cancel</button>
+                            </div>
+                          </div>
+                        )}
+                        {isVisited && <VisitDetailsPanel locationId={selectedTcc.name} details={tccDetails[selectedTcc.name]} onUpdate={setTccDetail} />}
+                      </>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          ) : selectedStadium ? (
             <div className="p-6 flex-1">
               <button onClick={() => setSelectedStadium(null)} className="text-slate-400 hover:text-white text-sm mb-4 flex items-center gap-1 transition-colors">
                 ← Back
@@ -2014,13 +2290,19 @@ export default function App() {
         {/* Tab bar + progress */}
         <div className="flex items-center justify-between px-6 pt-4 pb-0 border-b border-slate-800 flex-wrap gap-y-2">
           <div className="flex items-center gap-1 flex-wrap">
-            {([
-              { id: "countries", label: "Countries" },
-              { id: "us-states", label: "US States" },
-              { id: "ca-provinces", label: "CA Provinces" },
-              { id: "stadiums", label: "MLB Stadiums" },
-              { id: "bucket-list", label: "★ Bucket List" },
-            ] as const).map(tab => (
+            {(mapMode === "tcc"
+              ? ([
+                  { id: "tcc",         label: `TCC (${TCC_TOTAL})` },
+                  { id: "bucket-list", label: "★ Bucket List" },
+                ] as const)
+              : ([
+                  { id: "countries",   label: "Countries" },
+                  { id: "us-states",   label: "US States" },
+                  { id: "ca-provinces", label: "CA Provinces" },
+                  { id: "stadiums",    label: "MLB Stadiums" },
+                  { id: "bucket-list", label: "★ Bucket List" },
+                ] as const)
+            ).map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setListTab(tab.id)}
@@ -2036,12 +2318,17 @@ export default function App() {
           </div>
           {/* Progress badges */}
           <div className="flex items-center gap-3 pb-2 flex-wrap">
-            {[
-              { label: "Countries", visited: visitedCountries.size, total: sortedCountries.length, color: "bg-emerald-500" },
-              { label: "US States", visited: visitedStates.size, total: sortedStates.length, color: "bg-red-500" },
-              { label: "CA Prov.", visited: visitedProvinces.size, total: sortedProvinces.length, color: "bg-orange-500" },
-              { label: "Stadiums", visited: visitedStadiums.size, total: sortedStadiums.length, color: "bg-blue-500" },
-            ].map(({ label, visited, total, color }, i, arr) => (
+            {(mapMode === "tcc"
+              ? [
+                  { label: "TCC", visited: tccVisited.size, total: TCC_TOTAL, color: "bg-purple-500" },
+                ]
+              : [
+                  { label: "Countries", visited: visitedCountries.size, total: sortedCountries.length, color: "bg-emerald-500" },
+                  { label: "US States", visited: visitedStates.size, total: sortedStates.length, color: "bg-red-500" },
+                  { label: "CA Prov.", visited: visitedProvinces.size, total: sortedProvinces.length, color: "bg-orange-500" },
+                  { label: "Stadiums", visited: visitedStadiums.size, total: sortedStadiums.length, color: "bg-blue-500" },
+                ]
+            ).map(({ label, visited, total, color }, i, arr) => (
               <div key={label} className="flex items-center gap-2">
                 <span className="text-xs text-slate-400">{label}</span>
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-white border border-slate-700">
@@ -2274,15 +2561,88 @@ export default function App() {
           </div>
         )}
 
+        {/* TCC tab */}
+        {listTab === "tcc" && (
+          <div className="px-6 py-4">
+            <div className="flex items-center gap-2 mb-3 flex-wrap">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Regions</span>
+              {(Object.entries(TCC_REGIONS) as [TccRegionKey, typeof TCC_REGIONS[TccRegionKey]][]).map(([k, r]) => {
+                const visitedInRegion = sortedTcc.filter(e => e.region === k && tccVisited.has(e.name)).length;
+                const totalInRegion = sortedTcc.filter(e => e.region === k).length;
+                return (
+                  <span key={k} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: r.color }}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-white/80" />
+                    {r.name}
+                    <span className="text-white/80 font-mono">{visitedInRegion}/{totalInRegion}</span>
+                  </span>
+                );
+              })}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-1.5">
+              {sortedTcc.map((entry) => {
+                const isVisited = tccVisited.has(entry.name);
+                const isBucket = !isVisited && tccBucket.has(entry.name);
+                const isActive = selectedTcc?.name === entry.name;
+                const region = TCC_REGIONS[entry.region];
+                return (
+                  <div
+                    key={entry.name}
+                    className={`flex items-center gap-1.5 px-2 py-2 rounded-lg text-sm transition-colors border ${
+                      isActive
+                        ? "bg-yellow-500/20 border-yellow-500/40"
+                        : isVisited
+                        ? "bg-purple-900/30 border-purple-700/30 hover:bg-purple-800/30"
+                        : isBucket
+                        ? "bg-amber-900/20 border-amber-700/30 hover:bg-amber-900/30"
+                        : "bg-slate-800/40 hover:bg-slate-700/60 border-transparent"
+                    }`}
+                  >
+                    {!isReadOnly && <input
+                      type="checkbox"
+                      checked={isVisited}
+                      onChange={() => toggleTccVisited(entry.name)}
+                      className="w-3.5 h-3.5 flex-shrink-0 accent-purple-500 cursor-pointer"
+                    />}
+                    <span
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: region.color }}
+                      title={region.name}
+                    />
+                    <button
+                      onClick={() => {
+                        setSelectedTcc(prev => prev?.name === entry.name ? null : entry);
+                        setConfirmBucket(null);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className={`text-left truncate flex-1 min-w-0 ${isActive ? "text-yellow-300" : isVisited ? "text-purple-200" : isBucket ? "text-amber-300" : "text-slate-300 hover:text-white"}`}
+                      title={`${entry.name} — ${region.name}`}
+                    >
+                      {entry.name}
+                    </button>
+                    {entry.geoId && (
+                      <span className="text-slate-500 text-[10px] flex-shrink-0" title="Located on map">🗺</span>
+                    )}
+                    {!isReadOnly && <button
+                      onClick={(e) => { e.stopPropagation(); toggleTccBucket(entry.name, isVisited); }}
+                      className={`flex-shrink-0 text-sm leading-none transition-colors ${isBucket ? "text-amber-400 hover:text-slate-400" : "text-slate-600 hover:text-amber-400"}`}
+                      title={isBucket ? "Remove from bucket list" : "Add to bucket list"}
+                    >★</button>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Bucket List tab */}
         {listTab === "bucket-list" && (() => {
-          const bucketTotal = bucketCountries.size + bucketStates.size + bucketProvinces.size + bucketStadiums.size;
+          const bucketTotal = bucketCountries.size + bucketStates.size + bucketProvinces.size + bucketStadiums.size + tccBucket.size;
           if (bucketTotal === 0) {
             return (
               <div className="px-6 py-12 text-center text-slate-400">
                 <div className="text-4xl mb-3">★</div>
                 <p className="text-base font-medium text-slate-300 mb-1">Your bucket list is empty</p>
-                <p className="text-sm">Click the ★ on any country, state, province, or stadium to add it here.</p>
+                <p className="text-sm">Click the ★ on any country, state, province, stadium, or TCC entry to add it here.</p>
               </div>
             );
           }
@@ -2291,6 +2651,7 @@ export default function App() {
             ...sortedStates.filter(s => bucketStates.has(s.fips)).map(s => ({ name: s.name, sub: "", badge: "US State", badgeClass: "bg-red-900/80 text-red-300", key: `state-${s.fips}`, id: s.fips, cat: "state" as const })),
             ...sortedProvinces.filter(p => bucketProvinces.has(p.key)).map(p => ({ name: p.name, sub: "", badge: "Province", badgeClass: "bg-orange-900/80 text-orange-300", key: `province-${p.key}`, id: p.key, cat: "province" as const })),
             ...sortedStadiums.filter(s => bucketStadiums.has(s.team)).map(s => ({ name: s.team, sub: s.stadium, badge: "Stadium", badgeClass: "bg-violet-900/80 text-violet-300", key: `stadium-${s.team}`, id: s.team, cat: "stadium" as const })),
+            ...sortedTcc.filter(e => tccBucket.has(e.name)).map(e => ({ name: e.name, sub: TCC_REGIONS[e.region].name, badge: "TCC", badgeClass: "bg-purple-900/80 text-purple-300", key: `tcc-${e.name}`, id: e.name, cat: "tcc" as const })),
           ].sort((a, b) => a.name.localeCompare(b.name));
           return (
             <div className="px-6 py-4">
@@ -2303,12 +2664,16 @@ export default function App() {
                       onClick={() => {
                         if (item.cat === "stadium") {
                           const s = MLB_STADIUMS.find(st => st.team === item.id);
-                          if (s) { setSelected(null); setSelectedStadium(s); window.scrollTo({ top: 0, behavior: "smooth" }); }
+                          if (s) { setSelected(null); setSelectedTcc(null); setSelectedStadium(s); window.scrollTo({ top: 0, behavior: "smooth" }); }
+                        } else if (item.cat === "tcc") {
+                          const t = TCC_BY_NAME.get(item.id);
+                          if (t) { setSelected(null); setSelectedStadium(null); setSelectedTcc(t); if (mapMode !== "tcc") setMapMode("tcc"); window.scrollTo({ top: 0, behavior: "smooth" }); }
                         } else {
-                          setSelectedStadium(null);
+                          setSelectedStadium(null); setSelectedTcc(null);
                           if (item.cat === "country") { const c = sortedCountries.find(c => c.id === item.id); if (c) setSelected({ key: item.key, info: c }); }
                           else if (item.cat === "state") { const s = sortedStates.find(s => s.fips === item.id); if (s) setSelected({ key: item.key, info: s }); }
                           else if (item.cat === "province") { const p = sortedProvinces.find(p => p.key === item.id); if (p) setSelected({ key: item.key, info: p }); }
+                          if (mapMode !== "world") setMapMode("world");
                           window.scrollTo({ top: 0, behavior: "smooth" });
                         }
                       }}
@@ -2321,6 +2686,7 @@ export default function App() {
                         if (item.cat === "country") toggleCountryBucket(item.id, false);
                         else if (item.cat === "state") toggleStateBucket(item.id, false);
                         else if (item.cat === "province") toggleProvinceBucket(item.id, false);
+                        else if (item.cat === "tcc") toggleTccBucket(item.id, false);
                         else toggleStadiumBucket(item.id, false);
                       }}
                       className="text-amber-500 hover:text-slate-400 shrink-0 text-sm leading-none mt-0.5"
@@ -2359,6 +2725,8 @@ export default function App() {
           bucketStates={isReadOnly ? bucketStates : rawBucketStates}
           bucketProvinces={isReadOnly ? bucketProvinces : rawBucketProvinces}
           bucketStadiums={isReadOnly ? bucketStadiums : rawBucketStadiums}
+          tccVisited={isReadOnly ? tccVisited : rawTccVisited}
+          tccBucket={isReadOnly ? tccBucket : rawTccBucket}
         />
       )}
 

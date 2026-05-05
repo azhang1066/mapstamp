@@ -1,0 +1,59 @@
+Feature: TCC (Travelers' Century Club) View
+Add a second map view that tracks the official Travelers' Century Club list of 330 countries and territories, toggleable with the existing country view.
+
+THE TOGGLE
+
+Add a prominent toggle/tab switcher in the header: "World Countries" | "TCC (330)"
+Switching between views should be instant with no page reload
+Each view maintains its own independent visited/bucket list state in localStorage
+
+
+THE TCC VIEW
+
+Replaces the main map with a world map showing all 330 TCC countries and territories as clickable regions
+The TCC list differs from standard country lists by splitting some countries into separate trackable territories — for example:
+
+The UAE counts Abu Dhabi, Dubai, and Ras Al Khaimah as three separate entries
+Alaska and Tasmania are separate entries from the US and Australia
+Many island territories, exclaves, and autonomous regions are individually tracked
+
+
+The 330 entries are grouped into 12 regions: Africa, Antarctica, Asia, Atlantic Ocean, Caribbean, Central America, Europe & Mediterranean, Indian Ocean, Middle East, North America, Pacific Ocean, and South America Wikipedia — use these as the color coding system on the map
+Territories that don't have their own distinct GeoJSON boundary (small islands, exclaves) should appear as labeled map markers/pins instead of shaded regions
+Hover tooltips and the sidebar info panel work the same as the existing country view
+
+
+THE TCC LIST TAB
+
+In the list section below the map, add a "TCC" tab alongside the existing Countries / US States / CA Provinces / MLB Stadiums tabs
+All 330 entries listed alphabetically with checkboxes, same UX as other tabs
+Each entry shows its TCC region as a small color-coded badge
+Entries that overlap with the standard country list (e.g. France) should have a small link icon indicating they're also tracked in the main view
+
+
+PROGRESS TRACKING
+
+Add a TCC-specific progress counter: TCC: X / 330 in a distinct color (purple)
+Show it only when the TCC view is active, or always visible as a fifth bar alongside the existing four
+Milestone callout at 100 visited — "You qualify for TCC membership!" Wikipedia shown as a celebratory banner
+
+
+DATA SOURCE
+
+Hard-code the full official TCC list of 330 entries (as of January 2022) into the app — the full alphabetical list is available at travelerscenturyclub.org/countries-and-territories/alphabetical-list/
+Each entry should include: TCC name, region, and whether it maps to a standard country GeoJSON boundary or needs a custom marker
+
+
+PERSISTENCE
+
+Extend localStorage schema to include TCC state separately from the standard country view:
+
+json{
+  "v": 3,
+  "tcc": {
+    "Abu Dhabi": { "visited": true, "timesVisited": 1, "firstYear": 2019, "lastYear": 2019 },
+    "Dubai": { "visited": false, "bucketList": true }
+  }
+}
+
+TCC visit details (times visited, first/last year dropdowns) work identically to the existing country view

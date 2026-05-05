@@ -1,0 +1,66 @@
+Feature: Bucket List Mode
+Add a "Bucket List" toggle state to every location (countries, US states, Canadian provinces, MLB stadiums) as a second tracking layer alongside the existing "visited" state.
+
+THE THREE STATES
+Every location should now have one of three states:
+
+Untracked — default dark/muted appearance (no action taken)
+Bucket List — want to go, shown as a distinct color/pattern on the map
+Visited — been there, shown in the existing category colors
+
+A location can only be in one state at a time. Marking something as visited should automatically remove it from the bucket list.
+
+MAP APPEARANCE
+
+Bucket list locations should appear in a light gold / pale yellow with a subtle hatching or dashed border to visually distinguish from visited (solid color) and untracked (dark/muted)
+MLB stadium bucket list markers should show as a gold/outlined flag instead of the solid blue visited flag
+The currently selected location still highlights in bright yellow regardless of state
+
+
+SIDEBAR
+
+In the sidebar info panel, add two clearly labeled buttons below the location name:
+
+"✓ Mark Visited" — marks as visited, clears bucket list status
+"★ Add to Bucket List" — adds to bucket list, clears visited status (with a confirmation if the location was previously visited: "Remove from visited and add to bucket list?")
+
+
+If already visited, the "Mark Visited" button should appear active/filled and clicking it should toggle it off (un-mark as visited)
+Same toggle behavior for the bucket list button
+Show the visit detail dropdowns (times visited, first/last year) only for visited locations, not bucket list ones
+
+
+LIST SECTION
+
+Add a ★ icon next to each location name in the list tabs that toggles bucket list status on/off
+Bucket list items should show in gold in the list
+Add a fifth tab: "Bucket List" — shows all bucket list locations across all categories, sorted alphabetically, with their category label (Country / State / Province / Stadium) shown as a small badge next to the name
+
+
+PROGRESS TRACKING
+
+Add a bucket list counter below or alongside the existing four progress bars:
+
+★ Bucket List: X total (shown in gold)
+
+
+Optionally break it down: "12 countries, 4 states, 2 stadiums"
+
+
+PERSISTENCE
+
+Extend the existing localStorage schema to include bucket list state:
+
+json{
+  "v": 2,
+  "countries": {
+    "FR": { "visited": false, "bucketList": true },
+    "US": { "visited": true, "timesVisited": 3, "firstYear": 2010, "lastYear": 2023 }
+  },
+  "states": {},
+  "provinces": {},
+  "stadiums": {}
+}
+
+Migrate v1 data to v2 on load — existing visited locations should be unaffected
+Save on every state change as usual

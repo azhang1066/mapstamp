@@ -16,6 +16,29 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
 
+## Artifacts
+
+### World Map (`artifacts/world-map`)
+Interactive travel tracker built with React + Vite + TypeScript, react-simple-maps, Tailwind CSS.
+
+**Features:**
+- Clickable world map with 195 countries (continent-color-coded)
+- US States and Canadian Provinces via zoomed sub-layers
+- MLB Stadium flag markers (30 teams)
+- Microstate dot markers (Vatican, Monaco, San Marino, etc.)
+- Visited tracking with scratch-off style color reveals
+- **Bucket List mode** — golden dashed-border map styling; ★ toggle on every list item; dedicated ★ Bucket List tab aggregating all categories
+- Visit details panel (dates, notes, times visited) — shown only for visited items
+- Progress counters + progress bars for all 4 categories + bucket list count
+- localStorage persistence (wm_visited_*, wm_bucket_*, wm_details_*)
+- CSV export and Excel import (xlsx) with download template
+- Search bar with autocomplete + fly-to (zoom + pan) behavior
+- Tooltip on hover, zoom controls, reset
+
+**Key state:** visited/bucket Sets per category, details Records per category, confirmBucket string|null for UX confirmation when moving visited → bucket.
+
+**Key constants:** BUCKET_LIST_COLOR="#a37c1a", BUCKET_LIST_STROKE="#fbbf24"
+
 ## Key Commands
 
 - `pnpm run typecheck` — full typecheck across all packages

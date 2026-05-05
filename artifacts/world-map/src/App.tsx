@@ -434,7 +434,11 @@ const CA_PROVINCE_COLOR = "#f97316";
 const CA_PROVINCE_HOVER_COLOR = "#ea580c";
 const SELECTED_COLOR = "#facc15";
 
-function getCountryFill(numericCode: string, isSelected: boolean, isHovered: boolean, isVisited: boolean) {
+const BUCKET_LIST_COLOR = "#a37c1a";
+const BUCKET_LIST_HOVER_COLOR = "#c49a22";
+const BUCKET_LIST_STROKE = "#fbbf24";
+
+function getCountryFill(numericCode: string, isSelected: boolean, isHovered: boolean, isVisited: boolean, isBucketList: boolean) {
   if (isSelected) return SELECTED_COLOR;
   const data = COUNTRY_DATA[numericCode];
   if (data) {
@@ -442,20 +446,23 @@ function getCountryFill(numericCode: string, isSelected: boolean, isHovered: boo
       const base = CONTINENT_COLORS[data.continent ?? ""] ?? "#64748b";
       return isHovered ? base : base + "cc";
     }
+    if (isBucketList) return isHovered ? BUCKET_LIST_HOVER_COLOR : BUCKET_LIST_COLOR;
     return isHovered ? "#3d4a5c" : "#253040";
   }
   return isHovered ? "#3d4a5c" : "#1e293b";
 }
 
-function getStateFill(isSelected: boolean, isHovered: boolean, isVisited: boolean) {
+function getStateFill(isSelected: boolean, isHovered: boolean, isVisited: boolean, isBucketList: boolean) {
   if (isSelected) return SELECTED_COLOR;
   if (isVisited) return isHovered ? US_STATE_HOVER_COLOR : US_STATE_COLOR + "cc";
+  if (isBucketList) return isHovered ? BUCKET_LIST_HOVER_COLOR : BUCKET_LIST_COLOR;
   return isHovered ? "#3d4a5c" : "#253040";
 }
 
-function getProvinceFill(isSelected: boolean, isHovered: boolean, isVisited: boolean) {
+function getProvinceFill(isSelected: boolean, isHovered: boolean, isVisited: boolean, isBucketList: boolean) {
   if (isSelected) return SELECTED_COLOR;
   if (isVisited) return isHovered ? CA_PROVINCE_HOVER_COLOR : CA_PROVINCE_COLOR + "cc";
+  if (isBucketList) return isHovered ? BUCKET_LIST_HOVER_COLOR : BUCKET_LIST_COLOR;
   return isHovered ? "#3d4a5c" : "#253040";
 }
 
@@ -1076,7 +1083,8 @@ export default function App() {
   const [tooltipName, setTooltipName] = useState<string>("");
   const [zoom, setZoom] = useState(1);
   const [center, setCenter] = useState<[number, number]>([0, 20]);
-  const [listTab, setListTab] = useState<"countries" | "stadiums" | "us-states" | "ca-provinces">("countries");
+  const [listTab, setListTab] = useState<"countries" | "stadiums" | "us-states" | "ca-provinces" | "bucket-list">("countries");
+  const [confirmBucket, setConfirmBucket] = useState<string | null>(null);
   const [showExport, setShowExport] = useState(false);
   const [toast, setToast] = useState<{ message: string; kind: "success" | "warning" } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1085,6 +1093,10 @@ export default function App() {
   const [visitedStadiums, setVisitedStadiums] = useLocalStorageSet("wm_visited_stadiums");
   const [visitedStates, setVisitedStates] = useLocalStorageSet("wm_visited_states");
   const [visitedProvinces, setVisitedProvinces] = useLocalStorageSet("wm_visited_provinces");
+  const [bucketCountries, setBucketCountries] = useLocalStorageSet("wm_bucket_countries");
+  const [bucketStadiums, setBucketStadiums] = useLocalStorageSet("wm_bucket_stadiums");
+  const [bucketStates, setBucketStates] = useLocalStorageSet("wm_bucket_states");
+  const [bucketProvinces, setBucketProvinces] = useLocalStorageSet("wm_bucket_provinces");
   const [countryDetails, setCountryDetail] = useLocalStorageRecord("wm_details_countries");
   const [stadiumDetails, setStadiumDetail] = useLocalStorageRecord("wm_details_stadiums");
   const [stateDetails, setStateDetail] = useLocalStorageRecord("wm_details_states");
@@ -1108,35 +1120,75 @@ export default function App() {
     e?.stopPropagation();
     setVisitedCountries(prev => {
       const n = new Set(prev);
-      if (n.has(id)) { n.delete(id); setCountryDetail(id, null); } else n.add(id);
+      if (n.has(id)) { n.delete(id); setCountryDetail(id, null); }
+      else { n.add(id); setBucketCountries(b => { const nb = new Set(b); nb.delete(id); return nb; }); }
       return n;
     });
-  }, [setCountryDetail]);
+  }, [setCountryDetail, setBucketCountries]);
 
   const toggleStadiumVisited = useCallback((team: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
     setVisitedStadiums(prev => {
       const n = new Set(prev);
-      if (n.has(team)) { n.delete(team); setStadiumDetail(team, null); } else n.add(team);
+      if (n.has(team)) { n.delete(team); setStadiumDetail(team, null); }
+      else { n.add(team); setBucketStadiums(b => { const nb = new Set(b); nb.delete(team); return nb; }); }
       return n;
     });
-  }, [setStadiumDetail]);
+  }, [setStadiumDetail, setBucketStadiums]);
 
   const toggleStateVisited = useCallback((fips: string) => {
     setVisitedStates(prev => {
       const n = new Set(prev);
-      if (n.has(fips)) { n.delete(fips); setStateDetail(fips, null); } else n.add(fips);
+      if (n.has(fips)) { n.delete(fips); setStateDetail(fips, null); }
+      else { n.add(fips); setBucketStates(b => { const nb = new Set(b); nb.delete(fips); return nb; }); }
       return n;
     });
-  }, [setStateDetail]);
+  }, [setStateDetail, setBucketStates]);
 
   const toggleProvinceVisited = useCallback((name: string) => {
     setVisitedProvinces(prev => {
       const n = new Set(prev);
-      if (n.has(name)) { n.delete(name); setProvinceDetail(name, null); } else n.add(name);
+      if (n.has(name)) { n.delete(name); setProvinceDetail(name, null); }
+      else { n.add(name); setBucketProvinces(b => { const nb = new Set(b); nb.delete(name); return nb; }); }
       return n;
     });
+  }, [setProvinceDetail, setBucketProvinces]);
+
+  const toggleCountryBucket = useCallback((id: string, isVisited: boolean) => {
+    setConfirmBucket(null);
+    if (isVisited) {
+      setVisitedCountries(prev => { const n = new Set(prev); n.delete(id); return n; });
+      setCountryDetail(id, null);
+    }
+    setBucketCountries(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }, [setCountryDetail]);
+
+  const toggleStateBucket = useCallback((fips: string, isVisited: boolean) => {
+    setConfirmBucket(null);
+    if (isVisited) {
+      setVisitedStates(prev => { const n = new Set(prev); n.delete(fips); return n; });
+      setStateDetail(fips, null);
+    }
+    setBucketStates(prev => { const n = new Set(prev); if (n.has(fips)) n.delete(fips); else n.add(fips); return n; });
+  }, [setStateDetail]);
+
+  const toggleProvinceBucket = useCallback((name: string, isVisited: boolean) => {
+    setConfirmBucket(null);
+    if (isVisited) {
+      setVisitedProvinces(prev => { const n = new Set(prev); n.delete(name); return n; });
+      setProvinceDetail(name, null);
+    }
+    setBucketProvinces(prev => { const n = new Set(prev); if (n.has(name)) n.delete(name); else n.add(name); return n; });
   }, [setProvinceDetail]);
+
+  const toggleStadiumBucket = useCallback((team: string, isVisited: boolean) => {
+    setConfirmBucket(null);
+    if (isVisited) {
+      setVisitedStadiums(prev => { const n = new Set(prev); n.delete(team); return n; });
+      setStadiumDetail(team, null);
+    }
+    setBucketStadiums(prev => { const n = new Set(prev); if (n.has(team)) n.delete(team); else n.add(team); return n; });
+  }, [setStadiumDetail]);
 
   const showToast = useCallback((message: string, kind: "success" | "warning") => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -1344,6 +1396,7 @@ export default function App() {
                       const key = `country-${geo.id}`;
                       const isSelected = selected?.key === key;
                       const isVisited = visitedCountries.has(geo.id);
+                      const isBucketList = !isVisited && bucketCountries.has(geo.id);
                       const countryName = COUNTRY_DATA[geo.id]?.name ?? "";
                       const isHovered = hovered === countryName;
                       return (
@@ -1355,8 +1408,8 @@ export default function App() {
                           onMouseMove={handleMouseMove}
                           onMouseLeave={handleMouseLeave}
                           style={{
-                            default: { fill: getCountryFill(geo.id, isSelected, false, isVisited), stroke: "#1e293b", strokeWidth: 0.5, outline: "none", cursor: "pointer", transition: "fill 0.15s" },
-                            hover: { fill: getCountryFill(geo.id, isSelected, true, isVisited), stroke: "#334155", strokeWidth: 0.7, outline: "none", cursor: "pointer" },
+                            default: { fill: getCountryFill(geo.id, isSelected, false, isVisited, isBucketList), stroke: isBucketList ? BUCKET_LIST_STROKE : "#1e293b", strokeWidth: isBucketList ? 0.8 : 0.5, strokeDasharray: isBucketList ? "3 2" : undefined, outline: "none", cursor: "pointer", transition: "fill 0.15s" },
+                            hover: { fill: getCountryFill(geo.id, isSelected, true, isVisited, isBucketList), stroke: isBucketList ? BUCKET_LIST_STROKE : "#334155", strokeWidth: isBucketList ? 1 : 0.7, outline: "none", cursor: "pointer" },
                             pressed: { fill: SELECTED_COLOR, outline: "none" },
                           }}
                         />
@@ -1373,6 +1426,7 @@ export default function App() {
                     const key = `state-${fips}`;
                     const isSelected = selected?.key === key;
                     const isVisited = visitedStates.has(fips);
+                    const isBucketList = !isVisited && bucketStates.has(fips);
                     const stateName = US_STATE_DATA[fips]?.name ?? "Unknown State";
                     const isHovered = hovered === stateName;
                     return (
@@ -1384,8 +1438,8 @@ export default function App() {
                         onMouseMove={handleMouseMove}
                         onMouseLeave={handleMouseLeave}
                         style={{
-                          default: { fill: getStateFill(isSelected, false, isVisited), stroke: "#1e293b", strokeWidth: 0.4, outline: "none", cursor: "pointer", transition: "fill 0.15s" },
-                          hover: { fill: getStateFill(isSelected, true, isVisited), stroke: "#334155", strokeWidth: 0.6, outline: "none", cursor: "pointer" },
+                          default: { fill: getStateFill(isSelected, false, isVisited, isBucketList), stroke: isBucketList ? BUCKET_LIST_STROKE : "#1e293b", strokeWidth: isBucketList ? 0.8 : 0.4, strokeDasharray: isBucketList ? "3 2" : undefined, outline: "none", cursor: "pointer", transition: "fill 0.15s" },
+                          hover: { fill: getStateFill(isSelected, true, isVisited, isBucketList), stroke: isBucketList ? BUCKET_LIST_STROKE : "#334155", strokeWidth: isBucketList ? 1 : 0.6, outline: "none", cursor: "pointer" },
                           pressed: { fill: SELECTED_COLOR, outline: "none" },
                         }}
                       />
@@ -1402,6 +1456,7 @@ export default function App() {
                     const key = `province-${name}`;
                     const isSelected = selected?.key === key;
                     const isVisited = visitedProvinces.has(name);
+                    const isBucketList = !isVisited && bucketProvinces.has(name);
                     const isHovered = hovered === name;
                     return (
                       <Geography
@@ -1412,8 +1467,8 @@ export default function App() {
                         onMouseMove={handleMouseMove}
                         onMouseLeave={handleMouseLeave}
                         style={{
-                          default: { fill: getProvinceFill(isSelected, false, isVisited), stroke: "#1e293b", strokeWidth: 0.4, outline: "none", cursor: "pointer", transition: "fill 0.15s" },
-                          hover: { fill: getProvinceFill(isSelected, true, isVisited), stroke: "#334155", strokeWidth: 0.6, outline: "none", cursor: "pointer" },
+                          default: { fill: getProvinceFill(isSelected, false, isVisited, isBucketList), stroke: isBucketList ? BUCKET_LIST_STROKE : "#1e293b", strokeWidth: isBucketList ? 0.8 : 0.4, strokeDasharray: isBucketList ? "3 2" : undefined, outline: "none", cursor: "pointer", transition: "fill 0.15s" },
+                          hover: { fill: getProvinceFill(isSelected, true, isVisited, isBucketList), stroke: isBucketList ? BUCKET_LIST_STROKE : "#334155", strokeWidth: isBucketList ? 1 : 0.6, outline: "none", cursor: "pointer" },
                           pressed: { fill: SELECTED_COLOR, outline: "none" },
                         }}
                       />
@@ -1427,11 +1482,12 @@ export default function App() {
                 if (!info) return null;
                 const isSelected = selected?.key === `country-${id}`;
                 const isVisited = visitedCountries.has(id);
+                const isBucketList = !isVisited && bucketCountries.has(id);
                 const isHov = hovered === info.name;
                 const s = 1 / zoom;
-                const continentColor = CONTINENT_COLORS[info.continent] ?? "#94a3b8";
-                const fillColor = isSelected ? SELECTED_COLOR : isVisited ? continentColor : (isHov ? "#475569" : "#334155");
-                const ringColor = isSelected ? "#f59e0b" : isVisited ? continentColor : "#475569";
+                const continentColor = (CONTINENT_COLORS as Record<string, string>)[info.continent ?? ""] ?? "#94a3b8";
+                const fillColor = isSelected ? SELECTED_COLOR : isVisited ? continentColor : isBucketList ? BUCKET_LIST_COLOR : (isHov ? "#475569" : "#334155");
+                const ringColor = isSelected ? "#f59e0b" : isVisited ? continentColor : isBucketList ? BUCKET_LIST_STROKE : "#475569";
                 return (
                   <Marker key={id} coordinates={coordinates}>
                     <g
@@ -1454,10 +1510,12 @@ export default function App() {
                 const isSelected = selectedStadium?.team === stadium.team;
                 const isHov = hoveredStadium === stadium.team;
                 const isVisited = visitedStadiums.has(stadium.team);
+                const isBucketList = !isVisited && bucketStadiums.has(stadium.team);
                 const s = 1 / zoom;
-                const poleColor = isSelected ? "#facc15" : isVisited ? "#93c5fd" : "#64748b";
-                const flagColor = isSelected ? "#facc15" : isVisited ? (isHov ? "#60a5fa" : "#2563eb") : (isHov ? "#64748b" : "#374151");
-                const dotColor = isSelected ? "#facc15" : isVisited ? "#2563eb" : "#374151";
+                const poleColor = isSelected ? "#facc15" : isVisited ? "#93c5fd" : isBucketList ? BUCKET_LIST_STROKE : "#64748b";
+                const flagColor = isSelected ? "#facc15" : isVisited ? (isHov ? "#60a5fa" : "#2563eb") : isBucketList ? "none" : (isHov ? "#64748b" : "#374151");
+                const flagStroke = isSelected ? "#f59e0b" : isVisited ? "#1d4ed8" : isBucketList ? BUCKET_LIST_STROKE : "#1f2937";
+                const dotColor = isSelected ? "#facc15" : isVisited ? "#2563eb" : isBucketList ? BUCKET_LIST_COLOR : "#374151";
                 return (
                   <Marker key={stadium.team} coordinates={stadium.coordinates}>
                     <g
@@ -1469,7 +1527,7 @@ export default function App() {
                       onMouseLeave={() => { setHoveredStadium(null); setTooltipName(""); }}
                     >
                       <line x1="0" y1="0" x2="0" y2="-20" stroke={poleColor} strokeWidth={isHov || isSelected ? 2 : 1.5} />
-                      <polygon points="0,-20 12,-16 0,-12" fill={flagColor} stroke={isSelected ? "#f59e0b" : isVisited ? "#1d4ed8" : "#1f2937"} strokeWidth="0.5" />
+                      <polygon points="0,-20 12,-16 0,-12" fill={flagColor} stroke={flagStroke} strokeWidth={isBucketList ? 1 : 0.5} />
                       <circle r={isHov || isSelected ? 3.5 : 2.5} fill={dotColor} stroke="#0f172a" strokeWidth="0.8" />
                     </g>
                   </Marker>
@@ -1537,13 +1595,40 @@ export default function App() {
                 </div>
               </div>
 
-              {visitedStadiums.has(selectedStadium.team) && (
-                <VisitDetailsPanel
-                  locationId={selectedStadium.team}
-                  details={stadiumDetails[selectedStadium.team]}
-                  onUpdate={setStadiumDetail}
-                />
-              )}
+              {(() => {
+                const team = selectedStadium.team;
+                const isVisited = visitedStadiums.has(team);
+                const isBucketList = !isVisited && bucketStadiums.has(team);
+                const confirmKey = `stadium-${team}`;
+                return (
+                  <>
+                    <div className="flex gap-2 mt-5 pt-5 border-t border-slate-800">
+                      <button
+                        onClick={() => { toggleStadiumVisited(team); setConfirmBucket(null); }}
+                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isVisited ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white"}`}
+                      >
+                        <span>{isVisited ? "✓" : "○"}</span>{isVisited ? "Visited" : "Mark Visited"}
+                      </button>
+                      <button
+                        onClick={() => { if (!isBucketList && isVisited) { setConfirmBucket(confirmKey); } else { toggleStadiumBucket(team, false); } }}
+                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isBucketList ? "bg-amber-700 hover:bg-amber-600 text-white" : "bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white"}`}
+                      >
+                        <span>★</span>{isBucketList ? "On Bucket List" : "Bucket List"}
+                      </button>
+                    </div>
+                    {confirmBucket === confirmKey && (
+                      <div className="mt-2 p-3 bg-amber-900/40 border border-amber-700/60 rounded-lg text-sm">
+                        <p className="text-amber-200 mb-2">Remove from visited and add to bucket list?</p>
+                        <div className="flex gap-2">
+                          <button onClick={() => toggleStadiumBucket(team, true)} className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium">Confirm</button>
+                          <button onClick={() => setConfirmBucket(null)} className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium">Cancel</button>
+                        </div>
+                      </div>
+                    )}
+                    {isVisited && <VisitDetailsPanel locationId={team} details={stadiumDetails[team]} onUpdate={setStadiumDetail} />}
+                  </>
+                );
+              })()}
 
               <div className="mt-5 pt-5 border-t border-slate-800">
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Other Teams in {selectedStadium.division}</p>
@@ -1640,23 +1725,58 @@ export default function App() {
 
               {(() => {
                 const rawId = selected.key.replace(/^(country|state|province)-/, "");
-                const isVisited = selected.key.startsWith("country-")
-                  ? visitedCountries.has(rawId)
-                  : selected.key.startsWith("state-")
-                  ? visitedStates.has(rawId)
-                  : visitedProvinces.has(rawId);
-                if (!isVisited) return null;
-                const details = selected.key.startsWith("country-")
-                  ? countryDetails[rawId]
-                  : selected.key.startsWith("state-")
-                  ? stateDetails[rawId]
-                  : provinceDetails[rawId];
-                const setter = selected.key.startsWith("country-")
-                  ? setCountryDetail
-                  : selected.key.startsWith("state-")
-                  ? setStateDetail
-                  : setProvinceDetail;
-                return <VisitDetailsPanel locationId={rawId} details={details} onUpdate={setter} />;
+                const isCountry = selected.key.startsWith("country-");
+                const isState = selected.key.startsWith("state-");
+                const isVisited = isCountry ? visitedCountries.has(rawId) : isState ? visitedStates.has(rawId) : visitedProvinces.has(rawId);
+                const isBucketList = (isCountry ? bucketCountries : isState ? bucketStates : bucketProvinces).has(rawId);
+                const confirmKey = selected.key;
+                const handleToggleVisited = () => {
+                  setConfirmBucket(null);
+                  if (isCountry) toggleCountryVisited(rawId);
+                  else if (isState) toggleStateVisited(rawId);
+                  else toggleProvinceVisited(rawId);
+                };
+                const handleToggleBucket = () => {
+                  if (!isBucketList && isVisited) { setConfirmBucket(confirmKey); }
+                  else if (isCountry) toggleCountryBucket(rawId, false);
+                  else if (isState) toggleStateBucket(rawId, false);
+                  else toggleProvinceBucket(rawId, false);
+                };
+                const handleConfirmBucket = () => {
+                  if (isCountry) toggleCountryBucket(rawId, true);
+                  else if (isState) toggleStateBucket(rawId, true);
+                  else toggleProvinceBucket(rawId, true);
+                };
+                const details = isCountry ? countryDetails[rawId] : isState ? stateDetails[rawId] : provinceDetails[rawId];
+                const setter = isCountry ? setCountryDetail : isState ? setStateDetail : setProvinceDetail;
+                return (
+                  <>
+                    <div className="flex gap-2 mt-5 pt-5 border-t border-slate-800">
+                      <button
+                        onClick={handleToggleVisited}
+                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isVisited ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white"}`}
+                      >
+                        <span>{isVisited ? "✓" : "○"}</span>{isVisited ? "Visited" : "Mark Visited"}
+                      </button>
+                      <button
+                        onClick={handleToggleBucket}
+                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isBucketList ? "bg-amber-700 hover:bg-amber-600 text-white" : "bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white"}`}
+                      >
+                        <span>★</span>{isBucketList ? "On Bucket List" : "Bucket List"}
+                      </button>
+                    </div>
+                    {confirmBucket === confirmKey && (
+                      <div className="mt-2 p-3 bg-amber-900/40 border border-amber-700/60 rounded-lg text-sm">
+                        <p className="text-amber-200 mb-2">Remove from visited and add to bucket list?</p>
+                        <div className="flex gap-2">
+                          <button onClick={handleConfirmBucket} className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium">Confirm</button>
+                          <button onClick={() => setConfirmBucket(null)} className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium">Cancel</button>
+                        </div>
+                      </div>
+                    )}
+                    {isVisited && <VisitDetailsPanel locationId={rawId} details={details} onUpdate={setter} />}
+                  </>
+                );
               })()}
             </div>
           ) : (
@@ -1689,6 +1809,10 @@ export default function App() {
                       <circle cy="0" r="2.5" fill="#1d4ed8"/>
                     </svg>
                     <span className="text-sm text-slate-300">MLB Stadium</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-sm flex-shrink-0 border-2" style={{ backgroundColor: BUCKET_LIST_COLOR, borderColor: BUCKET_LIST_STROKE, borderStyle: "dashed" }} />
+                    <span className="text-sm text-slate-300">Bucket List</span>
                   </div>
                 </div>
               </div>
@@ -1740,6 +1864,7 @@ export default function App() {
               { id: "us-states", label: "US States" },
               { id: "ca-provinces", label: "CA Provinces" },
               { id: "stadiums", label: "MLB Stadiums" },
+              { id: "bucket-list", label: "★ Bucket List" },
             ] as const).map(tab => (
               <button
                 key={tab.id}
@@ -1770,9 +1895,20 @@ export default function App() {
                 <div className="w-16 h-1.5 bg-slate-700 rounded-full overflow-hidden">
                   <div className={`h-full ${color} rounded-full transition-all duration-300`} style={{ width: `${(visited / total) * 100}%` }} />
                 </div>
-                {i < arr.length - 1 && <div className="w-px h-5 bg-slate-700" />}
+                <div className="w-px h-5 bg-slate-700" />
               </div>
             ))}
+            {(() => {
+              const bucketTotal = bucketCountries.size + bucketStates.size + bucketProvinces.size + bucketStadiums.size;
+              return (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-amber-400">★ Bucket List</span>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-900/40 text-amber-300 border border-amber-700/50">
+                    {bucketTotal}
+                  </span>
+                </div>
+              );
+            })()}
           </div>
         </div>
 
@@ -1782,6 +1918,7 @@ export default function App() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5">
               {sortedCountries.map((country) => {
                 const isVisited = visitedCountries.has(country.id);
+                const isBucket = !isVisited && bucketCountries.has(country.id);
                 const isActive = selected?.key === `country-${country.id}`;
                 return (
                   <div
@@ -1791,6 +1928,8 @@ export default function App() {
                         ? "bg-yellow-500/20 border border-yellow-500/40"
                         : isVisited
                         ? "bg-emerald-900/30 border border-emerald-700/30 hover:bg-emerald-800/30"
+                        : isBucket
+                        ? "bg-amber-900/20 border border-amber-700/30 hover:bg-amber-900/30"
                         : "bg-slate-800/40 hover:bg-slate-700/60 border border-transparent"
                     }`}
                   >
@@ -1807,11 +1946,16 @@ export default function App() {
                         setSelected({ key: `country-${country.id}`, info: country });
                         window.scrollTo({ top: 0, behavior: "smooth" });
                       }}
-                      className={`text-left truncate flex-1 min-w-0 ${isActive ? "text-yellow-300" : isVisited ? "text-emerald-300" : "text-slate-300 hover:text-white"}`}
+                      className={`text-left truncate flex-1 min-w-0 ${isActive ? "text-yellow-300" : isVisited ? "text-emerald-300" : isBucket ? "text-amber-300" : "text-slate-300 hover:text-white"}`}
                       title={country.name}
                     >
                       {country.name}
                     </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleCountryBucket(country.id, isVisited); }}
+                      className={`flex-shrink-0 text-sm leading-none transition-colors ${isBucket ? "text-amber-400 hover:text-slate-400" : "text-slate-600 hover:text-amber-400"}`}
+                      title={isBucket ? "Remove from bucket list" : "Add to bucket list"}
+                    >★</button>
                   </div>
                 );
               })}
@@ -1825,6 +1969,7 @@ export default function App() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5">
               {sortedStates.map((state) => {
                 const isVisited = visitedStates.has(state.fips);
+                const isBucket = !isVisited && bucketStates.has(state.fips);
                 const isActive = selected?.key === `state-${state.fips}`;
                 return (
                   <div
@@ -1834,6 +1979,8 @@ export default function App() {
                         ? "bg-yellow-500/20 border border-yellow-500/40"
                         : isVisited
                         ? "bg-red-900/30 border border-red-700/30 hover:bg-red-800/30"
+                        : isBucket
+                        ? "bg-amber-900/20 border border-amber-700/30 hover:bg-amber-900/30"
                         : "bg-slate-800/40 hover:bg-slate-700/60 border border-transparent"
                     }`}
                   >
@@ -1850,11 +1997,16 @@ export default function App() {
                         setSelected({ key: `state-${state.fips}`, info: state });
                         window.scrollTo({ top: 0, behavior: "smooth" });
                       }}
-                      className={`text-left truncate flex-1 min-w-0 ${isActive ? "text-yellow-300" : isVisited ? "text-red-300" : "text-slate-300 hover:text-white"}`}
+                      className={`text-left truncate flex-1 min-w-0 ${isActive ? "text-yellow-300" : isVisited ? "text-red-300" : isBucket ? "text-amber-300" : "text-slate-300 hover:text-white"}`}
                       title={state.name}
                     >
                       {state.name}
                     </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleStateBucket(state.fips, isVisited); }}
+                      className={`flex-shrink-0 text-sm leading-none transition-colors ${isBucket ? "text-amber-400 hover:text-slate-400" : "text-slate-600 hover:text-amber-400"}`}
+                      title={isBucket ? "Remove from bucket list" : "Add to bucket list"}
+                    >★</button>
                   </div>
                 );
               })}
@@ -1868,6 +2020,7 @@ export default function App() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5">
               {sortedProvinces.map((province) => {
                 const isVisited = visitedProvinces.has(province.key);
+                const isBucket = !isVisited && bucketProvinces.has(province.key);
                 const isActive = selected?.key === `province-${province.key}`;
                 return (
                   <div
@@ -1877,6 +2030,8 @@ export default function App() {
                         ? "bg-yellow-500/20 border border-yellow-500/40"
                         : isVisited
                         ? "bg-orange-900/30 border border-orange-700/30 hover:bg-orange-800/30"
+                        : isBucket
+                        ? "bg-amber-900/20 border border-amber-700/30 hover:bg-amber-900/30"
                         : "bg-slate-800/40 hover:bg-slate-700/60 border border-transparent"
                     }`}
                   >
@@ -1893,11 +2048,16 @@ export default function App() {
                         setSelected({ key: `province-${province.key}`, info: province });
                         window.scrollTo({ top: 0, behavior: "smooth" });
                       }}
-                      className={`text-left truncate flex-1 min-w-0 ${isActive ? "text-yellow-300" : isVisited ? "text-orange-300" : "text-slate-300 hover:text-white"}`}
+                      className={`text-left truncate flex-1 min-w-0 ${isActive ? "text-yellow-300" : isVisited ? "text-orange-300" : isBucket ? "text-amber-300" : "text-slate-300 hover:text-white"}`}
                       title={province.name}
                     >
                       {province.name}
                     </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleProvinceBucket(province.key, isVisited); }}
+                      className={`flex-shrink-0 text-sm leading-none transition-colors ${isBucket ? "text-amber-400 hover:text-slate-400" : "text-slate-600 hover:text-amber-400"}`}
+                      title={isBucket ? "Remove from bucket list" : "Add to bucket list"}
+                    >★</button>
                   </div>
                 );
               })}
@@ -1911,6 +2071,7 @@ export default function App() {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-1.5">
               {sortedStadiums.map((stadium) => {
                 const isVisited = visitedStadiums.has(stadium.team);
+                const isBucket = !isVisited && bucketStadiums.has(stadium.team);
                 const isActive = selectedStadium?.team === stadium.team;
                 return (
                   <div
@@ -1920,6 +2081,8 @@ export default function App() {
                         ? "bg-yellow-500/20 border border-yellow-500/40"
                         : isVisited
                         ? "bg-blue-900/30 border border-blue-700/30 hover:bg-blue-800/30"
+                        : isBucket
+                        ? "bg-amber-900/20 border border-amber-700/30 hover:bg-amber-900/30"
                         : "bg-slate-800/40 hover:bg-slate-700/60 border border-transparent"
                     }`}
                   >
@@ -1938,15 +2101,79 @@ export default function App() {
                       }}
                       className="text-left flex-1 min-w-0"
                     >
-                      <p className={`font-medium truncate ${isActive ? "text-yellow-300" : isVisited ? "text-blue-300" : "text-slate-300 hover:text-white"}`}>{stadium.team}</p>
+                      <p className={`font-medium truncate ${isActive ? "text-yellow-300" : isVisited ? "text-blue-300" : isBucket ? "text-amber-300" : "text-slate-300 hover:text-white"}`}>{stadium.team}</p>
                       <p className="text-xs text-slate-400 truncate mt-0.5">{stadium.stadium}</p>
                     </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleStadiumBucket(stadium.team, isVisited); }}
+                      className={`flex-shrink-0 text-sm leading-none transition-colors mt-0.5 ${isBucket ? "text-amber-400 hover:text-slate-400" : "text-slate-600 hover:text-amber-400"}`}
+                      title={isBucket ? "Remove from bucket list" : "Add to bucket list"}
+                    >★</button>
                   </div>
                 );
               })}
             </div>
           </div>
         )}
+
+        {/* Bucket List tab */}
+        {listTab === "bucket-list" && (() => {
+          const bucketTotal = bucketCountries.size + bucketStates.size + bucketProvinces.size + bucketStadiums.size;
+          if (bucketTotal === 0) {
+            return (
+              <div className="px-6 py-12 text-center text-slate-400">
+                <div className="text-4xl mb-3">★</div>
+                <p className="text-base font-medium text-slate-300 mb-1">Your bucket list is empty</p>
+                <p className="text-sm">Click the ★ on any country, state, province, or stadium to add it here.</p>
+              </div>
+            );
+          }
+          const allItems = [
+            ...sortedCountries.filter(c => bucketCountries.has(c.id)).map(c => ({ name: c.name, sub: "", badge: "Country", badgeClass: "bg-blue-900/80 text-blue-300", key: `country-${c.id}`, id: c.id, cat: "country" as const })),
+            ...sortedStates.filter(s => bucketStates.has(s.fips)).map(s => ({ name: s.name, sub: "", badge: "US State", badgeClass: "bg-red-900/80 text-red-300", key: `state-${s.fips}`, id: s.fips, cat: "state" as const })),
+            ...sortedProvinces.filter(p => bucketProvinces.has(p.key)).map(p => ({ name: p.name, sub: "", badge: "Province", badgeClass: "bg-orange-900/80 text-orange-300", key: `province-${p.key}`, id: p.key, cat: "province" as const })),
+            ...sortedStadiums.filter(s => bucketStadiums.has(s.team)).map(s => ({ name: s.team, sub: s.stadium, badge: "Stadium", badgeClass: "bg-violet-900/80 text-violet-300", key: `stadium-${s.team}`, id: s.team, cat: "stadium" as const })),
+          ].sort((a, b) => a.name.localeCompare(b.name));
+          return (
+            <div className="px-6 py-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-1.5">
+                {allItems.map(item => (
+                  <div key={item.key} className="flex items-start gap-2 px-2.5 py-2 rounded-lg text-sm bg-amber-900/20 border border-amber-700/30 hover:bg-amber-900/30 transition-colors">
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide shrink-0 mt-0.5 ${item.badgeClass}`}>{item.badge}</span>
+                    <button
+                      className="text-left flex-1 min-w-0"
+                      onClick={() => {
+                        if (item.cat === "stadium") {
+                          const s = MLB_STADIUMS.find(st => st.team === item.id);
+                          if (s) { setSelected(null); setSelectedStadium(s); window.scrollTo({ top: 0, behavior: "smooth" }); }
+                        } else {
+                          setSelectedStadium(null);
+                          if (item.cat === "country") { const c = sortedCountries.find(c => c.id === item.id); if (c) setSelected({ key: item.key, info: c }); }
+                          else if (item.cat === "state") { const s = sortedStates.find(s => s.fips === item.id); if (s) setSelected({ key: item.key, info: s }); }
+                          else if (item.cat === "province") { const p = sortedProvinces.find(p => p.key === item.id); if (p) setSelected({ key: item.key, info: p }); }
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }
+                      }}
+                    >
+                      <p className="font-medium truncate text-amber-300 hover:text-amber-200">{item.name}</p>
+                      {item.sub && <p className="text-xs text-slate-400 truncate mt-0.5">{item.sub}</p>}
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (item.cat === "country") toggleCountryBucket(item.id, false);
+                        else if (item.cat === "state") toggleStateBucket(item.id, false);
+                        else if (item.cat === "province") toggleProvinceBucket(item.id, false);
+                        else toggleStadiumBucket(item.id, false);
+                      }}
+                      className="text-amber-500 hover:text-slate-400 shrink-0 text-sm leading-none mt-0.5"
+                      title="Remove from bucket list"
+                    >★</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
       </section>
 
       {showExport && (

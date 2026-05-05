@@ -1602,6 +1602,7 @@ export default function App() {
               setMapMode("tcc");
               setSelected(null);
               setSelectedStadium(null);
+              setListTab("tcc");
             }}
             className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-1.5 ${
               mapMode === "tcc"

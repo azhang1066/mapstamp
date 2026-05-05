@@ -1288,7 +1288,7 @@ export default function App() {
 
   return (
     <div className="flex flex-col bg-slate-950 text-white">
-      <header className="flex items-center gap-4 px-6 py-4 border-b border-slate-800 bg-slate-900/80 backdrop-blur-sm flex-wrap">
+      <header className="flex items-center gap-4 px-6 py-4 border-b border-slate-800 bg-slate-900/80 backdrop-blur-sm flex-wrap relative z-10">
         <div className="shrink-0">
           <h1 className="text-2xl font-bold tracking-tight text-white">World Map</h1>
           <p className="text-sm text-slate-400 mt-0.5">Click any country, U.S. state, Canadian province, or MLB stadium to explore</p>

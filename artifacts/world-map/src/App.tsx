@@ -837,6 +837,139 @@ function PhotoGrid({ category, locationId, isReadOnly }: { category: PhotoCatego
   );
 }
 
+// ─── Short notes ─────────────────────────────────────────────────────────────
+
+const NOTE_KEY_PREFIX = "shortnote:";
+const noteKey = (cat: PhotoCategory, id: string) => `${NOTE_KEY_PREFIX}${cat}:${id}`;
+const MAX_NOTE_LENGTH = 280;
+
+type NotesIndex = Record<PhotoCategory, Set<string>>;
+
+function emptyNotesIndex(): NotesIndex {
+  return { country: new Set(), state: new Set(), province: new Set(), stadium: new Set(), tcc: new Set() };
+}
+
+function loadNote(cat: PhotoCategory, id: string): string {
+  try { return localStorage.getItem(noteKey(cat, id)) ?? ""; } catch { return ""; }
+}
+
+function saveNote(cat: PhotoCategory, id: string, text: string): void {
+  try {
+    const trimmed = text.slice(0, MAX_NOTE_LENGTH);
+    if (trimmed.trim() === "") localStorage.removeItem(noteKey(cat, id));
+    else localStorage.setItem(noteKey(cat, id), trimmed);
+  } catch { /* ignore — non-fatal */ }
+}
+
+function buildNotesIndexFromStorage(): NotesIndex {
+  const idx = emptyNotesIndex();
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(NOTE_KEY_PREFIX)) continue;
+      const rest = k.slice(NOTE_KEY_PREFIX.length);
+      const colon = rest.indexOf(":");
+      if (colon < 0) continue;
+      const cat = rest.slice(0, colon) as PhotoCategory;
+      const id = rest.slice(colon + 1);
+      if (id && (cat === "country" || cat === "state" || cat === "province" || cat === "stadium" || cat === "tcc")) {
+        idx[cat].add(id);
+      }
+    }
+  } catch { /* ignore */ }
+  return idx;
+}
+
+function loadAllNotes(): Record<string, string> {
+  const out: Record<string, string> = {};
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(NOTE_KEY_PREFIX)) continue;
+      const v = localStorage.getItem(k);
+      if (!v) continue;
+      out[k.slice(NOTE_KEY_PREFIX.length)] = v;
+    }
+  } catch { /* ignore */ }
+  return out;
+}
+
+function NoteField({
+  category, locationId, isReadOnly, readOnlyValue, onSaved,
+}: {
+  category: PhotoCategory;
+  locationId: string;
+  isReadOnly: boolean;
+  readOnlyValue?: string;
+  onSaved?: (cat: PhotoCategory, id: string, text: string) => void;
+}) {
+  const initial = isReadOnly ? (readOnlyValue ?? "") : loadNote(category, locationId);
+  const [text, setText] = useState(initial);
+  const [savedFlash, setSavedFlash] = useState(false);
+  const lastSavedRef = useRef(initial);
+  const taRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const v = isReadOnly ? (readOnlyValue ?? "") : loadNote(category, locationId);
+    setText(v);
+    lastSavedRef.current = v;
+  }, [category, locationId, isReadOnly, readOnlyValue]);
+
+  useEffect(() => {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    const lineHeight = 22;
+    const maxHeight = lineHeight * 5 + 16;
+    const minHeight = lineHeight * 2 + 16;
+    ta.style.height = Math.min(Math.max(ta.scrollHeight, minHeight), maxHeight) + "px";
+  }, [text]);
+
+  if (isReadOnly) {
+    return (
+      <div className="mt-5 pt-5 border-t border-slate-800">
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">📝 Note</p>
+        {text
+          ? <p className="text-sm text-slate-200 whitespace-pre-wrap break-words">{text}</p>
+          : <p className="text-xs text-slate-500 italic">No note</p>}
+      </div>
+    );
+  }
+
+  const handleBlur = () => {
+    if (text === lastSavedRef.current) return;
+    saveNote(category, locationId, text);
+    lastSavedRef.current = text;
+    onSaved?.(category, locationId, text);
+    setSavedFlash(true);
+    setTimeout(() => setSavedFlash(false), 1500);
+  };
+
+  return (
+    <div className="mt-5 pt-5 border-t border-slate-800">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">📝 Note</p>
+        {savedFlash && <span className="text-xs text-emerald-400 transition-opacity">Saved ✓</span>}
+      </div>
+      <div className="relative">
+        <textarea
+          ref={taRef}
+          rows={2}
+          maxLength={MAX_NOTE_LENGTH}
+          placeholder="Add a quick note about this place..."
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onBlur={handleBlur}
+          className="w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 pr-16 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500 leading-snug"
+        />
+        <span className="absolute bottom-2 right-2 text-[10px] text-slate-500 font-mono pointer-events-none bg-slate-800/80 px-1 rounded">
+          {text.length} / {MAX_NOTE_LENGTH}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function VisitDetailsPanel({
   locationId,
   category,
@@ -1055,10 +1188,19 @@ interface ShareData {
   vc: string[]; vt: string[]; vs: string[]; vp: string[];
   bc: string[]; bt: string[]; bs: string[]; bp: string[];
   tv?: string[]; tb?: string[]; // TCC visited / TCC bucket-list (entry names)
+  n?: Record<string, string>;   // notes keyed by "category:id"
 }
 
+const SHARE_URL_BUDGET = 6000;
+
 function encodeShareData(data: ShareData): string {
-  const b64 = btoa(JSON.stringify(data));
+  // Unicode-safe: convert UTF-8 bytes to a Latin1 string before btoa,
+  // so notes containing emojis or accented characters don't throw.
+  const json = JSON.stringify(data);
+  const bytes = new TextEncoder().encode(json);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  const b64 = btoa(bin);
   return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
@@ -1066,7 +1208,11 @@ function decodeShareData(encoded: string): ShareData | null {
   try {
     const b64 = encoded.replace(/-/g, "+").replace(/_/g, "/");
     const pad = (4 - (b64.length % 4)) % 4;
-    return JSON.parse(atob(b64 + "=".repeat(pad))) as ShareData;
+    const bin = atob(b64 + "=".repeat(pad));
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const json = new TextDecoder().decode(bytes);
+    return JSON.parse(json) as ShareData;
   } catch { return null; }
 }
 
@@ -1077,7 +1223,7 @@ function buildShareUrl(data: ShareData): string {
 function ShareModal({
   onClose, visitedCountries, visitedStates, visitedProvinces, visitedStadiums,
   bucketCountries, bucketStates, bucketProvinces, bucketStadiums,
-  tccVisited, tccBucket,
+  tccVisited, tccBucket, notesByKey,
 }: {
   onClose: () => void;
   visitedCountries: Set<string>; visitedStates: Set<string>;
@@ -1085,16 +1231,24 @@ function ShareModal({
   bucketCountries: Set<string>; bucketStates: Set<string>;
   bucketProvinces: Set<string>; bucketStadiums: Set<string>;
   tccVisited: Set<string>; tccBucket: Set<string>;
+  notesByKey: Record<string, string>;
 }) {
   const [copied, setCopied] = useState(false);
-  const data: ShareData = {
+  const baseData: ShareData = {
     vc: [...visitedCountries], vt: [...visitedStadiums],
     vs: [...visitedStates],   vp: [...visitedProvinces],
     bc: [...bucketCountries], bt: [...bucketStadiums],
     bs: [...bucketStates],    bp: [...bucketProvinces],
     tv: [...tccVisited],      tb: [...tccBucket],
   };
-  const url = buildShareUrl(data);
+  const hasNotes = Object.keys(notesByKey).length > 0;
+  let url = buildShareUrl(baseData);
+  let notesOmitted = false;
+  if (hasNotes) {
+    const urlWith = buildShareUrl({ ...baseData, n: notesByKey });
+    if (urlWith.length <= SHARE_URL_BUDGET) url = urlWith;
+    else notesOmitted = true;
+  }
   const totalVisited = visitedCountries.size + visitedStates.size + visitedProvinces.size + visitedStadiums.size + tccVisited.size;
   const totalBucket  = bucketCountries.size  + bucketStates.size  + bucketProvinces.size  + bucketStadiums.size  + tccBucket.size;
 
@@ -1149,6 +1303,9 @@ function ShareModal({
           </div>
 
           <p className="text-xs text-slate-500 italic">📷 Photos are not included in shared links</p>
+          {notesOmitted && (
+            <p className="text-xs text-slate-500 italic">📝 Notes are not included in shared links (link would exceed size limit)</p>
+          )}
 
           <div className="bg-slate-800/60 rounded-xl p-4 space-y-2.5">
             <p className="text-xs font-semibold text-slate-300 uppercase tracking-widest mb-1">How to post</p>
@@ -2017,6 +2174,34 @@ export default function App() {
 
   // In read-only (shared) mode, display the shared data instead of own localStorage data
   const isReadOnly = sharedData !== null;
+  const [notesIndex, setNotesIndex] = useState<NotesIndex>(() => buildNotesIndexFromStorage());
+  const handleNoteSaved = useCallback((cat: PhotoCategory, id: string, text: string) => {
+    setNotesIndex(prev => {
+      const nextSet = new Set(prev[cat]);
+      if (text.trim() === "") nextSet.delete(id);
+      else nextSet.add(id);
+      return { ...prev, [cat]: nextSet };
+    });
+  }, []);
+  const sharedNotesByKey: Record<string, string> = isReadOnly ? (sharedData!.n ?? {}) : {};
+  const effectiveNotesIndex: NotesIndex = useMemo(() => {
+    if (!isReadOnly) return notesIndex;
+    const idx = emptyNotesIndex();
+    Object.keys(sharedNotesByKey).forEach(k => {
+      const colon = k.indexOf(":");
+      if (colon < 0) return;
+      const cat = k.slice(0, colon) as PhotoCategory;
+      const id = k.slice(colon + 1);
+      if (id && (cat === "country" || cat === "state" || cat === "province" || cat === "stadium" || cat === "tcc")) {
+        idx[cat].add(id);
+      }
+    });
+    return idx;
+  }, [isReadOnly, sharedNotesByKey, notesIndex]);
+  const totalNoteCount = effectiveNotesIndex.country.size + effectiveNotesIndex.state.size + effectiveNotesIndex.province.size + effectiveNotesIndex.stadium.size + effectiveNotesIndex.tcc.size;
+  const getReadOnlyNote = useCallback((cat: PhotoCategory, id: string): string | undefined => {
+    return isReadOnly ? sharedNotesByKey[`${cat}:${id}`] : undefined;
+  }, [isReadOnly, sharedNotesByKey]);
   const baseVisitedCountries = isReadOnly ? new Set<string>(sharedData!.vc) : rawVisitedCountries;
   const baseVisitedStadiums  = isReadOnly ? new Set<string>(sharedData!.vt) : rawVisitedStadiums;
   const baseVisitedStates    = isReadOnly ? new Set<string>(sharedData!.vs) : rawVisitedStates;
@@ -2916,6 +3101,7 @@ export default function App() {
                         {isVisited && <VisitDetailsPanel locationId={selectedTcc.name} category="tcc" isReadOnly={isReadOnly} details={tccDetails[selectedTcc.name]} onUpdate={setTccDetail} />}
                       </>
                     )}
+                    <NoteField category="tcc" locationId={selectedTcc.name} isReadOnly={isReadOnly} readOnlyValue={getReadOnlyNote("tcc", selectedTcc.name)} onSaved={handleNoteSaved} />
                   </>
                 );
               })()}
@@ -3000,6 +3186,8 @@ export default function App() {
                   </>
                 );
               })()}
+
+              <NoteField category="stadium" locationId={selectedStadium.team} isReadOnly={isReadOnly} readOnlyValue={getReadOnlyNote("stadium", selectedStadium.team)} onSaved={handleNoteSaved} />
 
               <div className="mt-5 pt-5 border-t border-slate-800">
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Other Teams in {selectedStadium.division}</p>
@@ -3149,6 +3337,13 @@ export default function App() {
                   </>
                 );
               })()}
+              {(() => {
+                const rawId = selected.key.replace(/^(country|state|province)-/, "");
+                const isCountry = selected.key.startsWith("country-");
+                const isState = selected.key.startsWith("state-");
+                const cat: PhotoCategory = isCountry ? "country" : isState ? "state" : "province";
+                return <NoteField category={cat} locationId={rawId} isReadOnly={isReadOnly} readOnlyValue={getReadOnlyNote(cat, rawId)} onSaved={handleNoteSaved} />;
+              })()}
             </div>
           ) : mapMode === "tcc" ? (
             <div className="p-6 flex-1">
@@ -3258,6 +3453,13 @@ export default function App() {
                     <span className="text-sm text-slate-300 flex-1">Bucket List</span>
                     <span className="text-xs font-mono text-slate-500">{bucketCountries.size + bucketStates.size + bucketProvinces.size + bucketStadiums.size}</span>
                   </div>
+                  {totalNoteCount > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 flex items-center justify-center text-[10px] flex-shrink-0">📝</span>
+                      <span className="text-sm text-slate-300 flex-1">Notes</span>
+                      <span className="text-xs font-mono text-slate-500">{totalNoteCount}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -3407,6 +3609,7 @@ export default function App() {
                     >
                       {country.name}
                     </button>
+                    {effectiveNotesIndex.country.has(country.id) && <span className="text-[10px] flex-shrink-0" title="Has note">📝</span>}
                     {!isReadOnly && <button
                       onClick={(e) => { e.stopPropagation(); toggleCountryBucket(country.id, isVisited); }}
                       className={`flex-shrink-0 text-sm leading-none transition-colors ${isBucket ? "text-amber-400 hover:text-slate-400" : "text-slate-600 hover:text-amber-400"}`}
@@ -3459,6 +3662,7 @@ export default function App() {
                     >
                       {state.name}
                     </button>
+                    {effectiveNotesIndex.state.has(state.fips) && <span className="text-[10px] flex-shrink-0" title="Has note">📝</span>}
                     {!isReadOnly && <button
                       onClick={(e) => { e.stopPropagation(); toggleStateBucket(state.fips, isVisited); }}
                       className={`flex-shrink-0 text-sm leading-none transition-colors ${isBucket ? "text-amber-400 hover:text-slate-400" : "text-slate-600 hover:text-amber-400"}`}
@@ -3511,6 +3715,7 @@ export default function App() {
                     >
                       {province.name}
                     </button>
+                    {effectiveNotesIndex.province.has(province.key) && <span className="text-[10px] flex-shrink-0" title="Has note">📝</span>}
                     {!isReadOnly && <button
                       onClick={(e) => { e.stopPropagation(); toggleProvinceBucket(province.key, isVisited); }}
                       className={`flex-shrink-0 text-sm leading-none transition-colors ${isBucket ? "text-amber-400 hover:text-slate-400" : "text-slate-600 hover:text-amber-400"}`}
@@ -3559,7 +3764,10 @@ export default function App() {
                       }}
                       className="text-left flex-1 min-w-0"
                     >
-                      <p className={`font-medium truncate ${isActive ? "text-yellow-300" : isVisited ? "text-blue-300" : isBucket ? "text-amber-300" : "text-slate-300 hover:text-white"}`}>{stadium.team}</p>
+                      <p className={`font-medium truncate ${isActive ? "text-yellow-300" : isVisited ? "text-blue-300" : isBucket ? "text-amber-300" : "text-slate-300 hover:text-white"}`}>
+                        {stadium.team}
+                        {effectiveNotesIndex.stadium.has(stadium.team) && <span className="text-[10px] ml-1" title="Has note">📝</span>}
+                      </p>
                       <p className="text-xs text-slate-400 truncate mt-0.5">{stadium.stadium}</p>
                     </button>
                     {!isReadOnly && <button
@@ -3635,6 +3843,7 @@ export default function App() {
                     {entry.geoId && (
                       <span className="text-slate-500 text-[10px] flex-shrink-0" title="Located on map">🗺</span>
                     )}
+                    {effectiveNotesIndex.tcc.has(entry.name) && <span className="text-[10px] flex-shrink-0" title="Has note">📝</span>}
                     {!isReadOnly && <button
                       onClick={(e) => { e.stopPropagation(); toggleTccBucket(entry.name, isVisited); }}
                       className={`flex-shrink-0 text-sm leading-none transition-colors ${isBucket ? "text-amber-400 hover:text-slate-400" : "text-slate-600 hover:text-amber-400"}`}
@@ -3750,6 +3959,7 @@ export default function App() {
       {showShare && (
         <ShareModal
           onClose={() => setShowShare(false)}
+          notesByKey={loadAllNotes()}
           visitedCountries={isReadOnly ? visitedCountries : rawVisitedCountries}
           visitedStates={isReadOnly ? visitedStates : rawVisitedStates}
           visitedProvinces={isReadOnly ? visitedProvinces : rawVisitedProvinces}

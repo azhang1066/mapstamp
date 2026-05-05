@@ -2211,6 +2211,64 @@ export default function App() {
                 );
               })()}
             </div>
+          ) : mapMode === "tcc" ? (
+            <div className="p-6 flex-1">
+              <h2 className="text-lg font-semibold text-white mb-1">Travelers' Century Club</h2>
+              <p className="text-slate-400 text-sm mb-6">Track your progress across all 330 TCC countries and territories.</p>
+
+              <div className="mb-6">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">TCC Regions</h3>
+                <div className="space-y-2">
+                  {(Object.entries(TCC_REGIONS) as [TccRegionKey, typeof TCC_REGIONS[TccRegionKey]][]).map(([k, r]) => {
+                    const visitedInRegion = sortedTcc.filter(e => e.region === k && tccVisited.has(e.name)).length;
+                    const totalInRegion = sortedTcc.filter(e => e.region === k).length;
+                    return (
+                      <div key={k} className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: r.color }} />
+                        <span className="text-sm text-slate-300 flex-1">{r.name}</span>
+                        <span className="text-xs font-mono text-slate-500">{visitedInRegion}/{totalInRegion}</span>
+                      </div>
+                    );
+                  })}
+                  <div className="flex items-center gap-2 pt-2 mt-2 border-t border-slate-800">
+                    <div className="w-3 h-3 rounded-sm flex-shrink-0 border-2" style={{ backgroundColor: BUCKET_LIST_COLOR, borderColor: BUCKET_LIST_STROKE, borderStyle: "dashed" }} />
+                    <span className="text-sm text-slate-300">Bucket List</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Progress</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-3 rounded-lg bg-purple-900/30 border border-purple-800/40 text-center">
+                    <p className="text-xl font-bold text-purple-200">{tccVisited.size}</p>
+                    <p className="text-xs text-purple-300/80 mt-0.5">Visited</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-slate-800/60 text-center">
+                    <p className="text-xl font-bold text-white">{TCC_TOTAL}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Total</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-amber-900/20 border border-amber-800/30 text-center">
+                    <p className="text-xl font-bold text-amber-300">{tccBucket.size}</p>
+                    <p className="text-xs text-amber-400/80 mt-0.5">Bucket List</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-slate-800/60 text-center">
+                    <p className="text-xl font-bold text-white">{Math.max(0, TCC_MEMBERSHIP_THRESHOLD - tccVisited.size)}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">To 100 ✈️</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">About TCC</h3>
+                <div className="space-y-1.5 text-sm text-slate-400">
+                  <p>The Travelers' Century Club recognizes travelers who have visited 100 or more of the world's 330 countries and territories.</p>
+                  <p>• Click any country shape to mark it visited</p>
+                  <p>• Use the TCC tab to manage all 330 entries</p>
+                  <p>• Reach 100 to qualify for membership</p>
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="p-6 flex-1">
               <h2 className="text-lg font-semibold text-white mb-1">Explore the World</h2>

@@ -46,6 +46,7 @@ Interactive travel tracker built with React + Vite + TypeScript, react-simple-ma
   - Dedicated TCC list tab with region-pill legend (per-region X/Y counts), checkbox toggle, ★ bucket, 🗺 indicator for entries with map shapes
   - Sidebar TCC info panel with region badge, region/location/membership cards, Mark Visited/Bucket List buttons, VisitDetailsPanel for visited entries
   - Milestone celebratory banner above header at 100 visited (TCC membership threshold)
+  - US Territory split: "United States (Contiguous)", "Alaska", and "Hawaiian Islands" are rendered as independent, separately-clickable polygons via the US States geo-layer (FIPS 02→Alaska, FIPS 15→Hawaiian Islands, rest→Contiguous). The full USA country polygon (840) is excluded from the TCC world pass to prevent Alaska/Hawaii being swallowed. Defined in `TCC_US_STATE_ENTRIES` + `FIPS_TO_TCC_NAME` constants.
   - Independent localStorage: `wm_map_mode`, `wm_tcc_visited`, `wm_tcc_bucket`, `wm_details_tcc`
   - Bucket-list tab aggregates TCC entries (purple "TCC" badge); navigating to one auto-switches mapMode to "tcc"
   - Read-only mode (when viewing a Share URL) hides all TCC mutation controls and toggle handlers no-op

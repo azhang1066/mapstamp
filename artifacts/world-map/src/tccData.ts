@@ -49,7 +49,7 @@ export const TCC_DATA: TccEntry[] = [
   e("Afghanistan",                 "ASI", "004"),
   e("Ajman",                       "ME",  undefined, 55.55,  25.41),
   e("Aland Islands",               "EUR", undefined, 19.94,  60.18),
-  e("Alaska",                      "NA",  undefined, -149.50, 64.20),
+  e("Alaska",                      "NA",  undefined),
   e("Albania",                     "EUR", "008"),
   e("Algeria",                     "AFR", "012"),
   e("Andaman-Nicobar Islands",     "IND", undefined, 92.74,  11.74),
@@ -175,7 +175,7 @@ export const TCC_DATA: TccEntry[] = [
   // H
   e("Hainan Island",               "ASI", undefined, 109.84, 19.20),
   e("Haiti",                       "CAR", "332"),
-  e("Hawaiian Islands",            "PAC", undefined, -155.58, 19.90),
+  e("Hawaiian Islands",            "PAC", undefined),
   e("Honduras",                    "CAM", "340"),
   e("Hong Kong",                   "ASI", undefined, 114.17, 22.32),
   e("Hungary",                     "EUR", "348"),
@@ -374,7 +374,7 @@ export const TCC_DATA: TccEntry[] = [
   e("Uganda",                      "AFR", "800"),
   e("Ukraine",                     "EUR", "804"),
   e("Umm Al Qaiwain",              "ME",  undefined, 55.55, 25.57),
-  e("United States (Contiguous)",  "NA",  "840"),
+  e("United States (Contiguous)",  "NA",  undefined),
   e("Uruguay",                     "SAM", "858"),
   e("Uzbekistan",                  "ASI", "860"),
   // V

@@ -144,6 +144,20 @@ const MLB_STADIUMS: StadiumInfo[] = [
 ];
 
 const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json";
+
+// TCC entries rendered via the US States geo-layer instead of world polygons or marker dots.
+// These three must be excluded from the world-polygon pass (to avoid the full-USA multi-polygon
+// swallowing Alaska & Hawaii) and from the marker-dot pass (the state shapes replace them).
+const TCC_US_STATE_ENTRIES = new Set([
+  "United States (Contiguous)",
+  "Alaska",
+  "Hawaiian Islands",
+]);
+// FIPS → TCC entry name for the state-level TCC layer
+const FIPS_TO_TCC_NAME: Record<string, string> = {
+  "02": "Alaska",
+  "15": "Hawaiian Islands",
+};
 const US_STATES_URL = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json";
 const CA_PROVINCES_URL = `${import.meta.env.BASE_URL}canada-provinces.geojson`;
 
@@ -2793,10 +2807,10 @@ export default function App() {
             <ZoomableGroup zoom={zoom} center={center} onMoveEnd={({ zoom: z, coordinates }) => { setZoom(z); setCenter(coordinates); }}>
               {mapMode === "tcc" && (
                 <>
-                  {/* TCC: world geographies tinted by region */}
+                  {/* TCC: world geographies tinted by region — skip USA (840); handled by states layer */}
                   <Geographies geography={WORLD_URL}>
                     {({ geographies }) =>
-                      geographies.map((geo) => {
+                      geographies.filter(geo => String(geo.id) !== "840").map((geo) => {
                         const tcc = TCC_BY_GEO_ID.get(String(geo.id));
                         const tccName = tcc?.name;
                         const isSelected = !!tccName && selectedTcc?.name === tccName;
@@ -2828,8 +2842,9 @@ export default function App() {
                     }
                   </Geographies>
 
-                  {/* TCC: marker dots for entries without a geoId (small islands etc.) */}
-                  {TCC_DATA.filter(e => e.lng !== undefined && e.lat !== undefined).map((entry) => {
+                  {/* TCC: marker dots for entries without a geoId (small islands etc.)
+                      — exclude US State entries since they are rendered as polygons below */}
+                  {TCC_DATA.filter(e => e.lng !== undefined && e.lat !== undefined && !TCC_US_STATE_ENTRIES.has(e.name)).map((entry) => {
                     const isSelected = selectedTcc?.name === entry.name;
                     const isVisited = tccVisited.has(entry.name);
                     const isBucketList = !isVisited && tccBucket.has(entry.name);
@@ -2854,6 +2869,42 @@ export default function App() {
                       </Marker>
                     );
                   })}
+
+                  {/* TCC: US States layer — splits the USA into three independent TCC entries:
+                      "United States (Contiguous)", "Alaska", and "Hawaiian Islands" */}
+                  <Geographies geography={US_STATES_URL}>
+                    {({ geographies }) =>
+                      geographies.map((geo) => {
+                        const fips = String(geo.id).padStart(2, "0");
+                        const tccName = FIPS_TO_TCC_NAME[fips] ?? "United States (Contiguous)";
+                        const tccEntry = TCC_BY_NAME.get(tccName);
+                        if (!tccEntry) return null;
+                        const isSelected = selectedTcc?.name === tccName;
+                        const isVisited = tccVisited.has(tccName);
+                        const isBucketList = !isVisited && tccBucket.has(tccName);
+                        const isHov = hoveredTcc === tccName;
+                        const region = TCC_REGIONS[tccEntry.region];
+                        const baseFill = isVisited ? region.color : isBucketList ? BUCKET_LIST_COLOR : region.fillUnvisited;
+                        const fill = isSelected ? SELECTED_COLOR : (isHov ? region.color : baseFill);
+                        const stroke = isBucketList ? BUCKET_LIST_STROKE : "#0f172a";
+                        return (
+                          <Geography
+                            key={geo.rsmKey}
+                            geography={geo}
+                            onClick={() => handleTccGeoClick(tccEntry)}
+                            onMouseEnter={(evt) => { setHoveredTcc(tccName); setTooltipName(tccName); setTooltipPos({ x: evt.clientX, y: evt.clientY }); }}
+                            onMouseMove={(evt) => setTooltipPos({ x: evt.clientX, y: evt.clientY })}
+                            onMouseLeave={() => { setHoveredTcc(null); setTooltipName(""); }}
+                            style={{
+                              default: { fill, stroke, strokeWidth: isBucketList ? 0.9 : 0.4, strokeDasharray: isBucketList ? "3 2" : undefined, outline: "none", cursor: "pointer", transition: "fill 0.15s" },
+                              hover:   { fill: isSelected ? SELECTED_COLOR : region.color, stroke: isBucketList ? BUCKET_LIST_STROKE : "#334155", strokeWidth: isBucketList ? 1 : 0.6, outline: "none", cursor: "pointer" },
+                              pressed: { fill: SELECTED_COLOR, outline: "none" },
+                            }}
+                          />
+                        );
+                      })
+                    }
+                  </Geographies>
                 </>
               )}
 
@@ -3049,15 +3100,23 @@ export default function App() {
                         </div>
                       </div>
                       <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-800/60">
-                        <span className="text-xl">{selectedTcc.geoId ? "🗺" : "📍"}</span>
-                        <div>
-                          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Map Location</p>
-                          <p className="text-sm font-medium text-white mt-0.5">
-                            {selectedTcc.geoId
-                              ? "Highlighted on the world map"
-                              : "Marker dot on the world map"}
-                          </p>
-                        </div>
+                        {(() => {
+                          const hasPolygon = !!(selectedTcc.geoId || TCC_US_STATE_ENTRIES.has(selectedTcc.name));
+                          return (
+                            <>
+                              <span className="text-xl">{hasPolygon ? "🗺" : "📍"}</span>
+                              <div>
+                                <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Map Location</p>
+                                <p className="text-sm font-medium text-white mt-0.5">
+                                  {hasPolygon ? "Highlighted on the TCC map" : "Marker dot on the TCC map"}
+                                </p>
+                                {TCC_US_STATE_ENTRIES.has(selectedTcc.name) && selectedTcc.name !== "United States (Contiguous)" && (
+                                  <p className="text-xs text-slate-400 mt-1">Independent TCC entry — separate from United States (Contiguous)</p>
+                                )}
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                       <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-800/60">
                         <span className="text-xl">🏆</span>
@@ -3840,7 +3899,7 @@ export default function App() {
                     >
                       {entry.name}
                     </button>
-                    {entry.geoId && (
+                    {(entry.geoId || TCC_US_STATE_ENTRIES.has(entry.name)) && (
                       <span className="text-slate-500 text-[10px] flex-shrink-0" title="Located on map">🗺</span>
                     )}
                     {effectiveNotesIndex.tcc.has(entry.name) && <span className="text-[10px] flex-shrink-0" title="Has note">📝</span>}

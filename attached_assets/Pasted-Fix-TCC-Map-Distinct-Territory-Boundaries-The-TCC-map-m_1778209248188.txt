@@ -1,0 +1,169 @@
+Fix: TCC Map — Distinct Territory Boundaries
+The TCC map must treat every one of the 330 entries as a fully independent, separately clickable region. Currently, clicking "United States (Contiguous)" incorrectly highlights Alaska as part of the same region. Every TCC territory that has its own entry must be visually and functionally separate on the map.
+
+THE CORE PROBLEM
+Standard GeoJSON country files group territories under their parent country. The TCC splits many of these into separate trackable entries. The map must be rebuilt to respect TCC boundaries, not standard country boundaries.
+
+FULL LIST OF TCC SPLITS TO IMPLEMENT
+Every one of the following must be a separately clickable, separately colored, separately tracked region:
+United States
+
+United States (Contiguous 48 states) — excludes Alaska and Hawaii
+Alaska — separate TCC entry
+Hawaii — separate TCC entry
+
+United Kingdom
+
+England
+Scotland
+Wales
+Northern Ireland
+Gibraltar
+Guernsey & Dependencies
+Jersey
+Isle of Man
+
+France
+
+France (Metropolitan)
+French Guiana
+Guadeloupe
+Martinique
+Mayotte
+Réunion
+New Caledonia
+French Polynesia
+Saint Pierre & Miquelon
+Wallis & Futuna
+
+Australia
+
+Australia (Mainland + Tasmania grouped, or split if TCC separates Tasmania)
+Tasmania — confirm if TCC lists separately and treat accordingly
+Norfolk Island
+Christmas Island
+Cocos (Keeling) Islands
+
+United Arab Emirates
+
+Abu Dhabi
+Dubai
+Ras Al Khaimah
+(Remaining Emirates grouped as one entry if TCC does so)
+
+Netherlands
+
+Netherlands (European)
+Aruba
+Curaçao
+Sint Maarten
+Bonaire
+Saba & Sint Eustatius
+
+Denmark
+
+Denmark (European)
+Greenland
+Faroe Islands
+
+Norway
+
+Norway (European)
+Svalbard
+Jan Mayen
+
+Spain
+
+Spain (European)
+Canary Islands
+Ceuta
+Melilla
+
+Portugal
+
+Portugal (European)
+Azores
+Madeira
+
+China
+
+China (Mainland)
+Hong Kong
+Macau
+Taiwan (listed separately as R.O.C.)
+
+Russia
+
+Russia in Europe
+Russia in Asia (incl. Siberia)
+
+Ecuador
+
+Ecuador (Mainland)
+Galápagos Islands
+
+Yemen
+
+Yemen (Mainland)
+Socotra
+
+Tanzania
+
+Tanzania (Mainland)
+Zanzibar
+
+Papua New Guinea
+
+Papua New Guinea (Mainland)
+Bougainville
+
+Any other TCC splits not listed above — cross-reference the full official TCC list at travelerscenturyclub.org/countries-and-territories and apply the same treatment
+
+IMPLEMENTATION APPROACH
+For territories with distinct GeoJSON boundaries (Alaska, Hawaii, Greenland, Tasmania, Galápagos, Zanzibar, Canary Islands, etc.):
+
+Source a TCC-specific GeoJSON file or modify an existing one to extract these as separate feature objects
+Each feature should have its own TCC entry name as the identifier
+Recommended GeoJSON source: Natural Earth Data (naturalearthdata.com) has high-resolution files that include island territories and can be split by region
+
+For territories that share a land mass but are politically distinct (Abu Dhabi vs. Dubai vs. Ras Al Khaimah, England vs. Scotland vs. Wales):
+
+Use a GeoJSON file that includes sub-national administrative boundaries (e.g. GADM level-1 data)
+Extract only the relevant subdivisions and map them to their TCC entry names
+
+For very small territories with no practical GeoJSON polygon (tiny islands, atolls):
+
+Render as a clickable circular marker/pin on the map at the correct coordinates
+Clicking the pin opens the same sidebar info panel as a region click
+Pin should follow the same color/visited/bucket list logic as map regions
+
+
+CLICK BEHAVIOR
+
+Clicking "United States (Contiguous)" must highlight ONLY the contiguous 48 states — Alaska and Hawaii must remain in their own independent state (visited or unvisited)
+Clicking Alaska highlights only Alaska
+Clicking Dubai highlights only the Dubai emirate boundary, not the full UAE
+No parent-child relationship between territories and their parent country on the TCC map — every entry is fully independent
+Hovering any region or pin shows a tooltip with the TCC entry name and region category
+
+
+SIDEBAR INFO PANEL
+
+For split territories, show a contextual note: e.g. "This is a separate TCC entry from United States (Contiguous)"
+Show the TCC region category (e.g. North America, Pacific Ocean) as a badge
+All existing visit detail dropdowns (times visited, first/last year) work per TCC entry independently
+
+
+PERSISTENCE
+
+Each TCC entry is stored independently in localStorage by its exact TCC name:
+
+json{
+  "tcc": {
+    "Alaska": { "visited": true, "firstYear": 2021, "lastYear": 2021 },
+    "United States (Contiguous)": { "visited": true, "firstYear": 2005, "lastYear": 2024 },
+    "Hawaii": { "visited": false, "bucketList": true }
+  }
+}
+
+No entry inherits visited state from any other entry

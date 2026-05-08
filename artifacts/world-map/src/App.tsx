@@ -222,6 +222,7 @@ const COUNTRY_DATA: RegionRecord = {
   "276": { name: "Germany", regionType: "country", capital: "Berlin", population: "83.8M", area: "357,114 km²", continent: "Europe", currency: "Euro", language: "German" },
   "288": { name: "Ghana", regionType: "country", capital: "Accra", population: "32.8M", area: "238,533 km²", continent: "Africa", currency: "Ghanaian Cedi", language: "English" },
   "300": { name: "Greece", regionType: "country", capital: "Athens", population: "10.4M", area: "131,957 km²", continent: "Europe", currency: "Euro", language: "Greek" },
+  "304": { name: "Greenland", regionType: "country", capital: "Nuuk", population: "0.06M", area: "2,166,086 km²", continent: "North America", currency: "Danish Krone", language: "Greenlandic, Danish" },
   "320": { name: "Guatemala", regionType: "country", capital: "Guatemala City", population: "17.8M", area: "108,889 km²", continent: "North America", currency: "Guatemalan Quetzal", language: "Spanish" },
   "348": { name: "Hungary", regionType: "country", capital: "Budapest", population: "9.7M", area: "93,028 km²", continent: "Europe", currency: "Hungarian Forint", language: "Hungarian" },
   "356": { name: "India", regionType: "country", capital: "New Delhi", population: "1.4B", area: "3,287,263 km²", continent: "Asia", currency: "Indian Rupee", language: "Hindi, English" },
@@ -1895,7 +1896,7 @@ const COUNTRY_CENTROIDS: Record<string, [number, number]> = {
   "222":[-88.9,13.8],"226":[10.3,1.7],"231":[39.6,8.6],"232":[39.8,15.2],"233":[25.0,58.7],
   "242":[178.1,-18.1],"246":[26.3,64.0],"250":[2.2,46.2],"262":[42.6,11.8],"266":[11.6,-0.8],
   "268":[43.4,42.0],"270":[-15.3,13.4],"275":[35.2,31.9],"276":[10.5,51.2],"288":[-1.0,7.9],
-  "296":[174.0,1.4],"300":[21.8,39.1],"308":[-61.7,12.1],"320":[-90.2,15.8],"324":[-11.8,10.9],
+  "296":[174.0,1.4],"300":[21.8,39.1],"304":[-41.4,72.0],"308":[-61.7,12.1],"320":[-90.2,15.8],"324":[-11.8,10.9],
   "328":[-58.9,4.8],"332":[-72.3,19.1],"340":[-86.6,15.1],"344":[114.2,22.3],"348":[19.5,47.2],
   "356":[78.9,20.6],"360":[113.9,-0.8],"364":[53.7,32.4],"368":[43.7,33.2],"372":[-8.0,53.4],
   "376":[34.9,31.5],"380":[12.6,42.8],"388":[-77.3,18.1],"392":[138.3,36.2],"398":[66.9,48.0],
@@ -1924,7 +1925,7 @@ const COUNTRY_CENTROIDS: Record<string, [number, number]> = {
 };
 
 const COUNTRY_ZOOM: Record<string, number> = {
-  "36":2,"643":2,"156":2,"076":2,"840":2,"124":2,"356":3,"484":3,"036":2,
+  "36":2,"643":2,"156":2,"076":2,"840":2,"124":2,"356":3,"484":3,"036":2,"304":2,
   "520":8,"798":8,"492":8,"438":8,"674":7,"336":8,"462":8,"028":7,"212":7,
   "659":7,"662":7,"670":7,"308":7,
 };

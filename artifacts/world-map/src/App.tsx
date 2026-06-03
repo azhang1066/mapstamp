@@ -18,6 +18,7 @@ import {
   type TccEntry,
   type TccRegionKey,
 } from "./tccData";
+import { US_NATIONAL_PARKS, NP_TOTAL, type NationalParkInfo } from "./nationalParksData";
 
 type MapMode = "world" | "tcc";
 
@@ -521,7 +522,7 @@ function getProvinceFill(isSelected: boolean, isHovered: boolean, isVisited: boo
 
 // ─── Photos ──────────────────────────────────────────────────────────────────
 
-type PhotoCategory = "country" | "state" | "province" | "stadium" | "tcc";
+type PhotoCategory = "country" | "state" | "province" | "stadium" | "tcc" | "park";
 
 interface VisitPhoto {
   id: string;
@@ -861,7 +862,7 @@ const MAX_NOTE_LENGTH = 280;
 type NotesIndex = Record<PhotoCategory, Set<string>>;
 
 function emptyNotesIndex(): NotesIndex {
-  return { country: new Set(), state: new Set(), province: new Set(), stadium: new Set(), tcc: new Set() };
+  return { country: new Set(), state: new Set(), province: new Set(), stadium: new Set(), tcc: new Set(), park: new Set() };
 }
 
 function loadNote(cat: PhotoCategory, id: string): string {
@@ -887,7 +888,7 @@ function buildNotesIndexFromStorage(): NotesIndex {
       if (colon < 0) continue;
       const cat = rest.slice(0, colon) as PhotoCategory;
       const id = rest.slice(colon + 1);
-      if (id && (cat === "country" || cat === "state" || cat === "province" || cat === "stadium" || cat === "tcc")) {
+      if (id && (cat === "country" || cat === "state" || cat === "province" || cat === "stadium" || cat === "tcc" || cat === "park")) {
         idx[cat].add(id);
       }
     }
@@ -1058,10 +1059,12 @@ function buildTravelCSV(
   visitedStates: Set<string>,
   visitedProvinces: Set<string>,
   visitedStadiums: Set<string>,
+  visitedParks: Set<string>,
   countryDetails: Record<string, VisitDetails>,
   stateDetails: Record<string, VisitDetails>,
   provinceDetails: Record<string, VisitDetails>,
   stadiumDetails: Record<string, VisitDetails>,
+  parkDetails: Record<string, VisitDetails>,
 ): string {
   function esc(v: string | number | undefined): string {
     if (v === undefined || v === null) return "";
@@ -1117,29 +1120,40 @@ function buildTravelCSV(
       rows.push(row("MLB Stadium", s.stadium, `${s.team} (${s.division})`, timesLabel(d?.timesVisited), d?.firstYear, d?.lastYear));
     });
 
+  // National Parks
+  US_NATIONAL_PARKS
+    .filter(p => visitedParks.has(p.name))
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach(p => {
+      const d = parkDetails[p.name];
+      rows.push(row("National Park", p.name, p.state, timesLabel(d?.timesVisited), d?.firstYear, d?.lastYear));
+    });
+
   return rows.join("\n");
 }
 
 function ExportModal({
   onClose,
-  visitedCountries, visitedStates, visitedProvinces, visitedStadiums,
-  countryDetails, stateDetails, provinceDetails, stadiumDetails,
+  visitedCountries, visitedStates, visitedProvinces, visitedStadiums, visitedParks,
+  countryDetails, stateDetails, provinceDetails, stadiumDetails, parkDetails,
 }: {
   onClose: () => void;
   visitedCountries: Set<string>;
   visitedStates: Set<string>;
   visitedProvinces: Set<string>;
   visitedStadiums: Set<string>;
+  visitedParks: Set<string>;
   countryDetails: Record<string, VisitDetails>;
   stateDetails: Record<string, VisitDetails>;
   provinceDetails: Record<string, VisitDetails>;
   stadiumDetails: Record<string, VisitDetails>;
+  parkDetails: Record<string, VisitDetails>;
 }) {
   const [copied, setCopied] = useState(false);
 
   const csv = buildTravelCSV(
-    visitedCountries, visitedStates, visitedProvinces, visitedStadiums,
-    countryDetails, stateDetails, provinceDetails, stadiumDetails,
+    visitedCountries, visitedStates, visitedProvinces, visitedStadiums, visitedParks,
+    countryDetails, stateDetails, provinceDetails, stadiumDetails, parkDetails,
   );
 
   function handleCopy() {
@@ -1203,6 +1217,7 @@ interface ShareData {
   vc: string[]; vt: string[]; vs: string[]; vp: string[];
   bc: string[]; bt: string[]; bs: string[]; bp: string[];
   tv?: string[]; tb?: string[]; // TCC visited / TCC bucket-list (entry names)
+  vk?: string[]; bk?: string[]; // National Parks visited / bucket-list
   n?: Record<string, string>;   // notes keyed by "category:id"
 }
 
@@ -1236,15 +1251,15 @@ function buildShareUrl(data: ShareData): string {
 }
 
 function ShareModal({
-  onClose, visitedCountries, visitedStates, visitedProvinces, visitedStadiums,
-  bucketCountries, bucketStates, bucketProvinces, bucketStadiums,
+  onClose, visitedCountries, visitedStates, visitedProvinces, visitedStadiums, visitedParks,
+  bucketCountries, bucketStates, bucketProvinces, bucketStadiums, bucketParks,
   tccVisited, tccBucket, notesByKey,
 }: {
   onClose: () => void;
   visitedCountries: Set<string>; visitedStates: Set<string>;
-  visitedProvinces: Set<string>; visitedStadiums: Set<string>;
+  visitedProvinces: Set<string>; visitedStadiums: Set<string>; visitedParks: Set<string>;
   bucketCountries: Set<string>; bucketStates: Set<string>;
-  bucketProvinces: Set<string>; bucketStadiums: Set<string>;
+  bucketProvinces: Set<string>; bucketStadiums: Set<string>; bucketParks: Set<string>;
   tccVisited: Set<string>; tccBucket: Set<string>;
   notesByKey: Record<string, string>;
 }) {
@@ -1255,6 +1270,7 @@ function ShareModal({
     bc: [...bucketCountries], bt: [...bucketStadiums],
     bs: [...bucketStates],    bp: [...bucketProvinces],
     tv: [...tccVisited],      tb: [...tccBucket],
+    vk: [...visitedParks],    bk: [...bucketParks],
   };
   const hasNotes = Object.keys(notesByKey).length > 0;
   let url = buildShareUrl(baseData);
@@ -1264,8 +1280,8 @@ function ShareModal({
     if (urlWith.length <= SHARE_URL_BUDGET) url = urlWith;
     else notesOmitted = true;
   }
-  const totalVisited = visitedCountries.size + visitedStates.size + visitedProvinces.size + visitedStadiums.size + tccVisited.size;
-  const totalBucket  = bucketCountries.size  + bucketStates.size  + bucketProvinces.size  + bucketStadiums.size  + tccBucket.size;
+  const totalVisited = visitedCountries.size + visitedStates.size + visitedProvinces.size + visitedStadiums.size + visitedParks.size + tccVisited.size;
+  const totalBucket  = bucketCountries.size  + bucketStates.size  + bucketProvinces.size  + bucketStadiums.size  + bucketParks.size + tccBucket.size;
 
   function handleCopy() {
     navigator.clipboard.writeText(url).then(() => {
@@ -1345,23 +1361,26 @@ interface StatsDashboardProps {
   visitedStates: Set<string>;
   visitedProvinces: Set<string>;
   visitedStadiums: Set<string>;
+  visitedParks: Set<string>;
   tccVisited: Set<string>;
   bucketCountries: Set<string>;
   bucketStates: Set<string>;
   bucketProvinces: Set<string>;
   bucketStadiums: Set<string>;
+  bucketParks: Set<string>;
   tccBucket: Set<string>;
   countryDetails: Record<string, VisitDetails>;
   stateDetails: Record<string, VisitDetails>;
   provinceDetails: Record<string, VisitDetails>;
   stadiumDetails: Record<string, VisitDetails>;
+  parkDetails: Record<string, VisitDetails>;
   tccDetails: Record<string, VisitDetails>;
 }
 
 interface VisitedItem {
   id: string;
   name: string;
-  category: "country" | "state" | "province" | "stadium" | "tcc";
+  category: "country" | "state" | "province" | "stadium" | "tcc" | "park";
   continent?: string;
   year?: number;
 }
@@ -1369,9 +1388,9 @@ interface VisitedItem {
 function StatsDashboard(props: StatsDashboardProps) {
   const {
     onClose,
-    visitedCountries, visitedStates, visitedProvinces, visitedStadiums, tccVisited,
-    bucketCountries, bucketStates, bucketProvinces, bucketStadiums, tccBucket,
-    countryDetails, stateDetails, provinceDetails, stadiumDetails, tccDetails,
+    visitedCountries, visitedStates, visitedProvinces, visitedStadiums, visitedParks, tccVisited,
+    bucketCountries, bucketStates, bucketProvinces, bucketStadiums, bucketParks, tccBucket,
+    countryDetails, stateDetails, provinceDetails, stadiumDetails, parkDetails, tccDetails,
   } = props;
 
   const cardRef = useRef<HTMLDivElement>(null);
@@ -1402,11 +1421,14 @@ function StatsDashboard(props: StatsDashboardProps) {
     visitedStadiums.forEach(team => {
       out.push({ id: team, name: team, category: "stadium", year: yearOf(stadiumDetails[team]) });
     });
+    visitedParks.forEach(name => {
+      out.push({ id: name, name, category: "park", year: yearOf(parkDetails[name]) });
+    });
     tccVisited.forEach(name => {
       out.push({ id: name, name, category: "tcc", year: yearOf(tccDetails[name]) });
     });
     return out;
-  }, [visitedCountries, visitedStates, visitedProvinces, visitedStadiums, tccVisited, countryDetails, stateDetails, provinceDetails, stadiumDetails, tccDetails]);
+  }, [visitedCountries, visitedStates, visitedProvinces, visitedStadiums, visitedParks, tccVisited, countryDetails, stateDetails, provinceDetails, stadiumDetails, parkDetails, tccDetails]);
 
   // Continent breakdown (countries only)
   const continents: { name: string; visited: number; total: number; color: string }[] = useMemo(() => {
@@ -1455,8 +1477,8 @@ function StatsDashboard(props: StatsDashboardProps) {
     const contCounts = continents.filter(c => c.visited > 0).sort((a, b) => b.visited - a.visited);
     const topContinent = contCounts[0] ?? null;
     // Combined completion
-    const totalVisited = visitedCountries.size + visitedStates.size + visitedProvinces.size + visitedStadiums.size + tccVisited.size;
-    const totalAvail = 195 + 51 + 13 + 30 + TCC_TOTAL;
+    const totalVisited = visitedCountries.size + visitedStates.size + visitedProvinces.size + visitedStadiums.size + visitedParks.size + tccVisited.size;
+    const totalAvail = 195 + 51 + 13 + 30 + NP_TOTAL + TCC_TOTAL;
     const completionPct = totalAvail > 0 ? (totalVisited / totalAvail) * 100 : 0;
     // TCC distance
     const tccGap = TCC_MEMBERSHIP_THRESHOLD - tccVisited.size;
@@ -1467,14 +1489,15 @@ function StatsDashboard(props: StatsDashboardProps) {
       avgPerYear = dated.length / span;
     }
     return { earliest, latest, busiestYear, busiestCount, topContinent, totalVisited, totalAvail, completionPct, tccGap, avgPerYear };
-  }, [items, continents, visitedCountries.size, visitedStates.size, visitedProvinces.size, visitedStadiums.size, tccVisited.size]);
+  }, [items, continents, visitedCountries.size, visitedStates.size, visitedProvinces.size, visitedStadiums.size, visitedParks.size, tccVisited.size]);
 
-  const totalBucket = bucketCountries.size + bucketStates.size + bucketProvinces.size + bucketStadiums.size + tccBucket.size;
+  const totalBucket = bucketCountries.size + bucketStates.size + bucketProvinces.size + bucketStadiums.size + bucketParks.size + tccBucket.size;
 
   const headlineTiles = [
     { icon: "🌍", label: "Countries", visited: visitedCountries.size, total: 195, color: "from-blue-600 to-blue-800" },
     { icon: "🗺", label: "TCC Territories", visited: tccVisited.size, total: TCC_TOTAL, color: "from-purple-600 to-purple-800" },
     { icon: "🏟", label: "MLB Stadiums", visited: visitedStadiums.size, total: 30, color: "from-sky-600 to-sky-800" },
+    { icon: "🏞", label: "Nat. Parks", visited: visitedParks.size, total: NP_TOTAL, color: "from-green-600 to-green-800" },
     { icon: "🇺🇸", label: "US States", visited: visitedStates.size, total: 51, color: "from-red-600 to-red-800" },
     { icon: "🍁", label: "CA Provinces", visited: visitedProvinces.size, total: 13, color: "from-orange-600 to-orange-800" },
     { icon: "⭐", label: "Bucket List", visited: totalBucket, total: null, color: "from-amber-600 to-amber-800" },
@@ -2123,12 +2146,14 @@ export default function App() {
   const [selected, setSelected] = useState<{ key: string; info: RegionInfo } | null>(null);
   const [selectedStadium, setSelectedStadium] = useState<StadiumInfo | null>(null);
   const [hoveredStadium, setHoveredStadium] = useState<string | null>(null);
+  const [selectedPark, setSelectedPark] = useState<NationalParkInfo | null>(null);
+  const [hoveredPark, setHoveredPark] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const [tooltipName, setTooltipName] = useState<string>("");
   const [zoom, setZoom] = useState(1);
   const [center, setCenter] = useState<[number, number]>([0, 20]);
-  const [listTab, setListTab] = useState<"countries" | "stadiums" | "us-states" | "ca-provinces" | "tcc" | "bucket-list">("countries");
+  const [listTab, setListTab] = useState<"countries" | "stadiums" | "nat-parks" | "us-states" | "ca-provinces" | "tcc" | "bucket-list">("countries");
   const [confirmBucket, setConfirmBucket] = useState<string | null>(null);
   const [showExport, setShowExport] = useState(false);
   const [showShare, setShowShare] = useState(false);
@@ -2139,10 +2164,12 @@ export default function App() {
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [rawVisitedCountries, setVisitedCountries] = useLocalStorageSet("wm_visited_countries");
   const [rawVisitedStadiums, setVisitedStadiums] = useLocalStorageSet("wm_visited_stadiums");
+  const [rawVisitedParks, setVisitedParks] = useLocalStorageSet("wm_visited_parks");
   const [rawVisitedStates, setVisitedStates] = useLocalStorageSet("wm_visited_states");
   const [rawVisitedProvinces, setVisitedProvinces] = useLocalStorageSet("wm_visited_provinces");
   const [rawBucketCountries, setBucketCountries] = useLocalStorageSet("wm_bucket_countries");
   const [rawBucketStadiums, setBucketStadiums] = useLocalStorageSet("wm_bucket_stadiums");
+  const [rawBucketParks, setBucketParks] = useLocalStorageSet("wm_bucket_parks");
   const [rawBucketStates, setBucketStates] = useLocalStorageSet("wm_bucket_states");
   const [rawBucketProvinces, setBucketProvinces] = useLocalStorageSet("wm_bucket_provinces");
   const [rawTccVisited, setTccVisited] = useLocalStorageSet("wm_tcc_visited");
@@ -2213,22 +2240,25 @@ export default function App() {
     });
     return idx;
   }, [isReadOnly, sharedNotesByKey, notesIndex]);
-  const totalNoteCount = effectiveNotesIndex.country.size + effectiveNotesIndex.state.size + effectiveNotesIndex.province.size + effectiveNotesIndex.stadium.size + effectiveNotesIndex.tcc.size;
+  const totalNoteCount = effectiveNotesIndex.country.size + effectiveNotesIndex.state.size + effectiveNotesIndex.province.size + effectiveNotesIndex.stadium.size + effectiveNotesIndex.park.size + effectiveNotesIndex.tcc.size;
   const getReadOnlyNote = useCallback((cat: PhotoCategory, id: string): string | undefined => {
     return isReadOnly ? sharedNotesByKey[`${cat}:${id}`] : undefined;
   }, [isReadOnly, sharedNotesByKey]);
   const baseVisitedCountries = isReadOnly ? new Set<string>(sharedData!.vc) : rawVisitedCountries;
   const baseVisitedStadiums  = isReadOnly ? new Set<string>(sharedData!.vt) : rawVisitedStadiums;
+  const baseVisitedParks     = isReadOnly ? new Set<string>(sharedData!.vk ?? []) : rawVisitedParks;
   const baseVisitedStates    = isReadOnly ? new Set<string>(sharedData!.vs) : rawVisitedStates;
   const baseVisitedProvinces = isReadOnly ? new Set<string>(sharedData!.vp) : rawVisitedProvinces;
   const bucketCountries      = isReadOnly ? new Set<string>(sharedData!.bc) : rawBucketCountries;
   const bucketStadiums       = isReadOnly ? new Set<string>(sharedData!.bt) : rawBucketStadiums;
+  const bucketParks          = isReadOnly ? new Set<string>(sharedData!.bk ?? []) : rawBucketParks;
   const bucketStates         = isReadOnly ? new Set<string>(sharedData!.bs) : rawBucketStates;
   const bucketProvinces      = isReadOnly ? new Set<string>(sharedData!.bp) : rawBucketProvinces;
   const baseTccVisited       = isReadOnly ? new Set<string>(sharedData!.tv ?? []) : rawTccVisited;
   const tccBucket            = isReadOnly ? new Set<string>(sharedData!.tb ?? []) : rawTccBucket;
   const [countryDetails, setCountryDetail] = useLocalStorageRecord("wm_details_countries");
   const [stadiumDetails, setStadiumDetail] = useLocalStorageRecord("wm_details_stadiums");
+  const [parkDetails, setParkDetail] = useLocalStorageRecord("wm_details_parks");
   const [stateDetails, setStateDetail] = useLocalStorageRecord("wm_details_states");
   const [provinceDetails, setProvinceDetail] = useLocalStorageRecord("wm_details_provinces");
   const [tccDetails, setTccDetail] = useLocalStorageRecord("wm_details_tcc");
@@ -2242,6 +2272,7 @@ export default function App() {
   }
   const visitedCountries = filterVisited(baseVisitedCountries, countryDetails);
   const visitedStadiums  = filterVisited(baseVisitedStadiums,  stadiumDetails);
+  const visitedParks     = filterVisited(baseVisitedParks,     parkDetails);
   const visitedStates    = filterVisited(baseVisitedStates,    stateDetails);
   const visitedProvinces = filterVisited(baseVisitedProvinces, provinceDetails);
   const tccVisited       = filterVisited(baseTccVisited,       tccDetails);
@@ -2249,7 +2280,7 @@ export default function App() {
   // Earliest visit year across all categories (for slider min)
   const earliestYear = (() => {
     let m = CURRENT_YEAR;
-    for (const r of [countryDetails, stateDetails, provinceDetails, stadiumDetails, tccDetails]) {
+    for (const r of [countryDetails, stateDetails, provinceDetails, stadiumDetails, parkDetails, tccDetails]) {
       for (const k in r) {
         const d = r[k];
         if (d.firstYear && d.firstYear < m) m = d.firstYear;
@@ -2295,6 +2326,7 @@ export default function App() {
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const sortedStadiums = [...MLB_STADIUMS].sort((a, b) => a.team.localeCompare(b.team));
+  const sortedParks    = [...US_NATIONAL_PARKS].sort((a, b) => a.name.localeCompare(b.name));
 
   const sortedStates = Object.entries(US_STATE_DATA)
     .map(([fips, info]) => ({ fips, ...info }))
@@ -2410,6 +2442,31 @@ export default function App() {
     }
     setBucketStadiums(prev => { const n = new Set(prev); if (n.has(team)) n.delete(team); else n.add(team); return n; });
   }, [setStadiumDetail]);
+
+  const toggleParkVisited = useCallback((name: string) => {
+    setVisitedParks(prev => {
+      const n = new Set(prev);
+      if (n.has(name)) { n.delete(name); setParkDetail(name, null); }
+      else { n.add(name); setBucketParks(b => { const nb = new Set(b); nb.delete(name); return nb; }); }
+      return n;
+    });
+  }, [setParkDetail, setBucketParks]);
+
+  const toggleParkBucket = useCallback((name: string, isVisited: boolean) => {
+    setConfirmBucket(null);
+    if (isVisited) {
+      setVisitedParks(prev => { const n = new Set(prev); n.delete(name); return n; });
+      setParkDetail(name, null);
+    }
+    setBucketParks(prev => { const n = new Set(prev); if (n.has(name)) n.delete(name); else n.add(name); return n; });
+  }, [setParkDetail]);
+
+  const handleParkClick = useCallback((park: NationalParkInfo) => {
+    setSelected(null);
+    setSelectedTcc(null);
+    setConfirmBucket(null);
+    setSelectedPark(prev => prev?.name === park.name ? null : park);
+  }, []);
 
   const showToast = useCallback((message: string, kind: "success" | "warning") => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -3056,12 +3113,41 @@ export default function App() {
                   </Marker>
                 );
               })}
+
+              {/* National Park Markers */}
+              {US_NATIONAL_PARKS.map((park) => {
+                const isSelected = selectedPark?.name === park.name;
+                const isHov = hoveredPark === park.name;
+                const isVisited = visitedParks.has(park.name);
+                const isBucketList = !isVisited && bucketParks.has(park.name);
+                const s = 1 / zoom;
+                const poleColor = isSelected ? "#facc15" : isVisited ? "#86efac" : isBucketList ? BUCKET_LIST_STROKE : "#64748b";
+                const flagColor = isSelected ? "#facc15" : isVisited ? (isHov ? "#15803d" : "#16a34a") : isBucketList ? "none" : (isHov ? "#64748b" : "#374151");
+                const flagStroke = isSelected ? "#f59e0b" : isVisited ? "#14532d" : isBucketList ? BUCKET_LIST_STROKE : "#1f2937";
+                const dotColor = isSelected ? "#facc15" : isVisited ? "#16a34a" : isBucketList ? BUCKET_LIST_COLOR : "#374151";
+                return (
+                  <Marker key={park.name} coordinates={park.coordinates}>
+                    <g
+                      transform={`scale(${s})`}
+                      style={{ cursor: "pointer" }}
+                      onClick={(e) => { e.stopPropagation(); handleParkClick(park); }}
+                      onMouseEnter={(e) => { setHoveredPark(park.name); setTooltipName(park.name); setTooltipPos({ x: e.clientX, y: e.clientY }); }}
+                      onMouseMove={(e) => setTooltipPos({ x: e.clientX, y: e.clientY })}
+                      onMouseLeave={() => { setHoveredPark(null); setTooltipName(""); }}
+                    >
+                      <line x1="0" y1="0" x2="0" y2="-20" stroke={poleColor} strokeWidth={isHov || isSelected ? 2 : 1.5} />
+                      <polygon points="0,-20 12,-16 0,-12" fill={flagColor} stroke={flagStroke} strokeWidth={isBucketList ? 1 : 0.5} />
+                      <circle r={isHov || isSelected ? 3.5 : 2.5} fill={dotColor} stroke="#0f172a" strokeWidth="0.8" />
+                    </g>
+                  </Marker>
+                );
+              })}
               </>)}
             </ZoomableGroup>
           </ComposableMap>
 
           {/* Tooltip */}
-          {(hovered || hoveredStadium) && tooltipName && (
+          {(hovered || hoveredStadium || hoveredPark) && tooltipName && (
             <div
               className="fixed z-50 pointer-events-none bg-slate-800 text-white text-sm px-3 py-1.5 rounded-lg shadow-xl border border-slate-600 font-medium whitespace-nowrap"
               style={{ left: tooltipPos.x + 12, top: tooltipPos.y - 36 }}
@@ -3165,6 +3251,82 @@ export default function App() {
                   </>
                 );
               })()}
+            </div>
+          ) : selectedPark ? (
+            <div className="p-6 flex-1">
+              <button onClick={() => setSelectedPark(null)} className="text-slate-400 hover:text-white text-sm mb-4 flex items-center gap-1 transition-colors">
+                ← Back
+              </button>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold mb-3 text-white bg-green-700">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <line x1="5" y1="10" x2="5" y2="2" stroke="white" strokeWidth="1.5"/>
+                  <polygon points="5,2 10,4 5,6" fill="white"/>
+                </svg>
+                National Park
+              </div>
+              <h2 className="text-xl font-bold text-white mb-0.5">{selectedPark.name}</h2>
+              <p className="text-slate-400 text-sm mb-5">{selectedPark.state}</p>
+
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-800/60">
+                  <span className="text-xl">📍</span>
+                  <div>
+                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">State(s)</p>
+                    <p className="text-sm font-medium text-white mt-0.5">{selectedPark.state}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-800/60">
+                  <span className="text-xl">📅</span>
+                  <div>
+                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Established</p>
+                    <p className="text-sm font-medium text-white mt-0.5">{selectedPark.established}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-800/60">
+                  <span className="text-xl">🌲</span>
+                  <div>
+                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Area</p>
+                    <p className="text-sm font-medium text-white mt-0.5">{selectedPark.area}</p>
+                  </div>
+                </div>
+              </div>
+
+              {!isReadOnly && (() => {
+                const name = selectedPark.name;
+                const isVisited = visitedParks.has(name);
+                const isBucketList = !isVisited && bucketParks.has(name);
+                const confirmKey = `park-${name}`;
+                return (
+                  <>
+                    <div className="flex gap-2 mt-5 pt-5 border-t border-slate-800">
+                      <button
+                        onClick={() => { toggleParkVisited(name); setConfirmBucket(null); }}
+                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isVisited ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white"}`}
+                      >
+                        <span>{isVisited ? "✓" : "○"}</span>{isVisited ? "Visited" : "Mark Visited"}
+                      </button>
+                      <button
+                        onClick={() => { if (!isBucketList && isVisited) { setConfirmBucket(confirmKey); } else { toggleParkBucket(name, false); } }}
+                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isBucketList ? "bg-amber-700 hover:bg-amber-600 text-white" : "bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white"}`}
+                      >
+                        <span>★</span>{isBucketList ? "On Bucket List" : "Bucket List"}
+                      </button>
+                    </div>
+                    {confirmBucket === confirmKey && (
+                      <div className="mt-2 p-3 bg-amber-900/40 border border-amber-700/60 rounded-lg text-sm">
+                        <p className="text-amber-200 mb-2">Remove from visited and add to bucket list?</p>
+                        <div className="flex gap-2">
+                          <button onClick={() => toggleParkBucket(name, true)} className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium">Confirm</button>
+                          <button onClick={() => setConfirmBucket(null)} className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium">Cancel</button>
+                        </div>
+                      </div>
+                    )}
+                    {isVisited && <VisitDetailsPanel locationId={name} category="park" isReadOnly={isReadOnly} details={parkDetails[name]} onUpdate={setParkDetail} />}
+                  </>
+                );
+              })()}
+
+              <NoteField category="park" locationId={selectedPark.name} isReadOnly={isReadOnly} readOnlyValue={getReadOnlyNote("park", selectedPark.name)} onSaved={handleNoteSaved} />
             </div>
           ) : selectedStadium ? (
             <div className="p-6 flex-1">
@@ -3508,10 +3670,19 @@ export default function App() {
                     <span className="text-sm text-slate-300 flex-1">MLB Stadium</span>
                     <span className="text-xs font-mono text-slate-500">{visitedStadiums.size}/{sortedStadiums.length}</span>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <svg width="14" height="14" viewBox="-2 -14 14 14" fill="none" className="flex-shrink-0">
+                      <line x1="0" y1="0" x2="0" y2="-12" stroke="#86efac" strokeWidth="1.5"/>
+                      <polygon points="0,-12 8,-9 0,-6" fill="#16a34a"/>
+                      <circle cy="0" r="2.5" fill="#15803d"/>
+                    </svg>
+                    <span className="text-sm text-slate-300 flex-1">National Park</span>
+                    <span className="text-xs font-mono text-slate-500">{visitedParks.size}/{sortedParks.length}</span>
+                  </div>
                   <div className="flex items-center gap-2 pt-2 mt-2 border-t border-slate-800">
                     <div className="w-3 h-3 rounded-sm flex-shrink-0 border-2" style={{ backgroundColor: BUCKET_LIST_COLOR, borderColor: BUCKET_LIST_STROKE, borderStyle: "dashed" }} />
                     <span className="text-sm text-slate-300 flex-1">Bucket List</span>
-                    <span className="text-xs font-mono text-slate-500">{bucketCountries.size + bucketStates.size + bucketProvinces.size + bucketStadiums.size}</span>
+                    <span className="text-xs font-mono text-slate-500">{bucketCountries.size + bucketStates.size + bucketProvinces.size + bucketStadiums.size + bucketParks.size}</span>
                   </div>
                   {totalNoteCount > 0 && (
                     <div className="flex items-center gap-2">
@@ -3541,6 +3712,10 @@ export default function App() {
                   <div className="p-3 rounded-lg bg-slate-800/60 text-center">
                     <p className="text-xl font-bold text-white">30</p>
                     <p className="text-xs text-slate-400 mt-0.5">MLB Stadiums</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-slate-800/60 text-center">
+                    <p className="text-xl font-bold text-white">{NP_TOTAL}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Nat. Parks</p>
                   </div>
                 </div>
               </div>
@@ -3575,6 +3750,7 @@ export default function App() {
                   { id: "us-states",   label: "US States" },
                   { id: "ca-provinces", label: "CA Provinces" },
                   { id: "stadiums",    label: "MLB Stadiums" },
+                  { id: "nat-parks",   label: "Nat. Parks" },
                   { id: "bucket-list", label: "★ Bucket List" },
                 ] as const)
             ).map(tab => (
@@ -3602,6 +3778,7 @@ export default function App() {
                   { label: "US States", visited: visitedStates.size, total: sortedStates.length, color: "bg-red-500" },
                   { label: "CA Prov.", visited: visitedProvinces.size, total: sortedProvinces.length, color: "bg-orange-500" },
                   { label: "Stadiums", visited: visitedStadiums.size, total: sortedStadiums.length, color: "bg-blue-500" },
+                  { label: "Parks", visited: visitedParks.size, total: sortedParks.length, color: "bg-green-500" },
                 ]
             ).map(({ label, visited, total, color }, i, arr) => (
               <div key={label} className="flex items-center gap-2">
@@ -3842,6 +4019,60 @@ export default function App() {
           </div>
         )}
 
+        {/* National Parks tab */}
+        {listTab === "nat-parks" && (
+          <div className="px-6 py-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-1.5">
+              {sortedParks.map((park) => {
+                const isVisited = visitedParks.has(park.name);
+                const isBucket = !isVisited && bucketParks.has(park.name);
+                const isActive = selectedPark?.name === park.name;
+                return (
+                  <div
+                    key={park.name}
+                    className={`flex items-start gap-2 px-2.5 py-2 rounded-lg text-sm transition-colors ${
+                      isActive
+                        ? "bg-yellow-500/20 border border-yellow-500/40"
+                        : isVisited
+                        ? "bg-green-900/30 border border-green-700/30 hover:bg-green-800/30"
+                        : isBucket
+                        ? "bg-amber-900/20 border border-amber-700/30 hover:bg-amber-900/30"
+                        : "bg-slate-800/40 hover:bg-slate-700/60 border border-transparent"
+                    }`}
+                  >
+                    {!isReadOnly && <input
+                      type="checkbox"
+                      checked={isVisited}
+                      onChange={() => toggleParkVisited(park.name)}
+                      className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 accent-green-500 cursor-pointer"
+                    />}
+                    <button
+                      onClick={() => {
+                        setSelected(null);
+                        setConfirmBucket(null);
+                        setSelectedPark(prev => prev?.name === park.name ? null : park);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className="text-left flex-1 min-w-0"
+                    >
+                      <p className={`font-medium truncate ${isActive ? "text-yellow-300" : isVisited ? "text-green-300" : isBucket ? "text-amber-300" : "text-slate-300 hover:text-white"}`}>
+                        {park.name}
+                        {effectiveNotesIndex.park.has(park.name) && <span className="text-[10px] ml-1" title="Has note">📝</span>}
+                      </p>
+                      <p className="text-xs text-slate-400 truncate mt-0.5">{park.state}</p>
+                    </button>
+                    {!isReadOnly && <button
+                      onClick={(e) => { e.stopPropagation(); toggleParkBucket(park.name, isVisited); }}
+                      className={`flex-shrink-0 text-sm leading-none transition-colors mt-0.5 ${isBucket ? "text-amber-400 hover:text-slate-400" : "text-slate-600 hover:text-amber-400"}`}
+                      title={isBucket ? "Remove from bucket list" : "Add to bucket list"}
+                    >★</button>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* TCC tab */}
         {listTab === "tcc" && (
           <div className="px-6 py-4">
@@ -3918,13 +4149,13 @@ export default function App() {
 
         {/* Bucket List tab */}
         {listTab === "bucket-list" && (() => {
-          const bucketTotal = bucketCountries.size + bucketStates.size + bucketProvinces.size + bucketStadiums.size + tccBucket.size;
+          const bucketTotal = bucketCountries.size + bucketStates.size + bucketProvinces.size + bucketStadiums.size + bucketParks.size + tccBucket.size;
           if (bucketTotal === 0) {
             return (
               <div className="px-6 py-12 text-center text-slate-400">
                 <div className="text-4xl mb-3">★</div>
                 <p className="text-base font-medium text-slate-300 mb-1">Your bucket list is empty</p>
-                <p className="text-sm">Click the ★ on any country, state, province, stadium, or TCC entry to add it here.</p>
+                <p className="text-sm">Click the ★ on any country, state, province, stadium, park, or TCC entry to add it here.</p>
               </div>
             );
           }
@@ -3933,6 +4164,7 @@ export default function App() {
             ...sortedStates.filter(s => bucketStates.has(s.fips)).map(s => ({ name: s.name, sub: "", badge: "US State", badgeClass: "bg-red-900/80 text-red-300", key: `state-${s.fips}`, id: s.fips, cat: "state" as const })),
             ...sortedProvinces.filter(p => bucketProvinces.has(p.key)).map(p => ({ name: p.name, sub: "", badge: "Province", badgeClass: "bg-orange-900/80 text-orange-300", key: `province-${p.key}`, id: p.key, cat: "province" as const })),
             ...sortedStadiums.filter(s => bucketStadiums.has(s.team)).map(s => ({ name: s.team, sub: s.stadium, badge: "Stadium", badgeClass: "bg-violet-900/80 text-violet-300", key: `stadium-${s.team}`, id: s.team, cat: "stadium" as const })),
+            ...sortedParks.filter(p => bucketParks.has(p.name)).map(p => ({ name: p.name, sub: p.state, badge: "Park", badgeClass: "bg-green-900/80 text-green-300", key: `park-${p.name}`, id: p.name, cat: "park" as const })),
             ...sortedTcc.filter(e => tccBucket.has(e.name)).map(e => ({ name: e.name, sub: TCC_REGIONS[e.region].name, badge: "TCC", badgeClass: "bg-purple-900/80 text-purple-300", key: `tcc-${e.name}`, id: e.name, cat: "tcc" as const })),
           ].sort((a, b) => a.name.localeCompare(b.name));
           return (
@@ -3946,12 +4178,15 @@ export default function App() {
                       onClick={() => {
                         if (item.cat === "stadium") {
                           const s = MLB_STADIUMS.find(st => st.team === item.id);
-                          if (s) { setSelected(null); setSelectedTcc(null); setSelectedStadium(s); window.scrollTo({ top: 0, behavior: "smooth" }); }
+                          if (s) { setSelected(null); setSelectedTcc(null); setSelectedPark(null); setSelectedStadium(s); window.scrollTo({ top: 0, behavior: "smooth" }); }
+                        } else if (item.cat === "park") {
+                          const p = US_NATIONAL_PARKS.find(pk => pk.name === item.id);
+                          if (p) { setSelected(null); setSelectedTcc(null); setSelectedStadium(null); setSelectedPark(p); if (mapMode !== "world") setMapMode("world"); window.scrollTo({ top: 0, behavior: "smooth" }); }
                         } else if (item.cat === "tcc") {
                           const t = TCC_BY_NAME.get(item.id);
-                          if (t) { setSelected(null); setSelectedStadium(null); setSelectedTcc(t); if (mapMode !== "tcc") setMapMode("tcc"); window.scrollTo({ top: 0, behavior: "smooth" }); }
+                          if (t) { setSelected(null); setSelectedStadium(null); setSelectedPark(null); setSelectedTcc(t); if (mapMode !== "tcc") setMapMode("tcc"); window.scrollTo({ top: 0, behavior: "smooth" }); }
                         } else {
-                          setSelectedStadium(null); setSelectedTcc(null);
+                          setSelectedStadium(null); setSelectedTcc(null); setSelectedPark(null);
                           if (item.cat === "country") { const c = sortedCountries.find(c => c.id === item.id); if (c) setSelected({ key: item.key, info: c }); }
                           else if (item.cat === "state") { const s = sortedStates.find(s => s.fips === item.id); if (s) setSelected({ key: item.key, info: s }); }
                           else if (item.cat === "province") { const p = sortedProvinces.find(p => p.key === item.id); if (p) setSelected({ key: item.key, info: p }); }
@@ -3968,6 +4203,7 @@ export default function App() {
                         if (item.cat === "country") toggleCountryBucket(item.id, false);
                         else if (item.cat === "state") toggleStateBucket(item.id, false);
                         else if (item.cat === "province") toggleProvinceBucket(item.id, false);
+                        else if (item.cat === "park") toggleParkBucket(item.id, false);
                         else if (item.cat === "tcc") toggleTccBucket(item.id, false);
                         else toggleStadiumBucket(item.id, false);
                       }}
@@ -3989,10 +4225,12 @@ export default function App() {
           visitedStates={visitedStates}
           visitedProvinces={visitedProvinces}
           visitedStadiums={visitedStadiums}
+          visitedParks={visitedParks}
           countryDetails={countryDetails}
           stateDetails={stateDetails}
           provinceDetails={provinceDetails}
           stadiumDetails={stadiumDetails}
+          parkDetails={parkDetails}
         />
       )}
 
@@ -4003,16 +4241,19 @@ export default function App() {
           visitedStates={baseVisitedStates}
           visitedProvinces={baseVisitedProvinces}
           visitedStadiums={baseVisitedStadiums}
+          visitedParks={baseVisitedParks}
           tccVisited={baseTccVisited}
           bucketCountries={bucketCountries}
           bucketStates={bucketStates}
           bucketProvinces={bucketProvinces}
           bucketStadiums={bucketStadiums}
+          bucketParks={bucketParks}
           tccBucket={tccBucket}
           countryDetails={countryDetails}
           stateDetails={stateDetails}
           provinceDetails={provinceDetails}
           stadiumDetails={stadiumDetails}
+          parkDetails={parkDetails}
           tccDetails={tccDetails}
         />
       )}
@@ -4024,10 +4265,12 @@ export default function App() {
           visitedStates={isReadOnly ? visitedStates : rawVisitedStates}
           visitedProvinces={isReadOnly ? visitedProvinces : rawVisitedProvinces}
           visitedStadiums={isReadOnly ? visitedStadiums : rawVisitedStadiums}
+          visitedParks={isReadOnly ? visitedParks : rawVisitedParks}
           bucketCountries={isReadOnly ? bucketCountries : rawBucketCountries}
           bucketStates={isReadOnly ? bucketStates : rawBucketStates}
           bucketProvinces={isReadOnly ? bucketProvinces : rawBucketProvinces}
           bucketStadiums={isReadOnly ? bucketStadiums : rawBucketStadiums}
+          bucketParks={isReadOnly ? bucketParks : rawBucketParks}
           tccVisited={isReadOnly ? tccVisited : rawTccVisited}
           tccBucket={isReadOnly ? tccBucket : rawTccBucket}
         />

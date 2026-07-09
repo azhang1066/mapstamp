@@ -90,6 +90,41 @@ function SignInPage() {
   );
 }
 
+function EyeIcon({ open }: { open: boolean }) {
+  if (open) {
+    return (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-5 w-5"
+      >
+        <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a20.3 20.3 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a20.3 20.3 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+        <line x1="1" y1="1" x2="23" y2="23" />
+      </svg>
+    );
+  }
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5"
+    >
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
 function extractClerkError(err: unknown): string {
   if (err && typeof err === "object" && "errors" in err) {
     const errors = (
@@ -117,6 +152,8 @@ function SignUpPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -243,32 +280,54 @@ function SignUpPage() {
                 <label htmlFor="signup-password" className={labelClass}>
                   Password
                 </label>
-                <input
-                  id="signup-password"
-                  type="password"
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={inputClass}
-                  placeholder="Enter your password"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    id="signup-password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={`${inputClass} pr-10`}
+                    placeholder="Enter your password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-200"
+                  >
+                    <EyeIcon open={showPassword} />
+                  </button>
+                </div>
               </div>
 
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="signup-confirm-password" className={labelClass}>
                   Confirm Password
                 </label>
-                <input
-                  id="signup-confirm-password"
-                  type="password"
-                  autoComplete="new-password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className={inputClass}
-                  placeholder="Re-enter your password"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    id="signup-confirm-password"
+                    type={showConfirmPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className={`${inputClass} pr-10`}
+                    placeholder="Re-enter your password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((v) => !v)}
+                    aria-label={
+                      showConfirmPassword ? "Hide password" : "Show password"
+                    }
+                    className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-200"
+                  >
+                    <EyeIcon open={showConfirmPassword} />
+                  </button>
+                </div>
               </div>
 
               <div id="clerk-captcha" />

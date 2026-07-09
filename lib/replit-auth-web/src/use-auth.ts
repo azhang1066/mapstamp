@@ -43,11 +43,25 @@ export function useAuth(): AuthState {
 
   const login = useCallback(() => {
     const returnTo = window.location.origin + window.location.pathname;
-    window.location.href = `/api/login?returnTo=${encodeURIComponent(returnTo)}`;
+    const url = `${window.location.origin}/api/login?returnTo=${encodeURIComponent(returnTo)}`;
+    // Replit's login page refuses to render inside an iframe (e.g. when this
+    // app is previewed on the Canvas board), so navigate the top-level
+    // window instead of just the current frame. Setting `.location.href` on
+    // a cross-origin top window is allowed even though reading it is not.
+    try {
+      (window.top ?? window).location.href = url;
+    } catch {
+      window.location.href = url;
+    }
   }, []);
 
   const logout = useCallback(() => {
-    window.location.href = "/api/logout";
+    const url = `${window.location.origin}/api/logout`;
+    try {
+      (window.top ?? window).location.href = url;
+    } catch {
+      window.location.href = url;
+    }
   }, []);
 
   return {

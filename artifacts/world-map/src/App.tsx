@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import type { AuthProps } from "./SyncGate";
 import * as XLSX from "xlsx";
 import { toPng } from "html-to-image";
 import {
@@ -2142,7 +2143,7 @@ const DIVISION_COLORS: Record<string, string> = {
   "NL West": "#1d4ed8",
 };
 
-export default function App() {
+export default function App({ authUser, isAuthenticated, onLogin, onLogout }: AuthProps) {
   const [selected, setSelected] = useState<{ key: string; info: RegionInfo } | null>(null);
   const [selectedStadium, setSelectedStadium] = useState<StadiumInfo | null>(null);
   const [hoveredStadium, setHoveredStadium] = useState<string | null>(null);
@@ -2474,6 +2475,57 @@ export default function App() {
     toastTimerRef.current = setTimeout(() => setToast(null), 5000);
   }, []);
 
+  // Debounced server sync — runs 3s after any data change when logged in
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    syncTimerRef.current = setTimeout(() => {
+      const notesByKey: Record<string, string> = {};
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k?.startsWith("shortnote:")) notesByKey[k] = localStorage.getItem(k) ?? "";
+        }
+      } catch {}
+      const payload = {
+        visitedCountries: [...rawVisitedCountries],
+        visitedStates: [...rawVisitedStates],
+        visitedProvinces: [...rawVisitedProvinces],
+        visitedStadiums: [...rawVisitedStadiums],
+        visitedParks: [...rawVisitedParks],
+        tccVisited: [...rawTccVisited],
+        bucketCountries: [...rawBucketCountries],
+        bucketStates: [...rawBucketStates],
+        bucketProvinces: [...rawBucketProvinces],
+        bucketStadiums: [...rawBucketStadiums],
+        bucketParks: [...rawBucketParks],
+        tccBucket: [...rawTccBucket],
+        countryDetails,
+        stateDetails,
+        provinceDetails,
+        stadiumDetails,
+        parkDetails,
+        tccDetails,
+        notesByKey,
+        profileName: localStorage.getItem("wm_profile_name") ?? undefined,
+      };
+      fetch("/api/map-data", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }).catch(() => {});
+    }, 3000);
+    return () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current); };
+  }, [
+    isAuthenticated,
+    rawVisitedCountries, rawVisitedStates, rawVisitedProvinces, rawVisitedStadiums, rawVisitedParks, rawTccVisited,
+    rawBucketCountries, rawBucketStates, rawBucketProvinces, rawBucketStadiums, rawBucketParks, rawTccBucket,
+    countryDetails, stateDetails, provinceDetails, stadiumDetails, parkDetails, tccDetails,
+    notesIndex,
+  ]);
+
   const handleFileImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -2752,6 +2804,33 @@ export default function App() {
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="10.5" cy="2.5" r="1.5" stroke="currentColor" strokeWidth="1.3"/><circle cx="10.5" cy="10.5" r="1.5" stroke="currentColor" strokeWidth="1.3"/><circle cx="2.5" cy="6.5" r="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M4 6l5-3M4 7l5 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
             Share
           </button>
+          <div className="w-px bg-slate-700 self-stretch" />
+          {isAuthenticated ? (
+            <div className="flex items-center gap-2">
+              {authUser?.profileImageUrl ? (
+                <img src={authUser.profileImageUrl} alt="" className="w-7 h-7 rounded-full object-cover border border-slate-600" />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center text-xs font-medium text-slate-300 border border-slate-600">
+                  {authUser?.firstName?.[0]?.toUpperCase() ?? authUser?.id?.[0]?.toUpperCase() ?? "?"}
+                </div>
+              )}
+              <button
+                onClick={onLogout}
+                className="px-3 py-2 text-sm bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors font-medium text-slate-300 hover:text-white"
+              >
+                Sign out
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={onLogin}
+              className="px-3 py-2 text-sm bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors font-medium text-slate-300 hover:text-white flex items-center gap-1.5"
+              title="Sign in to save your travel data to the cloud"
+            >
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M8.5 1H11a1 1 0 011 1v9a1 1 0 01-1 1H8.5M5.5 9.5l3-3-3-3M8.5 6.5H1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Sign in
+            </button>
+          )}
         </div>
       </header>
 

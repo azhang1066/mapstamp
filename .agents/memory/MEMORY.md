@@ -1,0 +1,1 @@
+- [Replit Auth to Clerk migration](replit-auth-to-clerk-migration.md) — manual removal-and-rebuild required; no automated migration path exists.

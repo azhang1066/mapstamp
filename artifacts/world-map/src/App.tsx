@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import type { AuthProps } from "./SyncGate";
+import type { AuthProps } from "./auth-types";
 import * as XLSX from "xlsx";
 import { toPng } from "html-to-image";
 import {

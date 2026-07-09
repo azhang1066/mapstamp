@@ -1,11 +1,13 @@
 import { Router, type IRouter, type Request, type Response } from "express";
+import { getAuth } from "@clerk/express";
 import { db, userMapDataTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 const router: IRouter = Router();
 
 router.get("/map-data", async (req: Request, res: Response) => {
-  if (!req.isAuthenticated()) {
+  const { userId } = getAuth(req);
+  if (!userId) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
@@ -13,13 +15,14 @@ router.get("/map-data", async (req: Request, res: Response) => {
   const [row] = await db
     .select()
     .from(userMapDataTable)
-    .where(eq(userMapDataTable.userId, req.user.id));
+    .where(eq(userMapDataTable.userId, userId));
 
   res.json({ data: row?.data ?? null });
 });
 
 router.put("/map-data", async (req: Request, res: Response) => {
-  if (!req.isAuthenticated()) {
+  const { userId } = getAuth(req);
+  if (!userId) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
@@ -28,7 +31,7 @@ router.put("/map-data", async (req: Request, res: Response) => {
 
   await db
     .insert(userMapDataTable)
-    .values({ userId: req.user.id, data })
+    .values({ userId, data })
     .onConflictDoUpdate({
       target: userMapDataTable.userId,
       set: { data, updatedAt: new Date() },

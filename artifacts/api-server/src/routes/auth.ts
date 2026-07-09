@@ -23,11 +23,30 @@ const OIDC_COOKIE_TTL = 10 * 60 * 1000;
 
 const router: IRouter = Router();
 
+const KNOWN_DOMAINS = (process.env.REPLIT_DOMAINS ?? "")
+  .split(",")
+  .map((d) => d.trim())
+  .filter(Boolean);
+
 function getOrigin(req: Request): string {
   const proto = req.headers["x-forwarded-proto"] || "https";
-  const host =
-    req.headers["x-forwarded-host"] || req.headers["host"] || "localhost";
-  return `${proto}://${host}`;
+  const forwardedHost = req.headers["x-forwarded-host"] as string | undefined;
+  const host = (req.headers["host"] as string | undefined) ?? "";
+
+  // Prefer a forwarded/host header only if it matches a domain we know is
+  // valid for this repl. Requests routed through internal proxies (e.g. the
+  // Canvas iframe) can arrive with a missing or "localhost" host, which would
+  // otherwise produce an invalid OIDC redirect_uri.
+  if (forwardedHost && KNOWN_DOMAINS.includes(forwardedHost)) {
+    return `${proto}://${forwardedHost}`;
+  }
+  if (KNOWN_DOMAINS.includes(host)) {
+    return `${proto}://${host}`;
+  }
+  if (KNOWN_DOMAINS.length > 0) {
+    return `https://${KNOWN_DOMAINS[0]}`;
+  }
+  return `${proto}://${forwardedHost || host || "localhost"}`;
 }
 
 function setSessionCookie(res: Response, sid: string) {

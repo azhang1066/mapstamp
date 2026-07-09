@@ -11,6 +11,16 @@ interface AuthState {
   logout: () => void;
 }
 
+function fetchUser(): Promise<AuthUser | null> {
+  return fetch("/api/auth/user", { credentials: "include" })
+    .then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json() as Promise<{ user: AuthUser | null }>;
+    })
+    .then((data) => data.user ?? null)
+    .catch(() => null);
+}
+
 export function useAuth(): AuthState {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -18,48 +28,45 @@ export function useAuth(): AuthState {
   useEffect(() => {
     let cancelled = false;
 
-    fetch("/api/auth/user", { credentials: "include" })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json() as Promise<{ user: AuthUser | null }>;
-      })
-      .then((data) => {
-        if (!cancelled) {
-          setUser(data.user ?? null);
-          setIsLoading(false);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setUser(null);
-          setIsLoading(false);
-        }
+    fetchUser().then((u) => {
+      if (!cancelled) {
+        setUser(u);
+        setIsLoading(false);
+      }
+    });
+
+    // Auth completes in a separate tab/window when this app is embedded in
+    // an iframe (e.g. previewed on the Canvas board), where Replit's login
+    // page refuses to render and top-level navigation is blocked by iframe
+    // sandboxing. Re-check auth state whenever this tab regains focus so the
+    // app picks up the newly-created session without a manual refresh.
+    const onFocus = () => {
+      fetchUser().then((u) => {
+        if (!cancelled) setUser(u);
       });
+    };
+    window.addEventListener("focus", onFocus);
 
     return () => {
       cancelled = true;
+      window.removeEventListener("focus", onFocus);
     };
   }, []);
 
   const login = useCallback(() => {
     const returnTo = window.location.origin + window.location.pathname;
     const url = `${window.location.origin}/api/login?returnTo=${encodeURIComponent(returnTo)}`;
-    // Replit's login page refuses to render inside an iframe (e.g. when this
-    // app is previewed on the Canvas board), so navigate the top-level
-    // window instead of just the current frame. Setting `.location.href` on
-    // a cross-origin top window is allowed even though reading it is not.
-    try {
-      (window.top ?? window).location.href = url;
-    } catch {
+    const popup = window.open(url, "_blank", "noopener=false");
+    if (!popup) {
+      // Popup blocked; fall back to in-place navigation.
       window.location.href = url;
     }
   }, []);
 
   const logout = useCallback(() => {
     const url = `${window.location.origin}/api/logout`;
-    try {
-      (window.top ?? window).location.href = url;
-    } catch {
+    const popup = window.open(url, "_blank", "noopener=false");
+    if (!popup) {
       window.location.href = url;
     }
   }, []);

@@ -1,1 +1,2 @@
 - [Replit Auth to Clerk migration](replit-auth-to-clerk-migration.md) — manual removal-and-rebuild required; no automated migration path exists.
+- [Clerk custom sign-up forms](replit-auth-to-clerk-migration.md) — `useSignUp()` in `@clerk/react` returns the new "future" API (`signUp.password()`, `.sso()`, `.verifications.sendEmailCode/verifyEmailCode()`, `.finalize()`), not the legacy `create/prepareEmailAddressVerification/attemptEmailAddressVerification` methods.

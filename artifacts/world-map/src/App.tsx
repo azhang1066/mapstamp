@@ -2155,6 +2155,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout }: Au
   const [zoom, setZoom] = useState(1);
   const [center, setCenter] = useState<[number, number]>([0, 20]);
   const [listTab, setListTab] = useState<"countries" | "stadiums" | "nat-parks" | "us-states" | "ca-provinces" | "tcc" | "bucket-list">("countries");
+  const [expandedTccRegions, setExpandedTccRegions] = useState<Set<TccRegionKey>>(new Set());
   const [confirmBucket, setConfirmBucket] = useState<string | null>(null);
   const [showExport, setShowExport] = useState(false);
   const [showShare, setShowShare] = useState(false);
@@ -4157,68 +4158,105 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout }: Au
           <div className="px-6 py-4">
             <div className="flex items-center gap-2 mb-3 flex-wrap">
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Regions</span>
-              {(Object.entries(TCC_REGIONS) as [TccRegionKey, typeof TCC_REGIONS[TccRegionKey]][]).map(([k, r]) => {
-                const visitedInRegion = sortedTcc.filter(e => e.region === k && tccVisited.has(e.name)).length;
-                const totalInRegion = sortedTcc.filter(e => e.region === k).length;
-                return (
-                  <span key={k} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: r.color }}>
-                    <span className="w-1.5 h-1.5 rounded-full bg-white/80" />
-                    {r.name}
-                    <span className="text-white/80 font-mono">{visitedInRegion}/{totalInRegion}</span>
-                  </span>
-                );
-              })}
+              <button
+                onClick={() => setExpandedTccRegions(new Set(Object.keys(TCC_REGIONS) as TccRegionKey[]))}
+                className="text-[10px] font-semibold text-slate-400 hover:text-slate-200 underline ml-auto"
+              >
+                Expand all
+              </button>
+              <button
+                onClick={() => setExpandedTccRegions(new Set())}
+                className="text-[10px] font-semibold text-slate-400 hover:text-slate-200 underline"
+              >
+                Collapse all
+              </button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-1.5">
-              {sortedTcc.map((entry) => {
-                const isVisited = tccVisited.has(entry.name);
-                const isBucket = !isVisited && tccBucket.has(entry.name);
-                const isActive = selectedTcc?.name === entry.name;
-                const region = TCC_REGIONS[entry.region];
+            <div className="flex flex-col gap-2">
+              {(Object.entries(TCC_REGIONS) as [TccRegionKey, typeof TCC_REGIONS[TccRegionKey]][]).map(([k, r]) => {
+                const entriesInRegion = sortedTcc.filter(e => e.region === k);
+                const visitedInRegion = entriesInRegion.filter(e => tccVisited.has(e.name)).length;
+                const totalInRegion = entriesInRegion.length;
+                const isExpanded = expandedTccRegions.has(k);
                 return (
-                  <div
-                    key={entry.name}
-                    className={`flex items-center gap-1.5 px-2 py-2 rounded-lg text-sm transition-colors border ${
-                      isActive
-                        ? "bg-yellow-500/20 border-yellow-500/40"
-                        : isVisited
-                        ? "bg-purple-900/30 border-purple-700/30 hover:bg-purple-800/30"
-                        : isBucket
-                        ? "bg-amber-900/20 border-amber-700/30 hover:bg-amber-900/30"
-                        : "bg-slate-800/40 hover:bg-slate-700/60 border-transparent"
-                    }`}
-                  >
-                    {!isReadOnly && <input
-                      type="checkbox"
-                      checked={isVisited}
-                      onChange={() => toggleTccVisited(entry.name)}
-                      className="w-3.5 h-3.5 flex-shrink-0 accent-purple-500 cursor-pointer"
-                    />}
-                    <span
-                      className="w-2 h-2 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: region.color }}
-                      title={region.name}
-                    />
+                  <div key={k} className="rounded-lg border border-slate-700/60 overflow-hidden">
                     <button
                       onClick={() => {
-                        setSelectedTcc(prev => prev?.name === entry.name ? null : entry);
-                        setConfirmBucket(null);
-                        window.scrollTo({ top: 0, behavior: "smooth" });
+                        setExpandedTccRegions(prev => {
+                          const next = new Set(prev);
+                          if (next.has(k)) next.delete(k);
+                          else next.add(k);
+                          return next;
+                        });
                       }}
-                      className={`text-left truncate flex-1 min-w-0 ${isActive ? "text-yellow-300" : isVisited ? "text-purple-200" : isBucket ? "text-amber-300" : "text-slate-300 hover:text-white"}`}
-                      title={`${entry.name} — ${region.name}`}
+                      className="w-full flex items-center gap-2 px-3 py-2 bg-slate-800/60 hover:bg-slate-800 transition-colors text-left"
                     >
-                      {entry.name}
+                      <span
+                        className={`text-slate-400 text-xs transition-transform flex-shrink-0 ${isExpanded ? "rotate-90" : ""}`}
+                      >
+                        ▶
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold text-white flex-shrink-0" style={{ backgroundColor: r.color }}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-white/80" />
+                        {r.name}
+                      </span>
+                      <span className="text-xs text-slate-400 font-mono">{visitedInRegion}/{totalInRegion}</span>
                     </button>
-                    {(entry.geoId || TCC_US_STATE_ENTRIES.has(entry.name)) && (
-                      <span className="text-slate-500 text-[10px] flex-shrink-0" title="Located on map">🗺</span>
+                    {isExpanded && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-1.5 p-2 bg-slate-900/40">
+                        {entriesInRegion.map((entry) => {
+                          const isVisited = tccVisited.has(entry.name);
+                          const isBucket = !isVisited && tccBucket.has(entry.name);
+                          const isActive = selectedTcc?.name === entry.name;
+                          const region = TCC_REGIONS[entry.region];
+                          return (
+                            <div
+                              key={entry.name}
+                              className={`flex items-center gap-1.5 px-2 py-2 rounded-lg text-sm transition-colors border ${
+                                isActive
+                                  ? "bg-yellow-500/20 border-yellow-500/40"
+                                  : isVisited
+                                  ? "bg-purple-900/30 border-purple-700/30 hover:bg-purple-800/30"
+                                  : isBucket
+                                  ? "bg-amber-900/20 border-amber-700/30 hover:bg-amber-900/30"
+                                  : "bg-slate-800/40 hover:bg-slate-700/60 border-transparent"
+                              }`}
+                            >
+                              {!isReadOnly && <input
+                                type="checkbox"
+                                checked={isVisited}
+                                onChange={() => toggleTccVisited(entry.name)}
+                                className="w-3.5 h-3.5 flex-shrink-0 accent-purple-500 cursor-pointer"
+                              />}
+                              <span
+                                className="w-2 h-2 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: region.color }}
+                                title={region.name}
+                              />
+                              <button
+                                onClick={() => {
+                                  setSelectedTcc(prev => prev?.name === entry.name ? null : entry);
+                                  setConfirmBucket(null);
+                                  window.scrollTo({ top: 0, behavior: "smooth" });
+                                }}
+                                className={`text-left truncate flex-1 min-w-0 ${isActive ? "text-yellow-300" : isVisited ? "text-purple-200" : isBucket ? "text-amber-300" : "text-slate-300 hover:text-white"}`}
+                                title={`${entry.name} — ${region.name}`}
+                              >
+                                {entry.name}
+                              </button>
+                              {(entry.geoId || TCC_US_STATE_ENTRIES.has(entry.name)) && (
+                                <span className="text-slate-500 text-[10px] flex-shrink-0" title="Located on map">🗺</span>
+                              )}
+                              {effectiveNotesIndex.tcc.has(entry.name) && <span className="text-[10px] flex-shrink-0" title="Has note">📝</span>}
+                              {!isReadOnly && <button
+                                onClick={(e) => { e.stopPropagation(); toggleTccBucket(entry.name, isVisited); }}
+                                className={`flex-shrink-0 text-sm leading-none transition-colors ${isBucket ? "text-amber-400 hover:text-slate-400" : "text-slate-600 hover:text-amber-400"}`}
+                                title={isBucket ? "Remove from bucket list" : "Add to bucket list"}
+                              >★</button>}
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
-                    {effectiveNotesIndex.tcc.has(entry.name) && <span className="text-[10px] flex-shrink-0" title="Has note">📝</span>}
-                    {!isReadOnly && <button
-                      onClick={(e) => { e.stopPropagation(); toggleTccBucket(entry.name, isVisited); }}
-                      className={`flex-shrink-0 text-sm leading-none transition-colors ${isBucket ? "text-amber-400 hover:text-slate-400" : "text-slate-600 hover:text-amber-400"}`}
-                      title={isBucket ? "Remove from bucket list" : "Add to bucket list"}
-                    >★</button>}
                   </div>
                 );
               })}

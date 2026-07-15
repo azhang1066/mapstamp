@@ -338,3 +338,11 @@
     inset: -1px;
   }
 }
+
+/* Force Clerk's UserProfile card to fill its container */
+.cl-rootBox,
+.cl-cardBox,
+.cl-card {
+  width: 100% !important;
+  max-width: 100% !important;
+}

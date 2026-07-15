@@ -517,7 +517,16 @@ function AppWithSync() {
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
             </button>
-            <UserProfile routing="hash" />
+            <UserProfile
+              routing="hash"
+              appearance={{
+                elements: {
+                  rootBox: { width: "100%" },
+                  card: { width: "100%", maxWidth: "100%", boxShadow: "none" },
+                  navbar: { width: "220px" },
+                },
+              }}
+            />
           </div>
         </div>
       )}

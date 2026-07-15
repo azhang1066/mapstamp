@@ -509,7 +509,7 @@ function AppWithSync() {
           className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setShowUserProfile(false); }}
         >
-          <div className="relative w-full max-w-3xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl shadow-2xl">
+          <div className="relative w-full max-w-5xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl shadow-2xl">
             <button
               onClick={() => setShowUserProfile(false)}
               className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"

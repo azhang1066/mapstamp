@@ -4,6 +4,7 @@ import {
   AuthenticateWithRedirectCallback,
   ClerkProvider,
   SignIn,
+  UserProfile,
   useUser,
   useClerk,
   useSignUp,
@@ -455,9 +456,10 @@ function applyServerDataToLocalStorage(data: ServerData) {
 
 function AppWithSync() {
   const { user, isLoaded, isSignedIn } = useUser();
-  const { signOut, openUserProfile } = useClerk();
+  const { signOut } = useClerk();
   const [, setLocation] = useLocation();
   const [ready, setReady] = useState(false);
+  const [showUserProfile, setShowUserProfile] = useState(false);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -494,13 +496,32 @@ function AppWithSync() {
     : null;
 
   return (
-    <App
-      authUser={authUser}
-      isAuthenticated={!!isSignedIn}
-      onLogin={() => setLocation("/sign-in")}
-      onLogout={() => signOut({ redirectUrl: basePath || "/" })}
-      onOpenProfile={() => openUserProfile()}
-    />
+    <>
+      <App
+        authUser={authUser}
+        isAuthenticated={!!isSignedIn}
+        onLogin={() => setLocation("/sign-in")}
+        onLogout={() => signOut({ redirectUrl: basePath || "/" })}
+        onOpenProfile={() => setShowUserProfile(true)}
+      />
+      {showUserProfile && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowUserProfile(false); }}
+        >
+          <div className="relative w-full max-w-3xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl shadow-2xl">
+            <button
+              onClick={() => setShowUserProfile(false)}
+              className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+              title="Close"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+            </button>
+            <UserProfile routing="hash" />
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

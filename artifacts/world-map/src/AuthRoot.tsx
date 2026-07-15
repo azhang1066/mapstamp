@@ -463,6 +463,7 @@ function AppWithSync() {
   const [displayName, setDisplayName] = useState("");
   const [nameSaving, setNameSaving] = useState(false);
   const [nameSaved, setNameSaved] = useState(false);
+  const [profileName, setProfileName] = useState<string | null>(() => localStorage.getItem("wm_profile_name") || null);
 
   // Initialise display name when profile modal opens
   useEffect(() => {
@@ -476,6 +477,7 @@ function AppWithSync() {
     const trimmed = displayName.trim();
     setNameSaving(true);
     try { localStorage.setItem("wm_profile_name", trimmed); } catch { /* ignore */ }
+    setProfileName(trimmed || null);
     setNameSaved(true);
     setNameSaving(false);
     setTimeout(() => setNameSaved(false), 2500);
@@ -510,7 +512,7 @@ function AppWithSync() {
   const authUser: AuthUser | null = user
     ? {
         id: user.id,
-        firstName: user.firstName,
+        firstName: profileName ?? user.firstName,
         profileImageUrl: user.imageUrl ?? null,
       }
     : null;

@@ -9,4 +9,5 @@ export interface AuthProps {
   isAuthenticated: boolean;
   onLogin: () => void;
   onLogout: () => void;
+  onOpenProfile: () => void;
 }

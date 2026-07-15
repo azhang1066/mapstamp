@@ -2143,7 +2143,7 @@ const DIVISION_COLORS: Record<string, string> = {
   "NL West": "#1d4ed8",
 };
 
-export default function App({ authUser, isAuthenticated, onLogin, onLogout }: AuthProps) {
+export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOpenProfile }: AuthProps) {
   const [selected, setSelected] = useState<{ key: string; info: RegionInfo } | null>(null);
   const [selectedStadium, setSelectedStadium] = useState<StadiumInfo | null>(null);
   const [hoveredStadium, setHoveredStadium] = useState<string | null>(null);
@@ -2160,6 +2160,8 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout }: Au
   const [showExport, setShowExport] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const [sharedData, setSharedData] = useState<ShareData | null>(null);
   const [toast, setToast] = useState<{ message: string; kind: "success" | "warning" } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -2215,6 +2217,18 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout }: Au
       if (decoded) setSharedData(decoded);
     }
   }, []);
+
+  // Close profile menu when clicking outside
+  useEffect(() => {
+    if (!showProfileMenu) return;
+    function handleClick(e: MouseEvent) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setShowProfileMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showProfileMenu]);
 
   // In read-only (shared) mode, display the shared data instead of own localStorage data
   const isReadOnly = sharedData !== null;
@@ -2807,20 +2821,46 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout }: Au
           </button>
           <div className="w-px bg-slate-700 self-stretch" />
           {isAuthenticated ? (
-            <div className="flex items-center gap-2">
-              {authUser?.profileImageUrl ? (
-                <img src={authUser.profileImageUrl} alt="" className="w-7 h-7 rounded-full object-cover border border-slate-600" />
-              ) : (
-                <div className="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center text-xs font-medium text-slate-300 border border-slate-600">
-                  {authUser?.firstName?.[0]?.toUpperCase() ?? authUser?.id?.[0]?.toUpperCase() ?? "?"}
+            <div className="relative" ref={profileMenuRef}>
+              <button
+                onClick={() => setShowProfileMenu(p => !p)}
+                className="flex items-center justify-center w-8 h-8 rounded-full overflow-hidden border-2 border-slate-600 hover:border-slate-400 transition-colors focus:outline-none"
+                title="Account settings"
+              >
+                {authUser?.profileImageUrl ? (
+                  <img src={authUser.profileImageUrl} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-slate-700 flex items-center justify-center text-xs font-semibold text-slate-300">
+                    {authUser?.firstName?.[0]?.toUpperCase() ?? authUser?.id?.[0]?.toUpperCase() ?? "?"}
+                  </div>
+                )}
+              </button>
+              {showProfileMenu && (
+                <div className="absolute right-0 top-full mt-2 w-52 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-slate-700">
+                    <p className="text-xs text-slate-400">Signed in as</p>
+                    <p className="text-sm font-medium text-white truncate">
+                      {authUser?.firstName ?? "User"}
+                    </p>
+                  </div>
+                  <div className="py-1">
+                    <button
+                      onClick={() => { onOpenProfile(); setShowProfileMenu(false); }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"
+                    >
+                      <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="4.5" r="2.5" stroke="currentColor" strokeWidth="1.3"/><path d="M2 13c0-2.761 2.462-5 5.5-5S13 10.239 13 13" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+                      Profile settings
+                    </button>
+                    <button
+                      onClick={() => { onLogout(); setShowProfileMenu(false); }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"
+                    >
+                      <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M9.5 1H12a1 1 0 011 1v11a1 1 0 01-1 1H9.5M6.5 10.5l3-3-3-3M9.5 7.5H2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      Sign out
+                    </button>
+                  </div>
                 </div>
               )}
-              <button
-                onClick={onLogout}
-                className="px-3 py-2 text-sm bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors font-medium text-slate-300 hover:text-white"
-              >
-                Sign out
-              </button>
             </div>
           ) : (
             <button

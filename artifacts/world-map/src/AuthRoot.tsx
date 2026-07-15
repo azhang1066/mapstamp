@@ -455,7 +455,7 @@ function applyServerDataToLocalStorage(data: ServerData) {
 
 function AppWithSync() {
   const { user, isLoaded, isSignedIn } = useUser();
-  const { signOut } = useClerk();
+  const { signOut, openUserProfile } = useClerk();
   const [, setLocation] = useLocation();
   const [ready, setReady] = useState(false);
 
@@ -499,6 +499,7 @@ function AppWithSync() {
       isAuthenticated={!!isSignedIn}
       onLogin={() => setLocation("/sign-in")}
       onLogout={() => signOut({ redirectUrl: basePath || "/" })}
+      onOpenProfile={() => openUserProfile()}
     />
   );
 }

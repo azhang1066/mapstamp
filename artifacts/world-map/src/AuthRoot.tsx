@@ -472,17 +472,13 @@ function AppWithSync() {
     setNameSaved(false);
   }, [showUserProfile, user?.firstName]);
 
-  async function saveDisplayName() {
+  function saveDisplayName() {
     const trimmed = displayName.trim();
     setNameSaving(true);
-    try {
-      if (user) await user.update({ firstName: trimmed });
-      try { localStorage.setItem("wm_profile_name", trimmed); } catch { /* ignore */ }
-      setNameSaved(true);
-      setTimeout(() => setNameSaved(false), 2500);
-    } finally {
-      setNameSaving(false);
-    }
+    try { localStorage.setItem("wm_profile_name", trimmed); } catch { /* ignore */ }
+    setNameSaved(true);
+    setNameSaving(false);
+    setTimeout(() => setNameSaved(false), 2500);
   }
 
   useEffect(() => {

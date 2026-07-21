@@ -1775,7 +1775,11 @@ function buildLookupMaps() {
     stadiumByName.set(s.stadium.toLowerCase().trim(), s.team);
     stadiumByName.set(s.team.toLowerCase().trim(), s.team);
   }
-  return { countryByName, stateByName, provinceByName, stadiumByName };
+  const tccByName = new Map<string, string>();
+  for (const [canonical] of TCC_BY_NAME) {
+    tccByName.set(canonical.toLowerCase().trim(), canonical);
+  }
+  return { countryByName, stateByName, provinceByName, stadiumByName, tccByName };
 }
 
 function parseTimesVisited(raw: unknown): number | undefined {
@@ -1817,12 +1821,14 @@ function processImport(
   setVisitedStates: React.Dispatch<React.SetStateAction<Set<string>>>,
   setVisitedProvinces: React.Dispatch<React.SetStateAction<Set<string>>>,
   setVisitedStadiums: React.Dispatch<React.SetStateAction<Set<string>>>,
+  setVisitedTcc: React.Dispatch<React.SetStateAction<Set<string>>>,
   setCountryDetail: (id: string, d: VisitDetails | null) => void,
   setStateDetail: (id: string, d: VisitDetails | null) => void,
   setProvinceDetail: (id: string, d: VisitDetails | null) => void,
   setStadiumDetail: (id: string, d: VisitDetails | null) => void,
+  setTccDetail: (id: string, d: VisitDetails | null) => void,
 ): ImportResult {
-  const { countryByName, stateByName, provinceByName, stadiumByName } = lookups;
+  const { countryByName, stateByName, provinceByName, stadiumByName, tccByName } = lookups;
   const unmatched: string[] = [];
   let matched = 0;
 
@@ -1873,13 +1879,24 @@ function processImport(
       return true;
     };
 
+    const tryTcc = () => {
+      const canonical = tccByName.get(name);
+      if (!canonical) return false;
+      setVisitedTcc(prev => { const n = new Set(prev); n.add(canonical); return n; });
+      const d = detail(row);
+      if (Object.keys(d).length > 0) setTccDetail(canonical, d);
+      matched++;
+      return true;
+    };
+
     let found = false;
     if (t === "country") found = tryCountry();
     else if (t === "state") found = tryState();
     else if (t === "province") found = tryProvince();
     else if (t === "stadium") found = tryStadium();
+    else if (t === "tcc") found = tryTcc();
     else {
-      found = tryCountry() || tryState() || tryProvince() || tryStadium();
+      found = tryCountry() || tryState() || tryProvince() || tryStadium() || tryTcc();
     }
 
     if (!found) unmatched.push(row.name);
@@ -1894,6 +1911,8 @@ function downloadTemplate() {
     ["France", "country", 3, 2010, 2023],
     ["California", "state", 5, 2005, 2024],
     ["Yankee Stadium", "stadium", 1, 2019, 2019],
+    ["Ontario", "province", 2, 2018, 2022],
+    ["France (Metropolitan)", "tcc", 1, 2022, 2022],
   ];
   const ws = XLSX.utils.aoa_to_sheet([headers, ...examples]);
   ws["!cols"] = [{ wch: 30 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 18 }];
@@ -2558,8 +2577,8 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
         const lookups = buildLookupMaps();
         const result = processImport(
           rows, lookups,
-          setVisitedCountries, setVisitedStates, setVisitedProvinces, setVisitedStadiums,
-          setCountryDetail, setStateDetail, setProvinceDetail, setStadiumDetail,
+          setVisitedCountries, setVisitedStates, setVisitedProvinces, setVisitedStadiums, setTccVisited,
+          setCountryDetail, setStateDetail, setProvinceDetail, setStadiumDetail, setTccDetail,
         );
         if (result.unmatched.length > 0) {
           showToast(
@@ -2575,8 +2594,8 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
       }
     };
     reader.readAsArrayBuffer(file);
-  }, [setVisitedCountries, setVisitedStates, setVisitedProvinces, setVisitedStadiums,
-      setCountryDetail, setStateDetail, setProvinceDetail, setStadiumDetail, showToast]);
+  }, [setVisitedCountries, setVisitedStates, setVisitedProvinces, setVisitedStadiums, setTccVisited,
+      setCountryDetail, setStateDetail, setProvinceDetail, setStadiumDetail, setTccDetail, showToast]);
 
   const handleCountryClick = useCallback((geo: { id: string }) => {
     const code = geo.id;

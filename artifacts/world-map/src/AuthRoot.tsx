@@ -9,6 +9,7 @@ import {
   useClerk,
   useSignUp,
 } from "@clerk/react";
+import FavoritesTab from "./FavoritesTab";
 import { publishableKeyFromHost } from "@clerk/react/internal";
 import { shadcn } from "@clerk/themes";
 import { Switch, Route, useLocation, Router as WouterRouter } from "wouter";
@@ -454,12 +455,15 @@ function applyServerDataToLocalStorage(data: ServerData) {
   }
 }
 
+type ProfileTab = "profile" | "favorites";
+
 function AppWithSync() {
   const { user, isLoaded, isSignedIn } = useUser();
   const { signOut } = useClerk();
   const [, setLocation] = useLocation();
   const [ready, setReady] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
+  const [profileTab, setProfileTab] = useState<ProfileTab>("profile");
   const [displayName, setDisplayName] = useState("");
   const [nameSaving, setNameSaving] = useState(false);
   const [nameSaved, setNameSaved] = useState(false);
@@ -531,7 +535,7 @@ function AppWithSync() {
           className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setShowUserProfile(false); }}
         >
-          <div className="relative w-full max-w-5xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl shadow-2xl flex flex-col">
+          <div className="relative w-full max-w-5xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl shadow-2xl flex flex-col bg-[#0f1117]">
             <button
               onClick={() => setShowUserProfile(false)}
               className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
@@ -539,40 +543,68 @@ function AppWithSync() {
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
             </button>
-            {/* Custom display name row — sits above Clerk's built-in panel */}
-            <div className="bg-[#0f1117] border-b border-slate-700/60 px-8 py-5 flex items-center gap-6">
-              <div className="flex-1 min-w-0">
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
-                  Display name
-                </label>
-                <input
-                  type="text"
-                  value={displayName}
-                  onChange={e => setDisplayName(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter") saveDisplayName(); }}
-                  placeholder="Enter your name"
-                  className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                />
-                <p className="mt-1 text-xs text-slate-500">Used on your Stats card and as your profile name</p>
-              </div>
-              <button
-                onClick={saveDisplayName}
-                disabled={nameSaving}
-                className="shrink-0 px-4 py-2 text-sm font-medium rounded-lg transition-colors bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white"
-              >
-                {nameSaving ? "Saving…" : nameSaved ? "Saved ✓" : "Save"}
-              </button>
+
+            {/* Tab bar */}
+            <div className="flex gap-1 px-6 pt-5 pb-0 border-b border-slate-700/60">
+              {(["profile", "favorites"] as ProfileTab[]).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setProfileTab(tab)}
+                  className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors capitalize ${
+                    profileTab === tab
+                      ? "bg-slate-800 text-white border border-b-0 border-slate-700"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                  }`}
+                >
+                  {tab === "favorites" ? "⭐ Favorites" : "👤 Profile"}
+                </button>
+              ))}
             </div>
-            <UserProfile
-              routing="hash"
-              appearance={{
-                elements: {
-                  rootBox: { width: "100%" },
-                  card: { width: "100%", maxWidth: "100%", boxShadow: "none", borderRadius: "0 0 1rem 1rem" },
-                  navbar: { width: "220px" },
-                },
-              }}
-            />
+
+            {/* Profile tab */}
+            {profileTab === "profile" && (
+              <>
+                {/* Custom display name row */}
+                <div className="border-b border-slate-700/60 px-8 py-5 flex items-center gap-6">
+                  <div className="flex-1 min-w-0">
+                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                      Display name
+                    </label>
+                    <input
+                      type="text"
+                      value={displayName}
+                      onChange={e => setDisplayName(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") saveDisplayName(); }}
+                      placeholder="Enter your name"
+                      className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                    />
+                    <p className="mt-1 text-xs text-slate-500">Used on your Stats card and as your profile name</p>
+                  </div>
+                  <button
+                    onClick={saveDisplayName}
+                    disabled={nameSaving}
+                    className="shrink-0 px-4 py-2 text-sm font-medium rounded-lg transition-colors bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white"
+                  >
+                    {nameSaving ? "Saving…" : nameSaved ? "Saved ✓" : "Save"}
+                  </button>
+                </div>
+                <UserProfile
+                  routing="hash"
+                  appearance={{
+                    elements: {
+                      rootBox: { width: "100%" },
+                      card: { width: "100%", maxWidth: "100%", boxShadow: "none", borderRadius: "0 0 1rem 1rem" },
+                      navbar: { width: "220px" },
+                    },
+                  }}
+                />
+              </>
+            )}
+
+            {/* Favorites tab */}
+            {profileTab === "favorites" && (
+              <FavoritesTab />
+            )}
           </div>
         </div>
       )}

@@ -1061,11 +1061,13 @@ function buildTravelCSV(
   visitedProvinces: Set<string>,
   visitedStadiums: Set<string>,
   visitedParks: Set<string>,
+  visitedTcc: Set<string>,
   countryDetails: Record<string, VisitDetails>,
   stateDetails: Record<string, VisitDetails>,
   provinceDetails: Record<string, VisitDetails>,
   stadiumDetails: Record<string, VisitDetails>,
   parkDetails: Record<string, VisitDetails>,
+  tccDetails: Record<string, VisitDetails>,
 ): string {
   function esc(v: string | number | undefined): string {
     if (v === undefined || v === null) return "";
@@ -1130,13 +1132,23 @@ function buildTravelCSV(
       rows.push(row("National Park", p.name, p.state, timesLabel(d?.timesVisited), d?.firstYear, d?.lastYear));
     });
 
+  // TCC entries
+  TCC_DATA
+    .filter(t => visitedTcc.has(t.name))
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach(t => {
+      const d = tccDetails[t.name];
+      const regionName = TCC_REGIONS[t.region]?.name ?? t.region;
+      rows.push(row("TCC", t.name, regionName, timesLabel(d?.timesVisited), d?.firstYear, d?.lastYear));
+    });
+
   return rows.join("\n");
 }
 
 function ExportModal({
   onClose,
-  visitedCountries, visitedStates, visitedProvinces, visitedStadiums, visitedParks,
-  countryDetails, stateDetails, provinceDetails, stadiumDetails, parkDetails,
+  visitedCountries, visitedStates, visitedProvinces, visitedStadiums, visitedParks, visitedTcc,
+  countryDetails, stateDetails, provinceDetails, stadiumDetails, parkDetails, tccDetails,
 }: {
   onClose: () => void;
   visitedCountries: Set<string>;
@@ -1144,17 +1156,19 @@ function ExportModal({
   visitedProvinces: Set<string>;
   visitedStadiums: Set<string>;
   visitedParks: Set<string>;
+  visitedTcc: Set<string>;
   countryDetails: Record<string, VisitDetails>;
   stateDetails: Record<string, VisitDetails>;
   provinceDetails: Record<string, VisitDetails>;
   stadiumDetails: Record<string, VisitDetails>;
   parkDetails: Record<string, VisitDetails>;
+  tccDetails: Record<string, VisitDetails>;
 }) {
   const [copied, setCopied] = useState(false);
 
   const csv = buildTravelCSV(
-    visitedCountries, visitedStates, visitedProvinces, visitedStadiums, visitedParks,
-    countryDetails, stateDetails, provinceDetails, stadiumDetails, parkDetails,
+    visitedCountries, visitedStates, visitedProvinces, visitedStadiums, visitedParks, visitedTcc,
+    countryDetails, stateDetails, provinceDetails, stadiumDetails, parkDetails, tccDetails,
   );
 
   function handleCopy() {
@@ -4402,11 +4416,13 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
           visitedProvinces={visitedProvinces}
           visitedStadiums={visitedStadiums}
           visitedParks={visitedParks}
+          visitedTcc={rawTccVisited}
           countryDetails={countryDetails}
           stateDetails={stateDetails}
           provinceDetails={provinceDetails}
           stadiumDetails={stadiumDetails}
           parkDetails={parkDetails}
+          tccDetails={tccDetails}
         />
       )}
 

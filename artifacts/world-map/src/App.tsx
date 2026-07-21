@@ -1100,6 +1100,35 @@ interface VisitedItem {
   year?: number;
 }
 
+interface FavoriteEntry { type: "country" | "tcc"; name: string; }
+
+function getFavColor(fav: FavoriteEntry): string {
+  if (fav.type === "country") {
+    const entry = Object.values(COUNTRY_DATA).find(v => v.name === fav.name);
+    return CONTINENT_COLORS[entry?.continent ?? ""] ?? "#475569";
+  }
+  const entry = TCC_DATA.find(t => t.name === fav.name);
+  return TCC_REGIONS[entry?.region as keyof typeof TCC_REGIONS]?.color ?? "#475569";
+}
+
+function getFavSubtitle(fav: FavoriteEntry): string {
+  if (fav.type === "country") {
+    const entry = Object.values(COUNTRY_DATA).find(v => v.name === fav.name);
+    return entry?.continent ?? "";
+  }
+  const entry = TCC_DATA.find(t => t.name === fav.name);
+  return TCC_REGIONS[entry?.region as keyof typeof TCC_REGIONS]?.name ?? "";
+}
+
+function loadStatsFavorites(): FavoriteEntry[] {
+  try {
+    const raw = localStorage.getItem("wm_favorites");
+    if (!raw) return [];
+    const arr = JSON.parse(raw) as FavoriteEntry[];
+    return Array.isArray(arr) ? arr.slice(0, 5) : [];
+  } catch { return []; }
+}
+
 function StatsDashboard(props: StatsDashboardProps) {
   const {
     onClose,
@@ -1109,6 +1138,7 @@ function StatsDashboard(props: StatsDashboardProps) {
   } = props;
 
   const cardRef = useRef<HTMLDivElement>(null);
+  const [favorites] = useState<FavoriteEntry[]>(loadStatsFavorites);
   const [profileName, setProfileName] = useState<string>(() => {
     try { return localStorage.getItem("wm_profile_name") || "My Travels"; } catch { return "My Travels"; }
   });
@@ -1416,6 +1446,54 @@ function StatsDashboard(props: StatsDashboardProps) {
                   />
                   <span className="text-sm text-slate-400">🌍 World Map</span>
                 </div>
+
+                {/* Favorite Destinations — Letterboxd-style poster row */}
+                <div className="mb-6">
+                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-2.5">
+                    Favorite Destinations
+                  </p>
+                  <div className="flex gap-2">
+                    {Array.from({ length: 5 }, (_, i) => {
+                      const fav = favorites[i];
+                      if (!fav) {
+                        return (
+                          <div
+                            key={`empty-${i}`}
+                            className="rounded-lg border border-dashed border-slate-700/60 flex items-center justify-center shrink-0"
+                            style={{ width: 72, height: 96 }}
+                          >
+                            <span className="text-slate-700 text-lg">+</span>
+                          </div>
+                        );
+                      }
+                      const color = getFavColor(fav);
+                      const subtitle = getFavSubtitle(fav);
+                      return (
+                        <div
+                          key={i}
+                          className="rounded-lg overflow-hidden flex flex-col justify-end shrink-0 relative"
+                          style={{ width: 72, height: 96, background: color }}
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                          {fav.type === "tcc" && (
+                            <span className="absolute top-1 right-1 text-[8px] font-bold px-1 py-0.5 rounded bg-black/60 text-white z-10 tracking-wide">
+                              TCC
+                            </span>
+                          )}
+                          <div className="relative z-10 p-1.5">
+                            <p className="text-white text-[10px] font-semibold leading-tight line-clamp-2 drop-shadow">
+                              {fav.name}
+                            </p>
+                            {subtitle && (
+                              <p className="text-white/55 text-[8px] mt-0.5 truncate">{subtitle}</p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
                   {headlineTiles.slice(0, 6).map(t => (
                     <div key={t.label} className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/40">

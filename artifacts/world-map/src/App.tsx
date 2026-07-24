@@ -19,7 +19,6 @@ import {
   type TccEntry,
   type TccRegionKey,
 } from "./tccData";
-import { US_NATIONAL_PARKS, NP_TOTAL, type NationalParkInfo } from "./nationalParksData";
 import {
   type RegionInfo,
   type RegionRecord,
@@ -104,54 +103,6 @@ function useLocalStorageRecord(key: string): [Record<string, VisitDetails>, (id:
   }, []);
   return [value, setEntry];
 }
-
-interface StadiumInfo {
-  team: string;
-  stadium: string;
-  division: string;
-  capacity: string;
-  city: string;
-  coordinates: [number, number];
-}
-
-const MLB_STADIUMS: StadiumInfo[] = [
-  // AL East
-  { team: "Baltimore Orioles", stadium: "Oriole Park at Camden Yards", division: "AL East", capacity: "45,971", city: "Baltimore, MD", coordinates: [-76.6217, 39.2838] },
-  { team: "Boston Red Sox", stadium: "Fenway Park", division: "AL East", capacity: "37,755", city: "Boston, MA", coordinates: [-71.0972, 42.3467] },
-  { team: "New York Yankees", stadium: "Yankee Stadium", division: "AL East", capacity: "46,537", city: "Bronx, NY", coordinates: [-73.9262, 40.8296] },
-  { team: "Tampa Bay Rays", stadium: "Tropicana Field", division: "AL East", capacity: "25,025", city: "St. Petersburg, FL", coordinates: [-82.6534, 27.7682] },
-  { team: "Toronto Blue Jays", stadium: "Rogers Centre", division: "AL East", capacity: "49,282", city: "Toronto, ON", coordinates: [-79.3894, 43.6414] },
-  // AL Central
-  { team: "Chicago White Sox", stadium: "Guaranteed Rate Field", division: "AL Central", capacity: "40,615", city: "Chicago, IL", coordinates: [-87.6339, 41.8300] },
-  { team: "Cleveland Guardians", stadium: "Progressive Field", division: "AL Central", capacity: "34,830", city: "Cleveland, OH", coordinates: [-81.6852, 41.4962] },
-  { team: "Detroit Tigers", stadium: "Comerica Park", division: "AL Central", capacity: "41,297", city: "Detroit, MI", coordinates: [-83.0485, 42.3390] },
-  { team: "Kansas City Royals", stadium: "Kauffman Stadium", division: "AL Central", capacity: "37,903", city: "Kansas City, MO", coordinates: [-94.4803, 39.0518] },
-  { team: "Minnesota Twins", stadium: "Target Field", division: "AL Central", capacity: "38,544", city: "Minneapolis, MN", coordinates: [-93.2781, 44.9817] },
-  // AL West
-  { team: "Houston Astros", stadium: "Minute Maid Park", division: "AL West", capacity: "41,168", city: "Houston, TX", coordinates: [-95.3555, 29.7573] },
-  { team: "Los Angeles Angels", stadium: "Angel Stadium", division: "AL West", capacity: "45,517", city: "Anaheim, CA", coordinates: [-117.8827, 33.8003] },
-  { team: "Oakland Athletics", stadium: "Sutter Health Park", division: "AL West", capacity: "14,014", city: "Sacramento, CA", coordinates: [-121.5083, 38.5733] },
-  { team: "Seattle Mariners", stadium: "T-Mobile Park", division: "AL West", capacity: "47,943", city: "Seattle, WA", coordinates: [-122.3325, 47.5914] },
-  { team: "Texas Rangers", stadium: "Globe Life Field", division: "AL West", capacity: "40,000", city: "Arlington, TX", coordinates: [-97.0845, 32.7473] },
-  // NL East
-  { team: "Atlanta Braves", stadium: "Truist Park", division: "NL East", capacity: "41,084", city: "Cumberland, GA", coordinates: [-84.4678, 33.8908] },
-  { team: "Miami Marlins", stadium: "loanDepot park", division: "NL East", capacity: "36,742", city: "Miami, FL", coordinates: [-80.2197, 25.7781] },
-  { team: "New York Mets", stadium: "Citi Field", division: "NL East", capacity: "41,922", city: "Queens, NY", coordinates: [-73.8458, 40.7571] },
-  { team: "Philadelphia Phillies", stadium: "Citizens Bank Park", division: "NL East", capacity: "42,792", city: "Philadelphia, PA", coordinates: [-75.1665, 39.9061] },
-  { team: "Washington Nationals", stadium: "Nationals Park", division: "NL East", capacity: "41,339", city: "Washington, DC", coordinates: [-77.0075, 38.8731] },
-  // NL Central
-  { team: "Chicago Cubs", stadium: "Wrigley Field", division: "NL Central", capacity: "41,649", city: "Chicago, IL", coordinates: [-87.6553, 41.9484] },
-  { team: "Cincinnati Reds", stadium: "Great American Ball Park", division: "NL Central", capacity: "42,319", city: "Cincinnati, OH", coordinates: [-84.5066, 39.0975] },
-  { team: "Milwaukee Brewers", stadium: "American Family Field", division: "NL Central", capacity: "41,900", city: "Milwaukee, WI", coordinates: [-87.9712, 43.0280] },
-  { team: "Pittsburgh Pirates", stadium: "PNC Park", division: "NL Central", capacity: "38,362", city: "Pittsburgh, PA", coordinates: [-80.0057, 40.4469] },
-  { team: "St. Louis Cardinals", stadium: "Busch Stadium", division: "NL Central", capacity: "44,383", city: "St. Louis, MO", coordinates: [-90.1928, 38.6226] },
-  // NL West
-  { team: "Arizona Diamondbacks", stadium: "Chase Field", division: "NL West", capacity: "48,686", city: "Phoenix, AZ", coordinates: [-112.0667, 33.4453] },
-  { team: "Colorado Rockies", stadium: "Coors Field", division: "NL West", capacity: "50,144", city: "Denver, CO", coordinates: [-104.9942, 39.7559] },
-  { team: "Los Angeles Dodgers", stadium: "Dodger Stadium", division: "NL West", capacity: "56,000", city: "Los Angeles, CA", coordinates: [-118.2400, 34.0739] },
-  { team: "San Diego Padres", stadium: "Petco Park", division: "NL West", capacity: "42,524", city: "San Diego, CA", coordinates: [-117.1570, 32.7076] },
-  { team: "San Francisco Giants", stadium: "Oracle Park", division: "NL West", capacity: "41,915", city: "San Francisco, CA", coordinates: [-122.3893, 37.7786] },
-];
 
 const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json";
 
@@ -760,14 +711,10 @@ function buildTravelCSV(
   visitedCountries: Set<string>,
   visitedStates: Set<string>,
   visitedProvinces: Set<string>,
-  visitedStadiums: Set<string>,
-  visitedParks: Set<string>,
   visitedTcc: Set<string>,
   countryDetails: Record<string, VisitDetails>,
   stateDetails: Record<string, VisitDetails>,
   provinceDetails: Record<string, VisitDetails>,
-  stadiumDetails: Record<string, VisitDetails>,
-  parkDetails: Record<string, VisitDetails>,
   tccDetails: Record<string, VisitDetails>,
 ): string {
   function esc(v: string | number | undefined): string {
@@ -815,24 +762,6 @@ function buildTravelCSV(
       rows.push(row("Canadian Province", info.name, "Canada", timesLabel(d?.timesVisited), d?.firstYear, d?.lastYear));
     });
 
-  // MLB Stadiums
-  MLB_STADIUMS
-    .filter(s => visitedStadiums.has(s.team))
-    .sort((a, b) => a.team.localeCompare(b.team))
-    .forEach(s => {
-      const d = stadiumDetails[s.team];
-      rows.push(row("MLB Stadium", s.stadium, `${s.team} (${s.division})`, timesLabel(d?.timesVisited), d?.firstYear, d?.lastYear));
-    });
-
-  // National Parks
-  US_NATIONAL_PARKS
-    .filter(p => visitedParks.has(p.name))
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .forEach(p => {
-      const d = parkDetails[p.name];
-      rows.push(row("National Park", p.name, p.state, timesLabel(d?.timesVisited), d?.firstYear, d?.lastYear));
-    });
-
   // TCC entries
   TCC_DATA
     .filter(t => visitedTcc.has(t.name))
@@ -848,28 +777,24 @@ function buildTravelCSV(
 
 function ExportModal({
   onClose,
-  visitedCountries, visitedStates, visitedProvinces, visitedStadiums, visitedParks, visitedTcc,
-  countryDetails, stateDetails, provinceDetails, stadiumDetails, parkDetails, tccDetails,
+  visitedCountries, visitedStates, visitedProvinces, visitedTcc,
+  countryDetails, stateDetails, provinceDetails, tccDetails,
 }: {
   onClose: () => void;
   visitedCountries: Set<string>;
   visitedStates: Set<string>;
   visitedProvinces: Set<string>;
-  visitedStadiums: Set<string>;
-  visitedParks: Set<string>;
   visitedTcc: Set<string>;
   countryDetails: Record<string, VisitDetails>;
   stateDetails: Record<string, VisitDetails>;
   provinceDetails: Record<string, VisitDetails>;
-  stadiumDetails: Record<string, VisitDetails>;
-  parkDetails: Record<string, VisitDetails>;
   tccDetails: Record<string, VisitDetails>;
 }) {
   const [copied, setCopied] = useState(false);
 
   const csv = buildTravelCSV(
-    visitedCountries, visitedStates, visitedProvinces, visitedStadiums, visitedParks, visitedTcc,
-    countryDetails, stateDetails, provinceDetails, stadiumDetails, parkDetails, tccDetails,
+    visitedCountries, visitedStates, visitedProvinces, visitedTcc,
+    countryDetails, stateDetails, provinceDetails, tccDetails,
   );
 
   function handleCopy() {
@@ -930,10 +855,9 @@ function ExportModal({
 // ─── Share helpers ────────────────────────────────────────────────────────────
 
 interface ShareData {
-  vc: string[]; vt: string[]; vs: string[]; vp: string[];
-  bc: string[]; bt: string[]; bs: string[]; bp: string[];
+  vc: string[]; vs: string[]; vp: string[];
+  bc: string[]; bs: string[]; bp: string[];
   tv?: string[]; tb?: string[]; // TCC visited / TCC bucket-list (entry names)
-  vk?: string[]; bk?: string[]; // National Parks visited / bucket-list
   n?: Record<string, string>;   // notes keyed by "category:id"
 }
 
@@ -967,26 +891,25 @@ function buildShareUrl(data: ShareData): string {
 }
 
 function ShareModal({
-  onClose, visitedCountries, visitedStates, visitedProvinces, visitedStadiums, visitedParks,
-  bucketCountries, bucketStates, bucketProvinces, bucketStadiums, bucketParks,
+  onClose, visitedCountries, visitedStates, visitedProvinces,
+  bucketCountries, bucketStates, bucketProvinces,
   tccVisited, tccBucket, notesByKey,
 }: {
   onClose: () => void;
   visitedCountries: Set<string>; visitedStates: Set<string>;
-  visitedProvinces: Set<string>; visitedStadiums: Set<string>; visitedParks: Set<string>;
+  visitedProvinces: Set<string>;
   bucketCountries: Set<string>; bucketStates: Set<string>;
-  bucketProvinces: Set<string>; bucketStadiums: Set<string>; bucketParks: Set<string>;
+  bucketProvinces: Set<string>;
   tccVisited: Set<string>; tccBucket: Set<string>;
   notesByKey: Record<string, string>;
 }) {
   const [copied, setCopied] = useState(false);
   const baseData: ShareData = {
-    vc: [...visitedCountries], vt: [...visitedStadiums],
+    vc: [...visitedCountries],
     vs: [...visitedStates],   vp: [...visitedProvinces],
-    bc: [...bucketCountries], bt: [...bucketStadiums],
+    bc: [...bucketCountries],
     bs: [...bucketStates],    bp: [...bucketProvinces],
     tv: [...tccVisited],      tb: [...tccBucket],
-    vk: [...visitedParks],    bk: [...bucketParks],
   };
   const hasNotes = Object.keys(notesByKey).length > 0;
   let url = buildShareUrl(baseData);
@@ -996,8 +919,8 @@ function ShareModal({
     if (urlWith.length <= SHARE_URL_BUDGET) url = urlWith;
     else notesOmitted = true;
   }
-  const totalVisited = visitedCountries.size + visitedStates.size + visitedProvinces.size + visitedStadiums.size + visitedParks.size + tccVisited.size;
-  const totalBucket  = bucketCountries.size  + bucketStates.size  + bucketProvinces.size  + bucketStadiums.size  + bucketParks.size + tccBucket.size;
+  const totalVisited = visitedCountries.size + visitedStates.size + visitedProvinces.size + tccVisited.size;
+  const totalBucket  = bucketCountries.size  + bucketStates.size  + bucketProvinces.size  + tccBucket.size;
 
   function handleCopy() {
     navigator.clipboard.writeText(url).then(() => {
@@ -1076,27 +999,21 @@ interface StatsDashboardProps {
   visitedCountries: Set<string>;
   visitedStates: Set<string>;
   visitedProvinces: Set<string>;
-  visitedStadiums: Set<string>;
-  visitedParks: Set<string>;
   tccVisited: Set<string>;
   bucketCountries: Set<string>;
   bucketStates: Set<string>;
   bucketProvinces: Set<string>;
-  bucketStadiums: Set<string>;
-  bucketParks: Set<string>;
   tccBucket: Set<string>;
   countryDetails: Record<string, VisitDetails>;
   stateDetails: Record<string, VisitDetails>;
   provinceDetails: Record<string, VisitDetails>;
-  stadiumDetails: Record<string, VisitDetails>;
-  parkDetails: Record<string, VisitDetails>;
   tccDetails: Record<string, VisitDetails>;
 }
 
 interface VisitedItem {
   id: string;
   name: string;
-  category: "country" | "state" | "province" | "stadium" | "tcc" | "park";
+  category: "country" | "state" | "province" | "tcc";
   continent?: string;
   year?: number;
 }
@@ -1133,9 +1050,9 @@ function loadStatsFavorites(): FavoriteEntry[] {
 function StatsDashboard(props: StatsDashboardProps) {
   const {
     onClose,
-    visitedCountries, visitedStates, visitedProvinces, visitedStadiums, visitedParks, tccVisited,
-    bucketCountries, bucketStates, bucketProvinces, bucketStadiums, bucketParks, tccBucket,
-    countryDetails, stateDetails, provinceDetails, stadiumDetails, parkDetails, tccDetails,
+    visitedCountries, visitedStates, visitedProvinces, tccVisited,
+    bucketCountries, bucketStates, bucketProvinces, tccBucket,
+    countryDetails, stateDetails, provinceDetails, tccDetails,
   } = props;
 
   const cardRef = useRef<HTMLDivElement>(null);
@@ -1164,17 +1081,11 @@ function StatsDashboard(props: StatsDashboardProps) {
     visitedProvinces.forEach(name => {
       out.push({ id: name, name, category: "province", year: yearOf(provinceDetails[name]) });
     });
-    visitedStadiums.forEach(team => {
-      out.push({ id: team, name: team, category: "stadium", year: yearOf(stadiumDetails[team]) });
-    });
-    visitedParks.forEach(name => {
-      out.push({ id: name, name, category: "park", year: yearOf(parkDetails[name]) });
-    });
     tccVisited.forEach(name => {
       out.push({ id: name, name, category: "tcc", year: yearOf(tccDetails[name]) });
     });
     return out;
-  }, [visitedCountries, visitedStates, visitedProvinces, visitedStadiums, visitedParks, tccVisited, countryDetails, stateDetails, provinceDetails, stadiumDetails, parkDetails, tccDetails]);
+  }, [visitedCountries, visitedStates, visitedProvinces, tccVisited, countryDetails, stateDetails, provinceDetails, tccDetails]);
 
   // Continent breakdown (countries only)
   const continents: { name: string; visited: number; total: number; color: string }[] = useMemo(() => {
@@ -1223,8 +1134,8 @@ function StatsDashboard(props: StatsDashboardProps) {
     const contCounts = continents.filter(c => c.visited > 0).sort((a, b) => b.visited - a.visited);
     const topContinent = contCounts[0] ?? null;
     // Combined completion
-    const totalVisited = visitedCountries.size + visitedStates.size + visitedProvinces.size + visitedStadiums.size + visitedParks.size + tccVisited.size;
-    const totalAvail = 194 + 51 + 13 + 30 + NP_TOTAL + TCC_TOTAL;
+    const totalVisited = visitedCountries.size + visitedStates.size + visitedProvinces.size + tccVisited.size;
+    const totalAvail = 194 + 51 + 13 + TCC_TOTAL;
     const completionPct = totalAvail > 0 ? (totalVisited / totalAvail) * 100 : 0;
     // TCC distance
     const tccGap = TCC_MEMBERSHIP_THRESHOLD - tccVisited.size;
@@ -1235,15 +1146,13 @@ function StatsDashboard(props: StatsDashboardProps) {
       avgPerYear = dated.length / span;
     }
     return { earliest, latest, busiestYear, busiestCount, topContinent, totalVisited, totalAvail, completionPct, tccGap, avgPerYear };
-  }, [items, continents, visitedCountries.size, visitedStates.size, visitedProvinces.size, visitedStadiums.size, visitedParks.size, tccVisited.size]);
+  }, [items, continents, visitedCountries.size, visitedStates.size, visitedProvinces.size, tccVisited.size]);
 
-  const totalBucket = bucketCountries.size + bucketStates.size + bucketProvinces.size + bucketStadiums.size + bucketParks.size + tccBucket.size;
+  const totalBucket = bucketCountries.size + bucketStates.size + bucketProvinces.size + tccBucket.size;
 
   const headlineTiles = [
     { icon: "🌍", label: "Countries", visited: visitedCountries.size, total: 194, color: "from-blue-600 to-blue-800" },
     { icon: "🗺", label: "TCC Territories", visited: tccVisited.size, total: TCC_TOTAL, color: "from-purple-600 to-purple-800" },
-    { icon: "🏟", label: "MLB Stadiums", visited: visitedStadiums.size, total: 30, color: "from-sky-600 to-sky-800" },
-    { icon: "🏞", label: "Nat. Parks", visited: visitedParks.size, total: NP_TOTAL, color: "from-green-600 to-green-800" },
     { icon: "🇺🇸", label: "US States", visited: visitedStates.size, total: 51, color: "from-red-600 to-red-800" },
     { icon: "🍁", label: "CA Provinces", visited: visitedProvinces.size, total: 13, color: "from-orange-600 to-orange-800" },
     { icon: "⭐", label: "Bucket List", visited: totalBucket, total: null, color: "from-amber-600 to-amber-800" },
@@ -1563,16 +1472,11 @@ function buildLookupMaps() {
   for (const [key, info] of Object.entries(CA_PROVINCE_DATA)) {
     provinceByName.set(info.name.toLowerCase().trim(), key);
   }
-  const stadiumByName = new Map<string, string>();
-  for (const s of MLB_STADIUMS) {
-    stadiumByName.set(s.stadium.toLowerCase().trim(), s.team);
-    stadiumByName.set(s.team.toLowerCase().trim(), s.team);
-  }
   const tccByName = new Map<string, string>();
   for (const [canonical] of TCC_BY_NAME) {
     tccByName.set(canonical.toLowerCase().trim(), canonical);
   }
-  return { countryByName, stateByName, provinceByName, stadiumByName, tccByName };
+  return { countryByName, stateByName, provinceByName, tccByName };
 }
 
 function parseTimesVisited(raw: unknown): number | undefined {
@@ -1613,15 +1517,13 @@ function processImport(
   setVisitedCountries: React.Dispatch<React.SetStateAction<Set<string>>>,
   setVisitedStates: React.Dispatch<React.SetStateAction<Set<string>>>,
   setVisitedProvinces: React.Dispatch<React.SetStateAction<Set<string>>>,
-  setVisitedStadiums: React.Dispatch<React.SetStateAction<Set<string>>>,
   setVisitedTcc: React.Dispatch<React.SetStateAction<Set<string>>>,
   setCountryDetail: (id: string, d: VisitDetails | null) => void,
   setStateDetail: (id: string, d: VisitDetails | null) => void,
   setProvinceDetail: (id: string, d: VisitDetails | null) => void,
-  setStadiumDetail: (id: string, d: VisitDetails | null) => void,
   setTccDetail: (id: string, d: VisitDetails | null) => void,
 ): ImportResult {
-  const { countryByName, stateByName, provinceByName, stadiumByName, tccByName } = lookups;
+  const { countryByName, stateByName, provinceByName, tccByName } = lookups;
   const unmatched: string[] = [];
   let matched = 0;
 
@@ -1662,16 +1564,6 @@ function processImport(
       matched++;
       return true;
     };
-    const tryStadium = () => {
-      const team = stadiumByName.get(name);
-      if (!team) return false;
-      setVisitedStadiums(prev => { const n = new Set(prev); n.add(team); return n; });
-      const d = detail(row);
-      if (Object.keys(d).length > 0) setStadiumDetail(team, d);
-      matched++;
-      return true;
-    };
-
     const tryTcc = () => {
       const canonical = tccByName.get(name);
       if (!canonical) return false;
@@ -1686,10 +1578,9 @@ function processImport(
     if (t === "country") found = tryCountry();
     else if (t === "state") found = tryState();
     else if (t === "province") found = tryProvince();
-    else if (t === "stadium") found = tryStadium();
     else if (t === "tcc") found = tryTcc();
     else {
-      found = tryCountry() || tryState() || tryProvince() || tryStadium() || tryTcc();
+      found = tryCountry() || tryState() || tryProvince() || tryTcc();
     }
 
     if (!found) unmatched.push(row.name);
@@ -1703,7 +1594,6 @@ function downloadTemplate() {
   const examples = [
     ["France", "country", 3, 2010, 2023],
     ["California", "state", 5, 2005, 2024],
-    ["Yankee Stadium", "stadium", 1, 2019, 2019],
     ["Ontario", "province", 2, 2018, 2022],
     ["France (Metropolitan)", "tcc", 1, 2022, 2022],
   ];
@@ -1794,7 +1684,7 @@ interface SearchItem {
   id: string;
   label: string;
   sublabel: string;
-  category: "country" | "us-state" | "ca-province" | "stadium";
+  category: "country" | "us-state" | "ca-province";
   coordinates: [number, number];
   zoom: number;
 }
@@ -1822,12 +1712,6 @@ function buildSearchIndex(): SearchItem[] {
     if (!coords) continue;
     items.push({ id: key, label: info.name, sublabel: "CA Province", category: "ca-province", coordinates: coords, zoom: 4 });
   }
-  for (const s of MLB_STADIUMS) {
-    items.push({
-      id: s.team, label: s.stadium, sublabel: s.team,
-      category: "stadium", coordinates: s.coordinates as [number, number], zoom: 8,
-    });
-  }
   return items;
 }
 
@@ -1837,13 +1721,11 @@ const CATEGORY_BADGE: Record<SearchItem["category"], string> = {
   "country": "bg-blue-900 text-blue-300",
   "us-state": "bg-red-900 text-red-300",
   "ca-province": "bg-orange-900 text-orange-300",
-  "stadium": "bg-violet-900 text-violet-300",
 };
 const CATEGORY_LABEL: Record<SearchItem["category"], string> = {
   "country": "Country",
   "us-state": "US State",
   "ca-province": "Province",
-  "stadium": "Stadium",
 };
 
 function SearchBar({ onSelect }: { onSelect: (item: SearchItem) => void }) {
@@ -1900,7 +1782,7 @@ function SearchBar({ onSelect }: { onSelect: (item: SearchItem) => void }) {
           ref={inputRef}
           type="text"
           value={query}
-          placeholder="Search countries, states, stadiums…"
+          placeholder="Search countries, states, provinces…"
           className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg pl-9 pr-8 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           onChange={e => { setQuery(e.target.value); setOpen(true); setActiveIdx(-1); }}
           onFocus={() => setOpen(true)}
@@ -1946,27 +1828,14 @@ function SearchBar({ onSelect }: { onSelect: (item: SearchItem) => void }) {
 
 // ─── End search ───────────────────────────────────────────────────────────────
 
-const DIVISION_COLORS: Record<string, string> = {
-  "AL East": "#1d4ed8",
-  "AL Central": "#2563eb",
-  "AL West": "#3b82f6",
-  "NL East": "#1e40af",
-  "NL Central": "#1e3a8a",
-  "NL West": "#1d4ed8",
-};
-
 export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOpenProfile }: AuthProps) {
   const [selected, setSelected] = useState<{ key: string; info: RegionInfo } | null>(null);
-  const [selectedStadium, setSelectedStadium] = useState<StadiumInfo | null>(null);
-  const [hoveredStadium, setHoveredStadium] = useState<string | null>(null);
-  const [selectedPark, setSelectedPark] = useState<NationalParkInfo | null>(null);
-  const [hoveredPark, setHoveredPark] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const [tooltipName, setTooltipName] = useState<string>("");
   const [zoom, setZoom] = useState(1);
   const [center, setCenter] = useState<[number, number]>([0, 20]);
-  const [listTab, setListTab] = useState<"countries" | "stadiums" | "nat-parks" | "us-states" | "ca-provinces" | "tcc" | "bucket-list">("countries");
+  const [listTab, setListTab] = useState<"countries" | "us-states" | "ca-provinces" | "tcc" | "bucket-list">("countries");
   const [expandedTccRegions, setExpandedTccRegions] = useState<Set<TccRegionKey>>(new Set());
   const [confirmBucket, setConfirmBucket] = useState<string | null>(null);
   const [showExport, setShowExport] = useState(false);
@@ -1979,13 +1848,9 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [rawVisitedCountries, setVisitedCountries] = useLocalStorageSet("wm_visited_countries");
-  const [rawVisitedStadiums, setVisitedStadiums] = useLocalStorageSet("wm_visited_stadiums");
-  const [rawVisitedParks, setVisitedParks] = useLocalStorageSet("wm_visited_parks");
   const [rawVisitedStates, setVisitedStates] = useLocalStorageSet("wm_visited_states");
   const [rawVisitedProvinces, setVisitedProvinces] = useLocalStorageSet("wm_visited_provinces");
   const [rawBucketCountries, setBucketCountries] = useLocalStorageSet("wm_bucket_countries");
-  const [rawBucketStadiums, setBucketStadiums] = useLocalStorageSet("wm_bucket_stadiums");
-  const [rawBucketParks, setBucketParks] = useLocalStorageSet("wm_bucket_parks");
   const [rawBucketStates, setBucketStates] = useLocalStorageSet("wm_bucket_states");
   const [rawBucketProvinces, setBucketProvinces] = useLocalStorageSet("wm_bucket_provinces");
   const [rawTccVisited, setTccVisited] = useLocalStorageSet("wm_tcc_visited");
@@ -2009,7 +1874,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
   const [filterExpanded, setFilterExpanded] = useState(false);
   const [filterPlaying, setFilterPlaying] = useState(false);
 
-  // Map mode: "world" (countries / states / stadiums) or "tcc" (TCC list)
+  // Map mode: "world" (countries / states / provinces) or "tcc" (TCC list)
   const [mapMode, setMapModeRaw] = useState<MapMode>(() => {
     try {
       const v = localStorage.getItem("wm_map_mode");
@@ -2062,31 +1927,25 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
       if (colon < 0) return;
       const cat = k.slice(0, colon) as PhotoCategory;
       const id = k.slice(colon + 1);
-      if (id && (cat === "country" || cat === "state" || cat === "province" || cat === "stadium" || cat === "tcc")) {
+      if (id && (cat === "country" || cat === "state" || cat === "province" || cat === "tcc")) {
         idx[cat].add(id);
       }
     });
     return idx;
   }, [isReadOnly, sharedNotesByKey, notesIndex]);
-  const totalNoteCount = effectiveNotesIndex.country.size + effectiveNotesIndex.state.size + effectiveNotesIndex.province.size + effectiveNotesIndex.stadium.size + effectiveNotesIndex.park.size + effectiveNotesIndex.tcc.size;
+  const totalNoteCount = effectiveNotesIndex.country.size + effectiveNotesIndex.state.size + effectiveNotesIndex.province.size + effectiveNotesIndex.tcc.size;
   const getReadOnlyNote = useCallback((cat: PhotoCategory, id: string): string | undefined => {
     return isReadOnly ? sharedNotesByKey[`${cat}:${id}`] : undefined;
   }, [isReadOnly, sharedNotesByKey]);
   const baseVisitedCountries = isReadOnly ? new Set<string>(sharedData!.vc) : rawVisitedCountries;
-  const baseVisitedStadiums  = isReadOnly ? new Set<string>(sharedData!.vt) : rawVisitedStadiums;
-  const baseVisitedParks     = isReadOnly ? new Set<string>(sharedData!.vk ?? []) : rawVisitedParks;
   const baseVisitedStates    = isReadOnly ? new Set<string>(sharedData!.vs) : rawVisitedStates;
   const baseVisitedProvinces = isReadOnly ? new Set<string>(sharedData!.vp) : rawVisitedProvinces;
   const bucketCountries      = isReadOnly ? new Set<string>(sharedData!.bc) : rawBucketCountries;
-  const bucketStadiums       = isReadOnly ? new Set<string>(sharedData!.bt) : rawBucketStadiums;
-  const bucketParks          = isReadOnly ? new Set<string>(sharedData!.bk ?? []) : rawBucketParks;
   const bucketStates         = isReadOnly ? new Set<string>(sharedData!.bs) : rawBucketStates;
   const bucketProvinces      = isReadOnly ? new Set<string>(sharedData!.bp) : rawBucketProvinces;
   const baseTccVisited       = isReadOnly ? new Set<string>(sharedData!.tv ?? []) : rawTccVisited;
   const tccBucket            = isReadOnly ? new Set<string>(sharedData!.tb ?? []) : rawTccBucket;
   const [countryDetails, setCountryDetail] = useLocalStorageRecord("wm_details_countries");
-  const [stadiumDetails, setStadiumDetail] = useLocalStorageRecord("wm_details_stadiums");
-  const [parkDetails, setParkDetail] = useLocalStorageRecord("wm_details_parks");
   const [stateDetails, setStateDetail] = useLocalStorageRecord("wm_details_states");
   const [provinceDetails, setProvinceDetail] = useLocalStorageRecord("wm_details_provinces");
   const [tccDetails, setTccDetail] = useLocalStorageRecord("wm_details_tcc");
@@ -2099,8 +1958,6 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
     return out;
   }
   const visitedCountries = filterVisited(baseVisitedCountries, countryDetails);
-  const visitedStadiums  = filterVisited(baseVisitedStadiums,  stadiumDetails);
-  const visitedParks     = filterVisited(baseVisitedParks,     parkDetails);
   const visitedStates    = filterVisited(baseVisitedStates,    stateDetails);
   const visitedProvinces = filterVisited(baseVisitedProvinces, provinceDetails);
   const tccVisited       = filterVisited(baseTccVisited,       tccDetails);
@@ -2108,7 +1965,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
   // Earliest visit year across all categories (for slider min)
   const earliestYear = (() => {
     let m = CURRENT_YEAR;
-    for (const r of [countryDetails, stateDetails, provinceDetails, stadiumDetails, parkDetails, tccDetails]) {
+    for (const r of [countryDetails, stateDetails, provinceDetails, tccDetails]) {
       for (const k in r) {
         const d = r[k];
         if (d.firstYear && d.firstYear < m) m = d.firstYear;
@@ -2152,9 +2009,6 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
   const sortedCountries = Object.entries(COUNTRY_DATA)
     .map(([id, info]) => ({ id, ...info }))
     .sort((a, b) => a.name.localeCompare(b.name));
-
-  const sortedStadiums = [...MLB_STADIUMS].sort((a, b) => a.team.localeCompare(b.team));
-  const sortedParks    = [...US_NATIONAL_PARKS].sort((a, b) => a.name.localeCompare(b.name));
 
   const sortedStates = Object.entries(US_STATE_DATA)
     .map(([fips, info]) => ({ fips, ...info }))
@@ -2207,16 +2061,6 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
     setConfirmBucket(null);
   }, []);
 
-  const toggleStadiumVisited = useCallback((team: string, e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    setVisitedStadiums(prev => {
-      const n = new Set(prev);
-      if (n.has(team)) { n.delete(team); setStadiumDetail(team, null); }
-      else { n.add(team); setBucketStadiums(b => { const nb = new Set(b); nb.delete(team); return nb; }); }
-      return n;
-    });
-  }, [setStadiumDetail, setBucketStadiums]);
-
   const toggleStateVisited = useCallback((fips: string) => {
     setVisitedStates(prev => {
       const n = new Set(prev);
@@ -2262,39 +2106,6 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
     setBucketProvinces(prev => { const n = new Set(prev); if (n.has(name)) n.delete(name); else n.add(name); return n; });
   }, [setProvinceDetail]);
 
-  const toggleStadiumBucket = useCallback((team: string, isVisited: boolean) => {
-    setConfirmBucket(null);
-    if (isVisited) {
-      setVisitedStadiums(prev => { const n = new Set(prev); n.delete(team); return n; });
-      setStadiumDetail(team, null);
-    }
-    setBucketStadiums(prev => { const n = new Set(prev); if (n.has(team)) n.delete(team); else n.add(team); return n; });
-  }, [setStadiumDetail]);
-
-  const toggleParkVisited = useCallback((name: string) => {
-    setVisitedParks(prev => {
-      const n = new Set(prev);
-      if (n.has(name)) { n.delete(name); setParkDetail(name, null); }
-      else { n.add(name); setBucketParks(b => { const nb = new Set(b); nb.delete(name); return nb; }); }
-      return n;
-    });
-  }, [setParkDetail, setBucketParks]);
-
-  const toggleParkBucket = useCallback((name: string, isVisited: boolean) => {
-    setConfirmBucket(null);
-    if (isVisited) {
-      setVisitedParks(prev => { const n = new Set(prev); n.delete(name); return n; });
-      setParkDetail(name, null);
-    }
-    setBucketParks(prev => { const n = new Set(prev); if (n.has(name)) n.delete(name); else n.add(name); return n; });
-  }, [setParkDetail]);
-
-  const handleParkClick = useCallback((park: NationalParkInfo) => {
-    setSelected(null);
-    setSelectedTcc(null);
-    setConfirmBucket(null);
-    setSelectedPark(prev => prev?.name === park.name ? null : park);
-  }, []);
 
   const showToast = useCallback((message: string, kind: "success" | "warning") => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -2319,20 +2130,14 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
         visitedCountries: [...rawVisitedCountries],
         visitedStates: [...rawVisitedStates],
         visitedProvinces: [...rawVisitedProvinces],
-        visitedStadiums: [...rawVisitedStadiums],
-        visitedParks: [...rawVisitedParks],
         tccVisited: [...rawTccVisited],
         bucketCountries: [...rawBucketCountries],
         bucketStates: [...rawBucketStates],
         bucketProvinces: [...rawBucketProvinces],
-        bucketStadiums: [...rawBucketStadiums],
-        bucketParks: [...rawBucketParks],
         tccBucket: [...rawTccBucket],
         countryDetails,
         stateDetails,
         provinceDetails,
-        stadiumDetails,
-        parkDetails,
         tccDetails,
         notesByKey,
         profileName: localStorage.getItem("wm_profile_name") ?? undefined,
@@ -2347,9 +2152,9 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
     return () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current); };
   }, [
     isAuthenticated,
-    rawVisitedCountries, rawVisitedStates, rawVisitedProvinces, rawVisitedStadiums, rawVisitedParks, rawTccVisited,
-    rawBucketCountries, rawBucketStates, rawBucketProvinces, rawBucketStadiums, rawBucketParks, rawTccBucket,
-    countryDetails, stateDetails, provinceDetails, stadiumDetails, parkDetails, tccDetails,
+    rawVisitedCountries, rawVisitedStates, rawVisitedProvinces, rawTccVisited,
+    rawBucketCountries, rawBucketStates, rawBucketProvinces, rawTccBucket,
+    countryDetails, stateDetails, provinceDetails, tccDetails,
     notesIndex,
   ]);
 
@@ -2370,8 +2175,8 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
         const lookups = buildLookupMaps();
         const result = processImport(
           rows, lookups,
-          setVisitedCountries, setVisitedStates, setVisitedProvinces, setVisitedStadiums, setTccVisited,
-          setCountryDetail, setStateDetail, setProvinceDetail, setStadiumDetail, setTccDetail,
+          setVisitedCountries, setVisitedStates, setVisitedProvinces, setTccVisited,
+          setCountryDetail, setStateDetail, setProvinceDetail, setTccDetail,
         );
         if (result.unmatched.length > 0) {
           showToast(
@@ -2387,13 +2192,12 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
       }
     };
     reader.readAsArrayBuffer(file);
-  }, [setVisitedCountries, setVisitedStates, setVisitedProvinces, setVisitedStadiums, setTccVisited,
-      setCountryDetail, setStateDetail, setProvinceDetail, setStadiumDetail, setTccDetail, showToast]);
+  }, [setVisitedCountries, setVisitedStates, setVisitedProvinces, setTccVisited,
+      setCountryDetail, setStateDetail, setProvinceDetail, setTccDetail, showToast]);
 
   const handleCountryClick = useCallback((geo: { id: string }) => {
     const code = geo.id === "304" ? "208" : geo.id; // Greenland → Denmark
     const info = COUNTRY_DATA[code];
-    setSelectedStadium(null);
     setConfirmBucket(null);
     if (!info) { setSelected(null); return; }
     const key = `country-${code}`;
@@ -2403,7 +2207,6 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
   const handleStateClick = useCallback((geo: { id: string }) => {
     const fips = String(geo.id).padStart(2, "0");
     const info = US_STATE_DATA[fips];
-    setSelectedStadium(null);
     setConfirmBucket(null);
     if (!info) return;
     const key = `state-${fips}`;
@@ -2413,23 +2216,15 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
   const handleProvinceClick = useCallback((geo: { properties: Record<string, string> }) => {
     const name = geo.properties.name || geo.properties.NAME_1 || geo.properties.NAME;
     const info = CA_PROVINCE_DATA[name];
-    setSelectedStadium(null);
     setConfirmBucket(null);
     if (!info) return;
     const key = `province-${name}`;
     setSelected(prev => prev?.key === key ? null : { key, info });
   }, []);
 
-  const handleStadiumClick = useCallback((stadium: StadiumInfo) => {
-    setSelected(null);
-    setConfirmBucket(null);
-    setSelectedStadium(prev => prev?.team === stadium.team ? null : stadium);
-  }, []);
-
   const handleMicrostateClick = useCallback((id: string) => {
     const info = COUNTRY_DATA[id];
     if (!info) return;
-    setSelectedStadium(null);
     setConfirmBucket(null);
     const key = `country-${id}`;
     setSelected(prev => prev?.key === key ? null : { key, info });
@@ -2441,33 +2236,23 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
     if (item.category === "country") {
       const info = COUNTRY_DATA[item.id];
       if (info) {
-        setSelectedStadium(null);
         setVisitedCountries(prev => { const n = new Set(prev); n.add(item.id); return n; });
         setSelected({ key: `country-${item.id}`, info });
       }
     } else if (item.category === "us-state") {
       const info = US_STATE_DATA[item.id];
       if (info) {
-        setSelectedStadium(null);
         setVisitedStates(prev => { const n = new Set(prev); n.add(item.id); return n; });
         setSelected({ key: `state-${item.id}`, info });
       }
     } else if (item.category === "ca-province") {
       const info = CA_PROVINCE_DATA[item.id];
       if (info) {
-        setSelectedStadium(null);
         setVisitedProvinces(prev => { const n = new Set(prev); n.add(item.id); return n; });
         setSelected({ key: `province-${item.id}`, info });
       }
-    } else if (item.category === "stadium") {
-      const stadium = MLB_STADIUMS.find(s => s.team === item.id);
-      if (stadium) {
-        setSelected(null);
-        setVisitedStadiums(prev => { const n = new Set(prev); n.add(stadium.team); return n; });
-        setSelectedStadium(stadium);
-      }
     }
-  }, [setVisitedCountries, setVisitedStates, setVisitedProvinces, setVisitedStadiums]);
+  }, [setVisitedCountries, setVisitedStates, setVisitedProvinces]);
 
   const handleMouseEnter = useCallback((name: string, evt: React.MouseEvent) => {
     setHovered(name);
@@ -2531,7 +2316,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
           <p className="text-sm text-slate-400 mt-0.5">
             {mapMode === "tcc"
               ? "Track your progress toward Travelers' Century Club membership"
-              : "Click any country, U.S. state, Canadian province, or MLB stadium to explore"}
+              : "Click any country, U.S. state, or Canadian province to explore"}
           </p>
         </div>
 
@@ -2548,7 +2333,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                 ? "bg-blue-600 text-white shadow-sm"
                 : "text-slate-300 hover:text-white hover:bg-slate-700/60"
             }`}
-            title="Show countries, US states, Canadian provinces and MLB stadiums"
+            title="Show countries, US states and Canadian provinces"
           >
             🌍 World
           </button>
@@ -2556,7 +2341,6 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
             onClick={() => {
               setMapMode("tcc");
               setSelected(null);
-              setSelectedStadium(null);
               setListTab("tcc");
             }}
             className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-1.5 ${
@@ -2577,7 +2361,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
         <div className="flex gap-2 flex-wrap justify-end ml-auto">
           <button onClick={() => setZoom(z => Math.min(z * 1.5, 12))} className="px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors font-medium">+</button>
           <button onClick={() => setZoom(z => Math.max(z / 1.5, 0.5))} className="px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors font-medium">−</button>
-          <button onClick={() => { setZoom(1); setCenter([0, 20]); setSelected(null); setSelectedStadium(null); }} className="px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors font-medium">Reset</button>
+          <button onClick={() => { setZoom(1); setCenter([0, 20]); setSelected(null); }} className="px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors font-medium">Reset</button>
           <button
             onClick={() => setFilterExpanded(v => !v)}
             className={`px-3 py-2 text-sm rounded-lg transition-colors font-medium flex items-center gap-1.5 ${
@@ -3017,69 +2801,12 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                 );
               })}
 
-              {/* MLB Stadium Markers */}
-              {MLB_STADIUMS.map((stadium) => {
-                const isSelected = selectedStadium?.team === stadium.team;
-                const isHov = hoveredStadium === stadium.team;
-                const isVisited = visitedStadiums.has(stadium.team);
-                const isBucketList = !isVisited && bucketStadiums.has(stadium.team);
-                const s = 1 / zoom;
-                const poleColor = isSelected ? "#facc15" : isVisited ? "#93c5fd" : isBucketList ? BUCKET_LIST_STROKE : "#64748b";
-                const flagColor = isSelected ? "#facc15" : isVisited ? (isHov ? "#60a5fa" : "#2563eb") : isBucketList ? "none" : (isHov ? "#64748b" : "#374151");
-                const flagStroke = isSelected ? "#f59e0b" : isVisited ? "#1d4ed8" : isBucketList ? BUCKET_LIST_STROKE : "#1f2937";
-                const dotColor = isSelected ? "#facc15" : isVisited ? "#2563eb" : isBucketList ? BUCKET_LIST_COLOR : "#374151";
-                return (
-                  <Marker key={stadium.team} coordinates={stadium.coordinates}>
-                    <g
-                      transform={`scale(${s})`}
-                      style={{ cursor: "pointer" }}
-                      onClick={(e) => { e.stopPropagation(); handleStadiumClick(stadium); }}
-                      onMouseEnter={(e) => { setHoveredStadium(stadium.team); setTooltipName(stadium.team); setTooltipPos({ x: e.clientX, y: e.clientY }); }}
-                      onMouseMove={(e) => setTooltipPos({ x: e.clientX, y: e.clientY })}
-                      onMouseLeave={() => { setHoveredStadium(null); setTooltipName(""); }}
-                    >
-                      <line x1="0" y1="0" x2="0" y2="-20" stroke={poleColor} strokeWidth={isHov || isSelected ? 2 : 1.5} />
-                      <polygon points="0,-20 12,-16 0,-12" fill={flagColor} stroke={flagStroke} strokeWidth={isBucketList ? 1 : 0.5} />
-                      <circle r={isHov || isSelected ? 3.5 : 2.5} fill={dotColor} stroke="#0f172a" strokeWidth="0.8" />
-                    </g>
-                  </Marker>
-                );
-              })}
-
-              {/* National Park Markers */}
-              {US_NATIONAL_PARKS.map((park) => {
-                const isSelected = selectedPark?.name === park.name;
-                const isHov = hoveredPark === park.name;
-                const isVisited = visitedParks.has(park.name);
-                const isBucketList = !isVisited && bucketParks.has(park.name);
-                const s = 1 / zoom;
-                const poleColor = isSelected ? "#facc15" : isVisited ? "#86efac" : isBucketList ? BUCKET_LIST_STROKE : "#64748b";
-                const flagColor = isSelected ? "#facc15" : isVisited ? (isHov ? "#15803d" : "#16a34a") : isBucketList ? "none" : (isHov ? "#64748b" : "#374151");
-                const flagStroke = isSelected ? "#f59e0b" : isVisited ? "#14532d" : isBucketList ? BUCKET_LIST_STROKE : "#1f2937";
-                const dotColor = isSelected ? "#facc15" : isVisited ? "#16a34a" : isBucketList ? BUCKET_LIST_COLOR : "#374151";
-                return (
-                  <Marker key={park.name} coordinates={park.coordinates}>
-                    <g
-                      transform={`scale(${s})`}
-                      style={{ cursor: "pointer" }}
-                      onClick={(e) => { e.stopPropagation(); handleParkClick(park); }}
-                      onMouseEnter={(e) => { setHoveredPark(park.name); setTooltipName(park.name); setTooltipPos({ x: e.clientX, y: e.clientY }); }}
-                      onMouseMove={(e) => setTooltipPos({ x: e.clientX, y: e.clientY })}
-                      onMouseLeave={() => { setHoveredPark(null); setTooltipName(""); }}
-                    >
-                      <line x1="0" y1="0" x2="0" y2="-20" stroke={poleColor} strokeWidth={isHov || isSelected ? 2 : 1.5} />
-                      <polygon points="0,-20 12,-16 0,-12" fill={flagColor} stroke={flagStroke} strokeWidth={isBucketList ? 1 : 0.5} />
-                      <circle r={isHov || isSelected ? 3.5 : 2.5} fill={dotColor} stroke="#0f172a" strokeWidth="0.8" />
-                    </g>
-                  </Marker>
-                );
-              })}
               </>)}
             </ZoomableGroup>
           </ComposableMap>
 
           {/* Tooltip */}
-          {(hovered || hoveredStadium || hoveredPark) && tooltipName && (
+          {hovered && tooltipName && (
             <div
               className="fixed z-50 pointer-events-none bg-slate-800 text-white text-sm px-3 py-1.5 rounded-lg shadow-xl border border-slate-600 font-medium whitespace-nowrap"
               style={{ left: tooltipPos.x + 12, top: tooltipPos.y - 36 }}
@@ -3183,182 +2910,6 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                   </>
                 );
               })()}
-            </div>
-          ) : selectedPark ? (
-            <div className="p-6 flex-1">
-              <button onClick={() => setSelectedPark(null)} className="text-slate-400 hover:text-white text-sm mb-4 flex items-center gap-1 transition-colors">
-                ← Back
-              </button>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold mb-3 text-white bg-green-700">
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <line x1="5" y1="10" x2="5" y2="2" stroke="white" strokeWidth="1.5"/>
-                  <polygon points="5,2 10,4 5,6" fill="white"/>
-                </svg>
-                National Park
-              </div>
-              <h2 className="text-xl font-bold text-white mb-0.5">{selectedPark.name}</h2>
-              <p className="text-slate-400 text-sm mb-5">{selectedPark.state}</p>
-
-              <div className="space-y-3">
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-800/60">
-                  <span className="text-xl">📍</span>
-                  <div>
-                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">State(s)</p>
-                    <p className="text-sm font-medium text-white mt-0.5">{selectedPark.state}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-800/60">
-                  <span className="text-xl">📅</span>
-                  <div>
-                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Established</p>
-                    <p className="text-sm font-medium text-white mt-0.5">{selectedPark.established}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-800/60">
-                  <span className="text-xl">🌲</span>
-                  <div>
-                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Area</p>
-                    <p className="text-sm font-medium text-white mt-0.5">{selectedPark.area}</p>
-                  </div>
-                </div>
-              </div>
-
-              {!isReadOnly && (() => {
-                const name = selectedPark.name;
-                const isVisited = visitedParks.has(name);
-                const isBucketList = !isVisited && bucketParks.has(name);
-                const confirmKey = `park-${name}`;
-                return (
-                  <>
-                    <div className="flex gap-2 mt-5 pt-5 border-t border-slate-800">
-                      <button
-                        onClick={() => { toggleParkVisited(name); setConfirmBucket(null); }}
-                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isVisited ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white"}`}
-                      >
-                        <span>{isVisited ? "✓" : "○"}</span>{isVisited ? "Visited" : "Mark Visited"}
-                      </button>
-                      <button
-                        onClick={() => { if (!isBucketList && isVisited) { setConfirmBucket(confirmKey); } else { toggleParkBucket(name, false); } }}
-                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isBucketList ? "bg-amber-700 hover:bg-amber-600 text-white" : "bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white"}`}
-                      >
-                        <span>★</span>{isBucketList ? "On Bucket List" : "Bucket List"}
-                      </button>
-                    </div>
-                    {confirmBucket === confirmKey && (
-                      <div className="mt-2 p-3 bg-amber-900/40 border border-amber-700/60 rounded-lg text-sm">
-                        <p className="text-amber-200 mb-2">Remove from visited and add to bucket list?</p>
-                        <div className="flex gap-2">
-                          <button onClick={() => toggleParkBucket(name, true)} className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium">Confirm</button>
-                          <button onClick={() => setConfirmBucket(null)} className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium">Cancel</button>
-                        </div>
-                      </div>
-                    )}
-                    {isVisited && <VisitDetailsPanel locationId={name} category="park" isReadOnly={isReadOnly} details={parkDetails[name]} onUpdate={setParkDetail} />}
-                  </>
-                );
-              })()}
-
-              <NoteField category="park" locationId={selectedPark.name} isReadOnly={isReadOnly} readOnlyValue={getReadOnlyNote("park", selectedPark.name)} onSaved={handleNoteSaved} />
-            </div>
-          ) : selectedStadium ? (
-            <div className="p-6 flex-1">
-              <button onClick={() => setSelectedStadium(null)} className="text-slate-400 hover:text-white text-sm mb-4 flex items-center gap-1 transition-colors">
-                ← Back
-              </button>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold mb-3 text-white bg-blue-700">
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <line x1="5" y1="10" x2="5" y2="2" stroke="white" strokeWidth="1.5"/>
-                  <polygon points="5,2 10,4 5,6" fill="white"/>
-                </svg>
-                MLB Stadium
-              </div>
-              <h2 className="text-xl font-bold text-white mb-0.5">{selectedStadium.team}</h2>
-              <p className="text-slate-400 text-sm mb-5">{selectedStadium.city}</p>
-
-              <div className="space-y-3">
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-800/60">
-                  <span className="text-xl">🏟️</span>
-                  <div>
-                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Stadium</p>
-                    <p className="text-sm font-medium text-white mt-0.5">{selectedStadium.stadium}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-800/60">
-                  <span className="text-xl">⚾</span>
-                  <div>
-                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Division</p>
-                    <p className="text-sm font-medium text-white mt-0.5">{selectedStadium.division}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-800/60">
-                  <span className="text-xl">💺</span>
-                  <div>
-                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Capacity</p>
-                    <p className="text-sm font-medium text-white mt-0.5">{selectedStadium.capacity} seats</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-800/60">
-                  <span className="text-xl">📍</span>
-                  <div>
-                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Location</p>
-                    <p className="text-sm font-medium text-white mt-0.5">{selectedStadium.city}</p>
-                  </div>
-                </div>
-              </div>
-
-              {!isReadOnly && (() => {
-                const team = selectedStadium.team;
-                const isVisited = visitedStadiums.has(team);
-                const isBucketList = !isVisited && bucketStadiums.has(team);
-                const confirmKey = `stadium-${team}`;
-                return (
-                  <>
-                    <div className="flex gap-2 mt-5 pt-5 border-t border-slate-800">
-                      <button
-                        onClick={() => { toggleStadiumVisited(team); setConfirmBucket(null); }}
-                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isVisited ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white"}`}
-                      >
-                        <span>{isVisited ? "✓" : "○"}</span>{isVisited ? "Visited" : "Mark Visited"}
-                      </button>
-                      <button
-                        onClick={() => { if (!isBucketList && isVisited) { setConfirmBucket(confirmKey); } else { toggleStadiumBucket(team, false); } }}
-                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isBucketList ? "bg-amber-700 hover:bg-amber-600 text-white" : "bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white"}`}
-                      >
-                        <span>★</span>{isBucketList ? "On Bucket List" : "Bucket List"}
-                      </button>
-                    </div>
-                    {confirmBucket === confirmKey && (
-                      <div className="mt-2 p-3 bg-amber-900/40 border border-amber-700/60 rounded-lg text-sm">
-                        <p className="text-amber-200 mb-2">Remove from visited and add to bucket list?</p>
-                        <div className="flex gap-2">
-                          <button onClick={() => toggleStadiumBucket(team, true)} className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium">Confirm</button>
-                          <button onClick={() => setConfirmBucket(null)} className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium">Cancel</button>
-                        </div>
-                      </div>
-                    )}
-                    {isVisited && <VisitDetailsPanel locationId={team} category="stadium" isReadOnly={isReadOnly} details={stadiumDetails[team]} onUpdate={setStadiumDetail} />}
-                  </>
-                );
-              })()}
-
-              <NoteField category="stadium" locationId={selectedStadium.team} isReadOnly={isReadOnly} readOnlyValue={getReadOnlyNote("stadium", selectedStadium.team)} onSaved={handleNoteSaved} />
-
-              <div className="mt-5 pt-5 border-t border-slate-800">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Other Teams in {selectedStadium.division}</p>
-                <div className="space-y-2">
-                  {MLB_STADIUMS
-                    .filter(s => s.division === selectedStadium.division && s.team !== selectedStadium.team)
-                    .map(s => (
-                      <button
-                        key={s.team}
-                        onClick={() => setSelectedStadium(s)}
-                        className="w-full text-left px-3 py-2 rounded-lg bg-slate-800/40 hover:bg-slate-700/60 transition-colors text-sm text-slate-300 hover:text-white"
-                      >
-                        {s.team}
-                      </button>
-                    ))}
-                </div>
-              </div>
             </div>
           ) : selected ? (
             <div className="p-6 flex-1">
@@ -3593,28 +3144,10 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                     <span className="text-sm text-slate-300 flex-1">Canadian Provinces</span>
                     <span className="text-xs font-mono text-slate-500">{visitedProvinces.size}/{sortedProvinces.length}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <svg width="14" height="14" viewBox="-2 -14 14 14" fill="none" className="flex-shrink-0">
-                      <line x1="0" y1="0" x2="0" y2="-12" stroke="#93c5fd" strokeWidth="1.5"/>
-                      <polygon points="0,-12 8,-9 0,-6" fill="#2563eb"/>
-                      <circle cy="0" r="2.5" fill="#1d4ed8"/>
-                    </svg>
-                    <span className="text-sm text-slate-300 flex-1">MLB Stadium</span>
-                    <span className="text-xs font-mono text-slate-500">{visitedStadiums.size}/{sortedStadiums.length}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <svg width="14" height="14" viewBox="-2 -14 14 14" fill="none" className="flex-shrink-0">
-                      <line x1="0" y1="0" x2="0" y2="-12" stroke="#86efac" strokeWidth="1.5"/>
-                      <polygon points="0,-12 8,-9 0,-6" fill="#16a34a"/>
-                      <circle cy="0" r="2.5" fill="#15803d"/>
-                    </svg>
-                    <span className="text-sm text-slate-300 flex-1">National Park</span>
-                    <span className="text-xs font-mono text-slate-500">{visitedParks.size}/{sortedParks.length}</span>
-                  </div>
                   <div className="flex items-center gap-2 pt-2 mt-2 border-t border-slate-800">
                     <div className="w-3 h-3 rounded-sm flex-shrink-0 border-2" style={{ backgroundColor: BUCKET_LIST_COLOR, borderColor: BUCKET_LIST_STROKE, borderStyle: "dashed" }} />
                     <span className="text-sm text-slate-300 flex-1">Bucket List</span>
-                    <span className="text-xs font-mono text-slate-500">{bucketCountries.size + bucketStates.size + bucketProvinces.size + bucketStadiums.size + bucketParks.size}</span>
+                    <span className="text-xs font-mono text-slate-500">{bucketCountries.size + bucketStates.size + bucketProvinces.size}</span>
                   </div>
                   {totalNoteCount > 0 && (
                     <div className="flex items-center gap-2">
@@ -3640,14 +3173,6 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                   <div className="p-3 rounded-lg bg-slate-800/60 text-center">
                     <p className="text-xl font-bold text-white">13</p>
                     <p className="text-xs text-slate-400 mt-0.5">CA Provinces</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-slate-800/60 text-center">
-                    <p className="text-xl font-bold text-white">30</p>
-                    <p className="text-xs text-slate-400 mt-0.5">MLB Stadiums</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-slate-800/60 text-center">
-                    <p className="text-xl font-bold text-white">{NP_TOTAL}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">Nat. Parks</p>
                   </div>
                 </div>
               </div>
@@ -3681,8 +3206,6 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                   { id: "countries",   label: "Countries" },
                   { id: "us-states",   label: "US States" },
                   { id: "ca-provinces", label: "CA Provinces" },
-                  { id: "stadiums",    label: "MLB Stadiums" },
-                  { id: "nat-parks",   label: "Nat. Parks" },
                   { id: "bucket-list", label: "★ Bucket List" },
                 ] as const)
             ).map(tab => (
@@ -3709,8 +3232,6 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                   { label: "Countries", visited: visitedCountries.size, total: sortedCountries.length, color: "bg-emerald-500" },
                   { label: "US States", visited: visitedStates.size, total: sortedStates.length, color: "bg-red-500" },
                   { label: "CA Prov.", visited: visitedProvinces.size, total: sortedProvinces.length, color: "bg-orange-500" },
-                  { label: "Stadiums", visited: visitedStadiums.size, total: sortedStadiums.length, color: "bg-blue-500" },
-                  { label: "Parks", visited: visitedParks.size, total: sortedParks.length, color: "bg-green-500" },
                 ]
             ).map(({ label, visited, total, color }, i, arr) => (
               <div key={label} className="flex items-center gap-2">
@@ -3725,7 +3246,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
               </div>
             ))}
             {(() => {
-              const bucketTotal = bucketCountries.size + bucketStates.size + bucketProvinces.size + bucketStadiums.size;
+              const bucketTotal = bucketCountries.size + bucketStates.size + bucketProvinces.size;
               return (
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-amber-400">★ Bucket List</span>
@@ -3767,7 +3288,6 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                     />}
                     <button
                       onClick={() => {
-                        setSelectedStadium(null);
                         setConfirmBucket(null);
                         const key = `country-${country.id}`;
                         setSelected(prev => prev?.key === key ? null : { key, info: country });
@@ -3820,7 +3340,6 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                     />}
                     <button
                       onClick={() => {
-                        setSelectedStadium(null);
                         setConfirmBucket(null);
                         const key = `state-${state.fips}`;
                         setSelected(prev => prev?.key === key ? null : { key, info: state });
@@ -3873,7 +3392,6 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                     />}
                     <button
                       onClick={() => {
-                        setSelectedStadium(null);
                         setConfirmBucket(null);
                         const key = `province-${province.key}`;
                         setSelected(prev => prev?.key === key ? null : { key, info: province });
@@ -3888,114 +3406,6 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                     {!isReadOnly && <button
                       onClick={(e) => { e.stopPropagation(); toggleProvinceBucket(province.key, isVisited); }}
                       className={`flex-shrink-0 text-sm leading-none transition-colors ${isBucket ? "text-amber-400 hover:text-slate-400" : "text-slate-600 hover:text-amber-400"}`}
-                      title={isBucket ? "Remove from bucket list" : "Add to bucket list"}
-                    >★</button>}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* MLB Stadiums tab */}
-        {listTab === "stadiums" && (
-          <div className="px-6 py-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-1.5">
-              {sortedStadiums.map((stadium) => {
-                const isVisited = visitedStadiums.has(stadium.team);
-                const isBucket = !isVisited && bucketStadiums.has(stadium.team);
-                const isActive = selectedStadium?.team === stadium.team;
-                return (
-                  <div
-                    key={stadium.team}
-                    className={`flex items-start gap-2 px-2.5 py-2 rounded-lg text-sm transition-colors ${
-                      isActive
-                        ? "bg-yellow-500/20 border border-yellow-500/40"
-                        : isVisited
-                        ? "bg-blue-900/30 border border-blue-700/30 hover:bg-blue-800/30"
-                        : isBucket
-                        ? "bg-amber-900/20 border border-amber-700/30 hover:bg-amber-900/30"
-                        : "bg-slate-800/40 hover:bg-slate-700/60 border border-transparent"
-                    }`}
-                  >
-                    {!isReadOnly && <input
-                      type="checkbox"
-                      checked={isVisited}
-                      onChange={() => toggleStadiumVisited(stadium.team)}
-                      className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 accent-blue-500 cursor-pointer"
-                    />}
-                    <button
-                      onClick={() => {
-                        setSelected(null);
-                        setConfirmBucket(null);
-                        setSelectedStadium(prev => prev?.team === stadium.team ? null : stadium);
-                        window.scrollTo({ top: 0, behavior: "smooth" });
-                      }}
-                      className="text-left flex-1 min-w-0"
-                    >
-                      <p className={`font-medium truncate ${isActive ? "text-yellow-300" : isVisited ? "text-blue-300" : isBucket ? "text-amber-300" : "text-slate-300 hover:text-white"}`}>
-                        {stadium.team}
-                        {effectiveNotesIndex.stadium.has(stadium.team) && <span className="text-[10px] ml-1" title="Has note">📝</span>}
-                      </p>
-                      <p className="text-xs text-slate-400 truncate mt-0.5">{stadium.stadium}</p>
-                    </button>
-                    {!isReadOnly && <button
-                      onClick={(e) => { e.stopPropagation(); toggleStadiumBucket(stadium.team, isVisited); }}
-                      className={`flex-shrink-0 text-sm leading-none transition-colors mt-0.5 ${isBucket ? "text-amber-400 hover:text-slate-400" : "text-slate-600 hover:text-amber-400"}`}
-                      title={isBucket ? "Remove from bucket list" : "Add to bucket list"}
-                    >★</button>}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* National Parks tab */}
-        {listTab === "nat-parks" && (
-          <div className="px-6 py-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-1.5">
-              {sortedParks.map((park) => {
-                const isVisited = visitedParks.has(park.name);
-                const isBucket = !isVisited && bucketParks.has(park.name);
-                const isActive = selectedPark?.name === park.name;
-                return (
-                  <div
-                    key={park.name}
-                    className={`flex items-start gap-2 px-2.5 py-2 rounded-lg text-sm transition-colors ${
-                      isActive
-                        ? "bg-yellow-500/20 border border-yellow-500/40"
-                        : isVisited
-                        ? "bg-green-900/30 border border-green-700/30 hover:bg-green-800/30"
-                        : isBucket
-                        ? "bg-amber-900/20 border border-amber-700/30 hover:bg-amber-900/30"
-                        : "bg-slate-800/40 hover:bg-slate-700/60 border border-transparent"
-                    }`}
-                  >
-                    {!isReadOnly && <input
-                      type="checkbox"
-                      checked={isVisited}
-                      onChange={() => toggleParkVisited(park.name)}
-                      className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 accent-green-500 cursor-pointer"
-                    />}
-                    <button
-                      onClick={() => {
-                        setSelected(null);
-                        setConfirmBucket(null);
-                        setSelectedPark(prev => prev?.name === park.name ? null : park);
-                        window.scrollTo({ top: 0, behavior: "smooth" });
-                      }}
-                      className="text-left flex-1 min-w-0"
-                    >
-                      <p className={`font-medium truncate ${isActive ? "text-yellow-300" : isVisited ? "text-green-300" : isBucket ? "text-amber-300" : "text-slate-300 hover:text-white"}`}>
-                        {park.name}
-                        {effectiveNotesIndex.park.has(park.name) && <span className="text-[10px] ml-1" title="Has note">📝</span>}
-                      </p>
-                      <p className="text-xs text-slate-400 truncate mt-0.5">{park.state}</p>
-                    </button>
-                    {!isReadOnly && <button
-                      onClick={(e) => { e.stopPropagation(); toggleParkBucket(park.name, isVisited); }}
-                      className={`flex-shrink-0 text-sm leading-none transition-colors mt-0.5 ${isBucket ? "text-amber-400 hover:text-slate-400" : "text-slate-600 hover:text-amber-400"}`}
                       title={isBucket ? "Remove from bucket list" : "Add to bucket list"}
                     >★</button>}
                   </div>
@@ -4118,13 +3528,13 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
 
         {/* Bucket List tab */}
         {listTab === "bucket-list" && (() => {
-          const bucketTotal = bucketCountries.size + bucketStates.size + bucketProvinces.size + bucketStadiums.size + bucketParks.size + tccBucket.size;
+          const bucketTotal = bucketCountries.size + bucketStates.size + bucketProvinces.size + tccBucket.size;
           if (bucketTotal === 0) {
             return (
               <div className="px-6 py-12 text-center text-slate-400">
                 <div className="text-4xl mb-3">★</div>
                 <p className="text-base font-medium text-slate-300 mb-1">Your bucket list is empty</p>
-                <p className="text-sm">Click the ★ on any country, state, province, stadium, park, or TCC entry to add it here.</p>
+                <p className="text-sm">Click the ★ on any country, state, province, or TCC entry to add it here.</p>
               </div>
             );
           }
@@ -4132,8 +3542,6 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
             ...sortedCountries.filter(c => bucketCountries.has(c.id)).map(c => ({ name: c.name, sub: "", badge: "Country", badgeClass: "bg-blue-900/80 text-blue-300", key: `country-${c.id}`, id: c.id, cat: "country" as const })),
             ...sortedStates.filter(s => bucketStates.has(s.fips)).map(s => ({ name: s.name, sub: "", badge: "US State", badgeClass: "bg-red-900/80 text-red-300", key: `state-${s.fips}`, id: s.fips, cat: "state" as const })),
             ...sortedProvinces.filter(p => bucketProvinces.has(p.key)).map(p => ({ name: p.name, sub: "", badge: "Province", badgeClass: "bg-orange-900/80 text-orange-300", key: `province-${p.key}`, id: p.key, cat: "province" as const })),
-            ...sortedStadiums.filter(s => bucketStadiums.has(s.team)).map(s => ({ name: s.team, sub: s.stadium, badge: "Stadium", badgeClass: "bg-violet-900/80 text-violet-300", key: `stadium-${s.team}`, id: s.team, cat: "stadium" as const })),
-            ...sortedParks.filter(p => bucketParks.has(p.name)).map(p => ({ name: p.name, sub: p.state, badge: "Park", badgeClass: "bg-green-900/80 text-green-300", key: `park-${p.name}`, id: p.name, cat: "park" as const })),
             ...sortedTcc.filter(e => tccBucket.has(e.name)).map(e => ({ name: e.name, sub: TCC_REGIONS[e.region].name, badge: "TCC", badgeClass: "bg-purple-900/80 text-purple-300", key: `tcc-${e.name}`, id: e.name, cat: "tcc" as const })),
           ].sort((a, b) => a.name.localeCompare(b.name));
           return (
@@ -4145,17 +3553,11 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                     <button
                       className="text-left flex-1 min-w-0"
                       onClick={() => {
-                        if (item.cat === "stadium") {
-                          const s = MLB_STADIUMS.find(st => st.team === item.id);
-                          if (s) { setSelected(null); setSelectedTcc(null); setSelectedPark(null); setSelectedStadium(s); window.scrollTo({ top: 0, behavior: "smooth" }); }
-                        } else if (item.cat === "park") {
-                          const p = US_NATIONAL_PARKS.find(pk => pk.name === item.id);
-                          if (p) { setSelected(null); setSelectedTcc(null); setSelectedStadium(null); setSelectedPark(p); if (mapMode !== "world") setMapMode("world"); window.scrollTo({ top: 0, behavior: "smooth" }); }
-                        } else if (item.cat === "tcc") {
+                        if (item.cat === "tcc") {
                           const t = TCC_BY_NAME.get(item.id);
-                          if (t) { setSelected(null); setSelectedStadium(null); setSelectedPark(null); setSelectedTcc(t); if (mapMode !== "tcc") setMapMode("tcc"); window.scrollTo({ top: 0, behavior: "smooth" }); }
+                          if (t) { setSelected(null); setSelectedTcc(t); if (mapMode !== "tcc") setMapMode("tcc"); window.scrollTo({ top: 0, behavior: "smooth" }); }
                         } else {
-                          setSelectedStadium(null); setSelectedTcc(null); setSelectedPark(null);
+                          setSelectedTcc(null);
                           if (item.cat === "country") { const c = sortedCountries.find(c => c.id === item.id); if (c) setSelected({ key: item.key, info: c }); }
                           else if (item.cat === "state") { const s = sortedStates.find(s => s.fips === item.id); if (s) setSelected({ key: item.key, info: s }); }
                           else if (item.cat === "province") { const p = sortedProvinces.find(p => p.key === item.id); if (p) setSelected({ key: item.key, info: p }); }
@@ -4172,9 +3574,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                         if (item.cat === "country") toggleCountryBucket(item.id, false);
                         else if (item.cat === "state") toggleStateBucket(item.id, false);
                         else if (item.cat === "province") toggleProvinceBucket(item.id, false);
-                        else if (item.cat === "park") toggleParkBucket(item.id, false);
                         else if (item.cat === "tcc") toggleTccBucket(item.id, false);
-                        else toggleStadiumBucket(item.id, false);
                       }}
                       className="text-amber-500 hover:text-slate-400 shrink-0 text-sm leading-none mt-0.5"
                       title="Remove from bucket list"
@@ -4193,14 +3593,10 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
           visitedCountries={visitedCountries}
           visitedStates={visitedStates}
           visitedProvinces={visitedProvinces}
-          visitedStadiums={visitedStadiums}
-          visitedParks={visitedParks}
           visitedTcc={rawTccVisited}
           countryDetails={countryDetails}
           stateDetails={stateDetails}
           provinceDetails={provinceDetails}
-          stadiumDetails={stadiumDetails}
-          parkDetails={parkDetails}
           tccDetails={tccDetails}
         />
       )}
@@ -4211,20 +3607,14 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
           visitedCountries={baseVisitedCountries}
           visitedStates={baseVisitedStates}
           visitedProvinces={baseVisitedProvinces}
-          visitedStadiums={baseVisitedStadiums}
-          visitedParks={baseVisitedParks}
           tccVisited={baseTccVisited}
           bucketCountries={bucketCountries}
           bucketStates={bucketStates}
           bucketProvinces={bucketProvinces}
-          bucketStadiums={bucketStadiums}
-          bucketParks={bucketParks}
           tccBucket={tccBucket}
           countryDetails={countryDetails}
           stateDetails={stateDetails}
           provinceDetails={provinceDetails}
-          stadiumDetails={stadiumDetails}
-          parkDetails={parkDetails}
           tccDetails={tccDetails}
         />
       )}
@@ -4235,13 +3625,9 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
           visitedCountries={isReadOnly ? visitedCountries : rawVisitedCountries}
           visitedStates={isReadOnly ? visitedStates : rawVisitedStates}
           visitedProvinces={isReadOnly ? visitedProvinces : rawVisitedProvinces}
-          visitedStadiums={isReadOnly ? visitedStadiums : rawVisitedStadiums}
-          visitedParks={isReadOnly ? visitedParks : rawVisitedParks}
           bucketCountries={isReadOnly ? bucketCountries : rawBucketCountries}
           bucketStates={isReadOnly ? bucketStates : rawBucketStates}
           bucketProvinces={isReadOnly ? bucketProvinces : rawBucketProvinces}
-          bucketStadiums={isReadOnly ? bucketStadiums : rawBucketStadiums}
-          bucketParks={isReadOnly ? bucketParks : rawBucketParks}
           tccVisited={isReadOnly ? tccVisited : rawTccVisited}
           tccBucket={isReadOnly ? tccBucket : rawTccBucket}
         />

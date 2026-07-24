@@ -423,20 +423,14 @@ function applyServerDataToLocalStorage(data: ServerData) {
   setArr("wm_visited_countries", data.visitedCountries);
   setArr("wm_visited_states", data.visitedStates);
   setArr("wm_visited_provinces", data.visitedProvinces);
-  setArr("wm_visited_stadiums", data.visitedStadiums);
-  setArr("wm_visited_parks", data.visitedParks);
   setArr("wm_tcc_visited", data.tccVisited);
   setArr("wm_bucket_countries", data.bucketCountries);
   setArr("wm_bucket_states", data.bucketStates);
   setArr("wm_bucket_provinces", data.bucketProvinces);
-  setArr("wm_bucket_stadiums", data.bucketStadiums);
-  setArr("wm_bucket_parks", data.bucketParks);
   setArr("wm_tcc_bucket", data.tccBucket);
   setObj("wm_details_countries", data.countryDetails);
   setObj("wm_details_states", data.stateDetails);
   setObj("wm_details_provinces", data.provinceDetails);
-  setObj("wm_details_stadiums", data.stadiumDetails);
-  setObj("wm_details_parks", data.parkDetails);
   setObj("wm_details_tcc", data.tccDetails);
 
   if (data.notesByKey && typeof data.notesByKey === "object") {

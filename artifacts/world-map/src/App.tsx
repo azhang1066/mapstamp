@@ -195,6 +195,7 @@ const BUCKET_LIST_STROKE = "#fbbf24";
 
 function getCountryFill(numericCode: string, isSelected: boolean, isHovered: boolean, isVisited: boolean, isBucketList: boolean) {
   if (isSelected) return SELECTED_COLOR;
+  if (numericCode === "304") numericCode = "208"; // Greenland → Denmark
   const data = COUNTRY_DATA[numericCode];
   if (data) {
     if (isVisited) {
@@ -1223,7 +1224,7 @@ function StatsDashboard(props: StatsDashboardProps) {
     const topContinent = contCounts[0] ?? null;
     // Combined completion
     const totalVisited = visitedCountries.size + visitedStates.size + visitedProvinces.size + visitedStadiums.size + visitedParks.size + tccVisited.size;
-    const totalAvail = 195 + 51 + 13 + 30 + NP_TOTAL + TCC_TOTAL;
+    const totalAvail = 194 + 51 + 13 + 30 + NP_TOTAL + TCC_TOTAL;
     const completionPct = totalAvail > 0 ? (totalVisited / totalAvail) * 100 : 0;
     // TCC distance
     const tccGap = TCC_MEMBERSHIP_THRESHOLD - tccVisited.size;
@@ -1239,7 +1240,7 @@ function StatsDashboard(props: StatsDashboardProps) {
   const totalBucket = bucketCountries.size + bucketStates.size + bucketProvinces.size + bucketStadiums.size + bucketParks.size + tccBucket.size;
 
   const headlineTiles = [
-    { icon: "🌍", label: "Countries", visited: visitedCountries.size, total: 195, color: "from-blue-600 to-blue-800" },
+    { icon: "🌍", label: "Countries", visited: visitedCountries.size, total: 194, color: "from-blue-600 to-blue-800" },
     { icon: "🗺", label: "TCC Territories", visited: tccVisited.size, total: TCC_TOTAL, color: "from-purple-600 to-purple-800" },
     { icon: "🏟", label: "MLB Stadiums", visited: visitedStadiums.size, total: 30, color: "from-sky-600 to-sky-800" },
     { icon: "🏞", label: "Nat. Parks", visited: visitedParks.size, total: NP_TOTAL, color: "from-green-600 to-green-800" },
@@ -2390,7 +2391,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
       setCountryDetail, setStateDetail, setProvinceDetail, setStadiumDetail, setTccDetail, showToast]);
 
   const handleCountryClick = useCallback((geo: { id: string }) => {
-    const code = geo.id;
+    const code = geo.id === "304" ? "208" : geo.id; // Greenland → Denmark
     const info = COUNTRY_DATA[code];
     setSelectedStadium(null);
     setConfirmBucket(null);

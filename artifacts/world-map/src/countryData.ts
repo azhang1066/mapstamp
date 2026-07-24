@@ -48,7 +48,6 @@ export const COUNTRY_DATA: RegionRecord = {
   "276": { name: "Germany", regionType: "country", capital: "Berlin", population: "83.8M", area: "357,114 km²", continent: "Europe", currency: "Euro", language: "German" },
   "288": { name: "Ghana", regionType: "country", capital: "Accra", population: "32.8M", area: "238,533 km²", continent: "Africa", currency: "Ghanaian Cedi", language: "English" },
   "300": { name: "Greece", regionType: "country", capital: "Athens", population: "10.4M", area: "131,957 km²", continent: "Europe", currency: "Euro", language: "Greek" },
-  "304": { name: "Greenland", regionType: "country", capital: "Nuuk", population: "0.06M", area: "2,166,086 km²", continent: "North America", currency: "Danish Krone", language: "Greenlandic, Danish" },
   "320": { name: "Guatemala", regionType: "country", capital: "Guatemala City", population: "17.8M", area: "108,889 km²", continent: "North America", currency: "Guatemalan Quetzal", language: "Spanish" },
   "348": { name: "Hungary", regionType: "country", capital: "Budapest", population: "9.7M", area: "93,028 km²", continent: "Europe", currency: "Hungarian Forint", language: "Hungarian" },
   "356": { name: "India", regionType: "country", capital: "New Delhi", population: "1.4B", area: "3,287,263 km²", continent: "Asia", currency: "Indian Rupee", language: "Hindi, English" },

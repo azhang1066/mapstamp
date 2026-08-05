@@ -1,5 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import type { AuthProps } from "./auth-types";
+import { useListConnections, getListConnectionsQueryKey } from "@workspace/api-client-react";
+import ConnectionsPanel from "./ConnectionsPanel";
 import * as XLSX from "xlsx";
 import { toPng } from "html-to-image";
 import {
@@ -1862,7 +1864,15 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
   const [showExport, setShowExport] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [showConnections, setShowConnections] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+  // Badge count populated lazily after first open — hook always runs, enabled only when signed in
+  const { data: connectionsData } = useListConnections({
+    query: { enabled: isAuthenticated, staleTime: 30_000 },
+    request: { credentials: "include" },
+  });
+  const incomingPendingCount = connectionsData?.pending.incoming.length ?? 0;
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const [sharedData, setSharedData] = useState<ShareData | null>(null);
   const [toast, setToast] = useState<{ message: string; kind: "success" | "warning" } | null>(null);
@@ -2422,6 +2432,20 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
               Export
             </button>
           </>}
+          {isAuthenticated && (
+            <button
+              onClick={() => setShowConnections(true)}
+              className="relative px-3 py-2 text-sm bg-teal-700 hover:bg-teal-600 rounded-lg transition-colors font-medium text-white flex items-center gap-1.5"
+              title="Search travelers and manage connections"
+            >
+              🔗 Connections
+              {incomingPendingCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[1.1rem] h-[1.1rem] px-1 bg-rose-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
+                  {incomingPendingCount}
+                </span>
+              )}
+            </button>
+          )}
           <button
             onClick={() => setShowStats(true)}
             className="px-3 py-2 text-sm bg-fuchsia-700 hover:bg-fuchsia-600 rounded-lg transition-colors font-medium text-white flex items-center gap-1.5"
@@ -3619,6 +3643,13 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
           stateDetails={stateDetails}
           provinceDetails={provinceDetails}
           tccDetails={tccDetails}
+        />
+      )}
+
+      {showConnections && isAuthenticated && (
+        <ConnectionsPanel
+          onClose={() => setShowConnections(false)}
+          showToast={showToast}
         />
       )}
 

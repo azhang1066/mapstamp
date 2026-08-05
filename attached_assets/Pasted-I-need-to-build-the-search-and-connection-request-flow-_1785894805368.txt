@@ -1,0 +1,93 @@
+I need to build the search and connection request flow for the World Map Travel 
+Tracker (workspace root, pnpm monorepo, artifact: `artifacts/world-map`), and 
+first verify/fix a gap in the connections backend.
+
+STEP 0 — VERIFY BACKEND SUPPORTS CANCELING OUTGOING REQUESTS:
+The existing `DELETE /api/connections/:connectionId` endpoint (in 
+`artifacts/api-server`, likely `src/routes/connections.ts` or similar) was built 
+to remove an accepted connection. Check whether it also correctly handles 
+deleting a connection that's still in `pending` status (i.e. the requester 
+canceling their own outgoing request before the other user responds).
+
+Specifically check:
+- Does the route allow deletion when status = pending, or does it assume/require 
+  status = accepted?
+- Does the authorization check allow BOTH the requester and addressee to delete 
+  a pending row, or only whoever sent it? (It should: requester can cancel their 
+  own pending outgoing request; addressee canceling a pending request is 
+  equivalent to declining, which may already be handled by the decline endpoint 
+  — don't duplicate that path, just make sure canceling-as-requester works.)
+- Does deleting a pending connection do anything different from deleting an 
+  accepted one (e.g. should a canceled request vs. a removed connection get 
+  logged/notified differently)? If not, a single DELETE handling both states 
+  is fine — don't over-engineer this.
+
+If the endpoint already handles this correctly: confirm it in your summary and 
+move to Step 1 with no backend changes.
+
+If it doesn't: fix `src/routes/connections.ts` (or wherever the handler lives) 
+so DELETE works correctly for both pending (canceling) and accepted (removing) 
+states, with proper authorization for each. Update `lib/api-spec/openapi.yaml` 
+if the endpoint's documented behavior needs to change, then run 
+`pnpm --filter @workspace/api-spec run codegen` to regenerate the client hooks 
+and Zod schemas — do not hand-edit generated files.
+
+STEP 1 — BUILD THE SEARCH AND CONNECTION REQUEST FLOW:
+
+CURRENT STATE:
+The backend supports:
+- `GET /api/users/search?q=` — matches by username, returns id + username + 
+  display_name only, never travel data
+- `POST /api/connections/request/:userId` — send a connection request
+- `POST /api/connections/:connectionId/accept` — accept a pending request
+- `POST /api/connections/:connectionId/decline` — decline a pending request
+- `DELETE /api/connections/:connectionId` — remove a connection (now verified/
+  fixed in Step 0 to handle both pending-cancel and accepted-remove)
+- `GET /api/connections` — caller's connections split by pending 
+  (incoming/outgoing) vs. accepted
+Available as generated React Query hooks in `@workspace/api-client-react` — 
+check `lib/api-client-react/src/generated/api.ts` for exact hook names.
+
+Username onboarding (`UsernameOnboardingModal`) is already built, so every 
+authenticated user has a confirmed username.
+
+The app's header (`src/App.tsx`) already has icon buttons for existing features 
+(📊 Statistics, 📅 Year filter) — follow that pattern for new entry points. 
+Toast notifications are already used elsewhere for action feedback.
+
+GOAL:
+Let a user search for other users by username, send a connection request, and 
+manage incoming/outgoing requests — self-contained, no compare/leaderboard UI 
+yet.
+
+REQUIREMENTS:
+1. Entry point: new header icon/button (matching existing emoji-icon pattern) 
+   opening a "Connections" panel. Decide modal vs. slide-in vs. full-screen 
+   overlay (consistent with the Statistics Dashboard's overlay pattern if that 
+   fits better given multiple sub-views) — explain your choice briefly before 
+   implementing.
+2. New component(s), e.g. `src/ConnectionsPanel.tsx` with sub-components:
+   - **Search tab**: debounced (300-400ms) call to `GET /api/users/search`, 
+     results showing username + display_name, "Connect" button per result. 
+     Cross-reference against `GET /api/connections` to show "Pending" or 
+     "Connected" instead of "Connect" where a relationship already exists.
+   - **Pending tab**: incoming requests (Accept/Decline) and outgoing requests 
+     (show "Pending" with a **Cancel** button, using the now-verified/fixed 
+     DELETE endpoint).
+   - **Connections tab**: accepted connections list, with a confirm-before-
+     remove option per row (DELETE endpoint, accepted-state path).
+3. Use generated React Query hooks for all data. Invalidate/refetch the 
+   connections query after every request/accept/decline/cancel/remove action. 
+   Toast on success and failure for each action.
+4. Small count badge on the header entry-point icon when there are incoming 
+   pending requests.
+
+CONSTRAINTS:
+- Don't build compare view or leaderboard yet.
+- Don't touch read-only/share-URL mode — authenticated users only.
+- Reuse existing patterns: header icon-button style, toasts, overlay pattern, 
+  loading states.
+
+Give me a summary after Step 0 (what you found, whether you changed anything) 
+before proceeding to Step 1, and a quick summary of your UI pattern choice 
+before building the panel.

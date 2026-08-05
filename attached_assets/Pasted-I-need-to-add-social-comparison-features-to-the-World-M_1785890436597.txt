@@ -1,0 +1,82 @@
+I need to add social/comparison features to the World Map Travel Tracker (workspace 
+root, pnpm monorepo), building on the existing Clerk auth and the `user_destinations` 
+table (source of truth for visited/bucket status per user).
+
+CURRENT STATE:
+- Auth: Clerk, per-user data scoped by Clerk user_id
+- `user_destinations`: user_id, category, destination_id, status, first/last visited, 
+  times_visited — queryable per user or aggregated globally
+- `user_map_data.data` jsonb: notes, photo refs, profile_name (free-text display 
+  name, currently only surfaced in the Statistics Dashboard's shareable summary card)
+- No existing concept of connecting to or following another user, and no unique 
+  identifier for a user other than their internal Clerk ID.
+
+GOAL:
+Instagram/Facebook-style private-profile model: users are found via a unique 
+username, but their travel map (visited/bucket data, comparisons, stats) is only 
+visible to users they've accepted a mutual connection request from.
+
+REQUIREMENTS:
+1. Schema in `lib/db`:
+   - `user_profiles` table: user_id (PK/FK), username (unique, indexed), 
+     display_name, username_set (boolean — has the user confirmed/chosen their 
+     username, vs. still on an auto-generated placeholder), created_at.
+   - `user_connections` table: requester_id, addressee_id, status 
+     (pending/accepted/declined), created_at, responded_at. Data visibility 
+     requires status = accepted.
+   - Username generation: propose a scheme for auto-generating a unique 
+     candidate username for both new and existing users (e.g. slugified 
+     display_name + random suffix, retrying on collision) so every user has a 
+     valid username immediately — the "prompt on next login" step is about 
+     letting them customize it, not about the app being unable to function 
+     until they do.
+2. Backfill for existing users:
+   - One-time script: for every existing user, generate and store a unique 
+     username using the scheme above, `username_set = false`.
+3. New API endpoints (add to `lib/api-spec/openapi.yaml` first, then run 
+   `pnpm --filter @workspace/api-spec run codegen` — do not hand-edit generated 
+   files):
+   - `GET /api/profile/me` — returns the caller's username, display_name, and 
+     username_set flag (frontend uses this to decide whether to show a 
+     "choose your username" prompt on login).
+   - `PUT /api/profile/username` — set/change username; validate uniqueness 
+     (case-insensitive), reasonable format (alphanumeric + underscore, length 
+     bounds), and set username_set = true on success. Return a clear 
+     conflict error if taken.
+   - `GET /api/users/search?q=` — matches username (exact or prefix match, 
+     case-insensitive) — NOT display_name, since usernames are now the unique 
+     identifier for search. Returns only id + username + display_name, never 
+     travel data.
+   - `POST /api/connections/request/:userId`
+   - `POST /api/connections/:connectionId/accept`
+   - `POST /api/connections/:connectionId/decline`
+   - `DELETE /api/connections/:connectionId`
+   - `GET /api/connections` — split by pending (incoming/outgoing) vs. accepted
+   - `GET /api/compare/:otherUserId` — must verify accepted connection exists 
+     before returning any data; 403 otherwise.
+   - `GET /api/leaderboard` — ranks caller's accepted connections by visited 
+     count per category.
+4. Authorization is the crux of this feature:
+   - Search and profile-lookup endpoints never include travel data.
+   - Every comparison/leaderboard query checks status = accepted in 
+     `user_connections` before touching `user_destinations` for the other 
+     user. Write this as a shared authorization helper, not duplicated per 
+     route.
+   - A pending connection grants zero visibility — same as no connection.
+5. No frontend UI work yet, EXCEPT: flag clearly in your plan where the 
+   "prompt to choose username on next login" hook would go (likely 
+   `AuthRoot.tsx`, checking `GET /api/profile/me`'s `username_set` flag right 
+   after Clerk auth resolves) — describe the approach but don't implement the 
+   modal/UI yet, I'll build that separately.
+
+CONSTRAINTS:
+- Don't modify `user_destinations` schema — read-only for comparison/leaderboard.
+- Don't change existing `/api/map-data` or `/api/stats/*` behavior.
+- Follow existing patterns: Drizzle ORM, Clerk auth via `getAuth(req)`, Pino 
+  logging.
+
+Before writing any code or migrations, give me a written plan covering: the 
+`user_profiles` schema and username generation scheme, the backfill approach 
+for existing users, the username validation rules, and the authorization 
+helper design for comparison/leaderboard — then wait for my go-ahead before 
+implementing.

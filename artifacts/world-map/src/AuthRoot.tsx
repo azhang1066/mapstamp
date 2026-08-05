@@ -531,6 +531,8 @@ function AppWithSync() {
   const [ready, setReady] = useState(false);
   const [needsUsername, setNeedsUsername] = useState(false);
   const [placeholderUsername, setPlaceholderUsername] = useState("");
+  // Tracks the confirmed username across the session
+  const [currentUsername, setCurrentUsername] = useState<string | null>(null);
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [profileTab, setProfileTab] = useState<ProfileTab>("profile");
   const [displayName, setDisplayName] = useState("");
@@ -538,13 +540,47 @@ function AppWithSync() {
   const [nameSaved, setNameSaved] = useState(false);
   const [profileName, setProfileName] = useState<string | null>(() => localStorage.getItem("wm_profile_name") || null);
 
-  // Initialise display name when profile modal opens
+  // Username edit state (profile modal)
+  const [usernameInput, setUsernameInput] = useState("");
+  const [usernameSaving, setUsernameSaving] = useState(false);
+  const [usernameSaved, setUsernameSaved] = useState(false);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+
+  // Mirrors backend validation in lib/username.ts — keep in sync if rules change
+  const USERNAME_REGEX = /^[a-z0-9_]{3,30}$/;
+  const USERNAME_RESERVED = new Set(["me","admin","api","search","leaderboard","compare","connection","connections","profile","user","users","stats","health","photos","map","mapdata","support"]);
+  function validateUsernameInput(raw: string): string | null {
+    const v = raw.trim().toLowerCase();
+    if (!USERNAME_REGEX.test(v)) return "3–30 characters, letters, numbers, and underscores only.";
+    if (USERNAME_RESERVED.has(v)) return "That username is reserved. Please choose another.";
+    return null;
+  }
+
+  // Initialise display name and username input when profile modal opens
   useEffect(() => {
     if (!showUserProfile) return;
     const stored = localStorage.getItem("wm_profile_name") ?? "";
     setDisplayName(stored || user?.firstName || "");
     setNameSaved(false);
-  }, [showUserProfile, user?.firstName]);
+    setUsernameSaved(false);
+    setUsernameError(null);
+    // Load latest username from API each time the modal opens
+    if (isSignedIn) {
+      fetch(`${basePath}/api/profile/me`, { credentials: "include" })
+        .then(r => r.ok ? r.json() : null)
+        .then((p: { username: string } | null) => {
+          if (p?.username) {
+            setCurrentUsername(p.username);
+            setUsernameInput(p.username);
+          }
+        })
+        .catch(() => {
+          // Non-fatal — input stays pre-filled with last known value
+          if (currentUsername) setUsernameInput(currentUsername);
+        });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showUserProfile]);
 
   function saveDisplayName() {
     const trimmed = displayName.trim();
@@ -554,6 +590,42 @@ function AppWithSync() {
     setNameSaved(true);
     setNameSaving(false);
     setTimeout(() => setNameSaved(false), 2500);
+  }
+
+  async function saveUsername() {
+    const normalized = usernameInput.trim().toLowerCase();
+    const err = validateUsernameInput(normalized);
+    if (err) { setUsernameError(err); return; }
+    if (normalized === currentUsername) {
+      setUsernameSaved(true);
+      setTimeout(() => setUsernameSaved(false), 2500);
+      return;
+    }
+    setUsernameSaving(true);
+    setUsernameError(null);
+    try {
+      const res = await fetch(`${basePath}/api/profile/username`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: normalized }),
+      });
+      const body = await res.json() as { ok?: boolean; username?: string; error?: string };
+      if (res.ok && body.ok && body.username) {
+        setCurrentUsername(body.username);
+        setUsernameInput(body.username);
+        setUsernameSaved(true);
+        setTimeout(() => setUsernameSaved(false), 2500);
+      } else if (res.status === 409) {
+        setUsernameError("That username is already taken. Please choose another.");
+      } else {
+        setUsernameError(body.error ?? "Failed to save username. Please try again.");
+      }
+    } catch {
+      setUsernameError("Network error. Please try again.");
+    } finally {
+      setUsernameSaving(false);
+    }
   }
 
   useEffect(() => {
@@ -672,6 +744,50 @@ function AppWithSync() {
             {/* Profile tab */}
             {profileTab === "profile" && (
               <>
+                {/* Username row */}
+                <div className="border-b border-slate-700/60 px-8 py-5 flex items-start gap-6">
+                  <div className="flex-1 min-w-0">
+                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                      Username
+                    </label>
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-3 flex items-center text-slate-500 text-sm select-none pointer-events-none">@</span>
+                      <input
+                        type="text"
+                        value={usernameInput}
+                        onChange={e => {
+                          setUsernameInput(e.target.value.toLowerCase());
+                          setUsernameError(null);
+                          setUsernameSaved(false);
+                        }}
+                        onKeyDown={e => { if (e.key === "Enter") void saveUsername(); }}
+                        placeholder="your_username"
+                        maxLength={30}
+                        spellCheck={false}
+                        className={`w-full bg-slate-800 border rounded-lg pl-7 pr-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:border-transparent transition-colors ${
+                          usernameError
+                            ? "border-red-500 focus:ring-red-500"
+                            : "border-slate-600 focus:ring-blue-500"
+                        }`}
+                      />
+                    </div>
+                    {usernameError ? (
+                      <p className="mt-1 text-xs text-red-400">{usernameError}</p>
+                    ) : (
+                      <p className="mt-1 text-xs text-slate-500">
+                        How other travelers find and connect with you · letters, numbers, underscores
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => void saveUsername()}
+                    disabled={usernameSaving || !!validateUsernameInput(usernameInput)}
+                    className="shrink-0 mt-6 px-4 py-2 text-sm font-medium rounded-lg transition-colors bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white"
+                  >
+                    {usernameSaving ? "Saving…" : usernameSaved ? "Saved ✓" : "Save"}
+                  </button>
+                </div>
+
                 {/* Custom display name row */}
                 <div className="border-b border-slate-700/60 px-8 py-5 flex items-center gap-6">
                   <div className="flex-1 min-w-0">

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import UsernameOnboardingModal from "./UsernameOnboardingModal";
 import {
   AuthenticateWithRedirectCallback,
   ClerkProvider,
@@ -528,6 +529,8 @@ function AppWithSync() {
   const { signOut } = useClerk();
   const [, setLocation] = useLocation();
   const [ready, setReady] = useState(false);
+  const [needsUsername, setNeedsUsername] = useState(false);
+  const [placeholderUsername, setPlaceholderUsername] = useState("");
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [profileTab, setProfileTab] = useState<ProfileTab>("profile");
   const [displayName, setDisplayName] = useState("");
@@ -565,6 +568,27 @@ function AppWithSync() {
         if (envelope?.data) applyServerDataToLocalStorage(envelope.data);
         // Migrate any legacy localStorage photos to backend storage (runs once per key).
         await migrateLocalStoragePhotos(basePath).catch(() => {});
+
+        // Check whether the user still has an auto-generated placeholder username.
+        // Failure is non-fatal — let the user into the app rather than hard-blocking.
+        try {
+          const profileRes = await fetch(`${basePath}/api/profile/me`, {
+            credentials: "include",
+          });
+          if (profileRes.ok) {
+            const profile = await profileRes.json() as {
+              username: string;
+              usernameSet: boolean;
+            };
+            if (!profile.usernameSet) {
+              setPlaceholderUsername(profile.username);
+              setNeedsUsername(true);
+            }
+          }
+        } catch {
+          // Network/server error — skip the prompt this session, retry next load.
+        }
+
         setReady(true);
       })
       .catch(() => setReady(true));
@@ -588,6 +612,22 @@ function AppWithSync() {
         profileImageUrl: user.imageUrl ?? null,
       }
     : null;
+
+  // Show the username onboarding modal before the main app renders.
+  // We don't render <App> at all while needsUsername is true — the modal
+  // is a required step, not an overlay on top of the map.
+  if (needsUsername) {
+    return (
+      <UsernameOnboardingModal
+        initialUsername={placeholderUsername}
+        apiBase={basePath}
+        onComplete={(newUsername) => {
+          setNeedsUsername(false);
+          setPlaceholderUsername(newUsername);
+        }}
+      />
+    );
+  }
 
   return (
     <>

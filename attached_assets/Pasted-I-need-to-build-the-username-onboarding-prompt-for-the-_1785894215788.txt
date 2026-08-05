@@ -1,0 +1,73 @@
+I need to build the username onboarding prompt for the World Map Travel Tracker 
+(workspace root, pnpm monorepo, artifact: `artifacts/world-map`).
+
+CURRENT STATE:
+The backend already supports:
+- `GET /api/profile/me` — returns the caller's username, display_name, and a 
+  `username_set` boolean (false = still on an auto-generated placeholder)
+- `PUT /api/profile/username` — sets/changes username; validates uniqueness 
+  and format; returns a conflict error if taken
+These are available as generated React Query hooks in `@workspace/api-client-react` 
+(check `lib/api-client-react/src/generated/api.ts` for the exact hook names — 
+likely something like `useGetProfileMe` / `useSetUsername` or similar, follow 
+whatever Orval generated).
+
+Auth flow: `src/AuthRoot.tsx` wraps the app with Clerk's provider and gates 
+between read-only share mode and authenticated mode.
+
+GOAL:
+Right after a user is authenticated (not in share/read-only mode), check 
+`username_set`. If false, show a modal prompting them to choose a username 
+before they can use the app. If true, proceed straight to the app as normal.
+
+REQUIREMENTS:
+1. In `src/AuthRoot.tsx` (or a new component it renders), after Clerk auth 
+   resolves and we're in authenticated (non-share) mode:
+   - Call the profile/me hook.
+   - While loading, show the app's existing loading state pattern (check what 
+     `AuthRoot.tsx` already does for auth-loading, reuse that same visual 
+     treatment rather than inventing a new spinner).
+   - If `username_set === false`, render a blocking modal (`UsernameOnboardingModal` 
+     or similar, new component file `src/UsernameOnboardingModal.tsx`) instead 
+     of `App.tsx`. Don't render the main app underneath/behind it.
+2. Modal UI:
+   - Single text input for username, with the auto-generated placeholder 
+     pre-filled as a starting point (so users can just hit confirm if they're 
+     fine with it — don't force typing from scratch).
+   - Inline validation: format rules should mirror whatever the backend 
+     enforces (get the exact rules — length, allowed characters — from the 
+     `PUT /api/profile/username` validation, don't guess a different rule set 
+     on the frontend).
+   - Real-time-ish availability feedback: debounce input (e.g. 400ms) and 
+     call the check — if there's no dedicated availability-check endpoint, 
+     just handle the conflict error from the save attempt gracefully rather 
+     than building a new endpoint for this.
+   - Clear error state on conflict ("username taken") and on invalid format, 
+     distinct messaging for each.
+   - Confirm button disabled while input is invalid or a save is in flight.
+   - On successful save, close the modal and proceed into the app — trigger 
+     a refetch of profile/me (or just optimistically update local state) so 
+     `username_set` reflects true without requiring a full page reload.
+3. Styling: match the existing app's visual language — check `src/index.css` 
+   and how other modals in the app are built (e.g. the lightbox modal 
+   mentioned in existing docs) for the modal overlay/dialog pattern already 
+   in use, and follow it rather than introducing a different modal style.
+4. Edge cases:
+   - Handle the profile/me fetch failing gracefully (don't hard-block the 
+     entire app on a transient network error — decide a sensible fallback, 
+     e.g. retry, or let the user into the app and re-prompt next load).
+   - No skip/dismiss option — this is a required step, matching the "prompt 
+     users to pick one on next login" requirement, but if you think a skip 
+     option is worth having, flag it as a question rather than adding it 
+     silently.
+
+CONSTRAINTS:
+- Don't touch the read-only/share-URL mode — this onboarding flow only applies 
+  to authenticated users viewing their own map.
+- Don't modify backend endpoints — this is frontend-only, consuming the 
+  existing `/api/profile/me` and `/api/profile/username` endpoints.
+- Reuse existing patterns (loading states, modal styling, toast notifications 
+  for success/error) rather than introducing new ones.
+
+Give me a quick summary of where you're placing the new component and how it 
+hooks into AuthRoot.tsx before you start, then implement it.

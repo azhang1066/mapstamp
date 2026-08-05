@@ -1,0 +1,52 @@
+I need to fix a data-loss gap in the World Map Travel Tracker (workspace root, pnpm monorepo).
+
+CURRENT STATE:
+Photo attachments (up to 3 per destination, resized client-side to 1200px max) 
+are stored as base64 strings in localStorage under keys like `photos:<category>:<id>`. 
+They are explicitly excluded from:
+- Backend sync (GET/PUT /api/map-data only handles the MapDataPayload blob, no photos)
+- Share URL payload (intentionally excluded due to size)
+
+This means photos don't survive a cleared browser, a new device, or localStorage eviction.
+
+GOAL:
+Move photo storage to the backend so photos persist per-user across devices, while 
+keeping the map data (`user_map_data.data` jsonb) as lightweight references rather 
+than embedded base64.
+
+REQUIREMENTS:
+1. Storage backend: propose the simplest option that fits a Replit-hosted app 
+   (e.g. Replit Object Storage, or S3/R2-compatible bucket) — ask me before 
+   committing if there's a meaningful tradeoff, otherwise pick the simplest.
+2. New API surface in `artifacts/api-server`:
+   - Upload endpoint (accepts image, returns a stored URL/key) — auth via existing 
+     Clerk middleware pattern in `clerkProxyMiddleware.ts`
+   - Delete endpoint for removing a photo
+   - Enforce the existing constraints: max 3 photos per destination, JPEG/PNG/WebP only
+3. Update `lib/api-spec/openapi.yaml` with the new endpoints, then run 
+   `pnpm --filter @workspace/api-spec run codegen` to regenerate the React Query 
+   hooks (`lib/api-client-react`) and Zod schemas (`lib/api-zod`) — do not hand-edit 
+   the generated files.
+4. Update `lib/db/src/schema/user_map_data.ts` (or a new table if that's cleaner — 
+   your call) to store photo references instead of/alongside inline base64.
+5. Frontend changes in `artifacts/world-map`:
+   - Replace direct localStorage photo read/writes with calls to the new generated 
+     hooks
+   - Keep the existing lightbox modal, captions, and resize-to-1200px behavior — 
+     only the storage layer changes
+   - Add a migration path: on load, if a user has legacy `photos:<category>:<id>` 
+     localStorage entries, upload them to the new backend storage once and then 
+     clear the localStorage key, so existing users don't lose photos during rollout
+6. Add a `schemaVersion` field to the map data payload if one doesn't already exist, 
+   since this is exactly the kind of shape change that should be tracked going forward.
+
+CONSTRAINTS:
+- Don't change the share-URL behavior — photos should remain excluded from share 
+  payloads as they are now.
+- Preserve existing UX: same 3-photo limit, same caption max (120 chars), same 
+  lightbox keyboard nav.
+- Follow existing patterns for auth (Clerk JWT via getAuth(req)) and logging (Pino).
+
+Before writing code, give me a short plan covering: chosen storage backend, new 
+DB/schema shape, new API endpoints, and the localStorage migration approach — 
+then wait for my go-ahead.

@@ -2406,20 +2406,6 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
               ? (yearFilter.mode === "snapshot" ? `As of ${yearFilter.snapshot}` : `${yearFilter.min}–${yearFilter.max}`)
               : "Filter by Year"}
           </button>
-          {isAuthenticated && (
-            <button
-              onClick={() => setShowConnections(true)}
-              className="relative px-3 py-2 text-sm bg-teal-700 hover:bg-teal-600 rounded-lg transition-colors font-medium text-white flex items-center gap-1.5"
-              title="Search travelers and manage connections"
-            >
-              🔗 Connections
-              {incomingPendingCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 min-w-[1.1rem] h-[1.1rem] px-1 bg-rose-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
-                  {incomingPendingCount}
-                </span>
-              )}
-            </button>
-          )}
           <button
             onClick={() => setShowStats(true)}
             className="px-3 py-2 text-sm bg-fuchsia-700 hover:bg-fuchsia-600 rounded-lg transition-colors font-medium text-white flex items-center gap-1.5"
@@ -2465,6 +2451,18 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                     >
                       <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="4.5" r="2.5" stroke="currentColor" strokeWidth="1.3"/><path d="M2 13c0-2.761 2.462-5 5.5-5S13 10.239 13 13" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
                       Profile settings
+                    </button>
+                    <button
+                      onClick={() => { setShowConnections(true); setShowProfileMenu(false); }}
+                      className="relative w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"
+                    >
+                      <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M10 8c1.657 0 3 .895 3 2v1M8 5a2 2 0 11-4 0 2 2 0 014 0zM2 10c0-1.105 1.343-2 3-2h2c1.657 0 3 .895 3 2v1H2v-1z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/><circle cx="10.5" cy="3.5" r="1.5" stroke="currentColor" strokeWidth="1.3"/></svg>
+                      Connections
+                      {incomingPendingCount > 0 && (
+                        <span className="ml-auto min-w-[1.1rem] h-[1.1rem] px-1 bg-rose-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
+                          {incomingPendingCount}
+                        </span>
+                      )}
                     </button>
                   </div>
                   {!isReadOnly && (

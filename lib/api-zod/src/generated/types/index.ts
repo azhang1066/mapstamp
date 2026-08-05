@@ -7,7 +7,16 @@
  */
 
 export * from "./aggregateStatsResponse";
+export * from "./compareResponse";
+export * from "./compareUserData";
+export * from "./connectionOtherUser";
+export * from "./connectionRecord";
+export * from "./connectionRecordDirection";
+export * from "./connectionRecordStatus";
+export * from "./connectionsResponse";
+export * from "./connectionsResponsePending";
 export * from "./deletePhotoResponse";
+export * from "./destinationRow";
 export * from "./destinationStatEntry";
 export * from "./destinationStatsResponse";
 export * from "./errorEnvelope";
@@ -15,6 +24,9 @@ export * from "./getAggregateStatsCategory";
 export * from "./getAggregateStatsParams";
 export * from "./getDestinationStatsParams";
 export * from "./healthStatus";
+export * from "./leaderboardEntry";
+export * from "./leaderboardResponse";
+export * from "./leaderboardVisitedCounts";
 export * from "./listPhotosParams";
 export * from "./mapDataEnvelope";
 export * from "./mapDataPayload";
@@ -28,5 +40,11 @@ export * from "./mapDataPayloadTccDetails";
 export * from "./photoListResponse";
 export * from "./photoRecord";
 export * from "./saveMapDataResponse";
+export * from "./searchUsersParams";
+export * from "./setUsernameBody";
+export * from "./setUsernameResponse";
 export * from "./updatePhotoBody";
 export * from "./uploadPhotoBody";
+export * from "./userProfile";
+export * from "./userSearchEntry";
+export * from "./userSearchResponse";

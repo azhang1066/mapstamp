@@ -88,6 +88,123 @@ export interface DeletePhotoResponse {
   ok: boolean;
 }
 
+export interface UserProfile {
+  userId: string;
+  username: string;
+  displayName?: string | null;
+  usernameSet: boolean;
+}
+
+export interface SetUsernameBody {
+  /**
+   * @minLength 3
+   * @maxLength 30
+   */
+  username: string;
+}
+
+export interface SetUsernameResponse {
+  ok: boolean;
+  username: string;
+  usernameSet: boolean;
+}
+
+export interface UserSearchEntry {
+  userId: string;
+  username: string;
+  displayName?: string | null;
+}
+
+export interface UserSearchResponse {
+  users: UserSearchEntry[];
+}
+
+export interface ConnectionOtherUser {
+  userId: string;
+  username?: string | null;
+  displayName?: string | null;
+}
+
+export type ConnectionRecordStatus =
+  (typeof ConnectionRecordStatus)[keyof typeof ConnectionRecordStatus];
+
+export const ConnectionRecordStatus = {
+  pending: "pending",
+  accepted: "accepted",
+  declined: "declined",
+} as const;
+
+export type ConnectionRecordDirection =
+  (typeof ConnectionRecordDirection)[keyof typeof ConnectionRecordDirection];
+
+export const ConnectionRecordDirection = {
+  incoming: "incoming",
+  outgoing: "outgoing",
+} as const;
+
+export interface ConnectionRecord {
+  id: string;
+  status: ConnectionRecordStatus;
+  direction: ConnectionRecordDirection;
+  createdAt: string;
+  respondedAt?: string | null;
+  otherUser?: ConnectionOtherUser;
+}
+
+export type ConnectionsResponsePending = {
+  incoming: ConnectionRecord[];
+  outgoing: ConnectionRecord[];
+};
+
+export interface ConnectionsResponse {
+  pending: ConnectionsResponsePending;
+  accepted: ConnectionRecord[];
+}
+
+export interface DestinationRow {
+  userId: string;
+  category: string;
+  destinationId: string;
+  isVisited: boolean;
+  isBucket: boolean;
+  firstVisitedYear?: number | null;
+  lastVisitedYear?: number | null;
+  timesVisited?: number | null;
+}
+
+export interface CompareUserData {
+  userId: string;
+  username?: string | null;
+  displayName?: string | null;
+  destinations: DestinationRow[];
+}
+
+export interface CompareResponse {
+  me: CompareUserData;
+  other: CompareUserData;
+}
+
+export interface LeaderboardVisitedCounts {
+  country?: number;
+  us_state?: number;
+  ca_province?: number;
+  tcc?: number;
+}
+
+export interface LeaderboardEntry {
+  rank: number;
+  userId: string;
+  username?: string | null;
+  displayName?: string | null;
+  isMe: boolean;
+  visitedCounts: LeaderboardVisitedCounts;
+  totalVisited: number;
+}
+
+export interface LeaderboardResponse {
+  leaderboard: LeaderboardEntry[];
+}
+
 export interface DestinationStatEntry {
   destinationId: string;
   visitedCount: number;
@@ -135,6 +252,14 @@ export type UploadPhotoBody = {
   position?: number;
   /** @maxLength 120 */
   caption?: string;
+};
+
+export type SearchUsersParams = {
+  /**
+   * @minLength 2
+   * @maxLength 30
+   */
+  q: string;
 };
 
 export type GetAggregateStatsParams = {

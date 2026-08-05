@@ -18,20 +18,29 @@ import type {
 
 import type {
   AggregateStatsResponse,
+  CompareResponse,
+  ConnectionRecord,
+  ConnectionsResponse,
   DeletePhotoResponse,
   DestinationStatsResponse,
   ErrorEnvelope,
   GetAggregateStatsParams,
   GetDestinationStatsParams,
   HealthStatus,
+  LeaderboardResponse,
   ListPhotosParams,
   MapDataEnvelope,
   MapDataPayload,
   PhotoListResponse,
   PhotoRecord,
   SaveMapDataResponse,
+  SearchUsersParams,
+  SetUsernameBody,
+  SetUsernameResponse,
   UpdatePhotoBody,
   UploadPhotoBody,
+  UserProfile,
+  UserSearchResponse,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -720,6 +729,838 @@ export function useGetPhotoContent<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetPhotoContentQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get the caller's profile (username, display name, username_set flag)
+ */
+export const getGetMyProfileUrl = () => {
+  return `/api/profile/me`;
+};
+
+export const getMyProfile = async (
+  options?: RequestInit,
+): Promise<UserProfile> => {
+  return customFetch<UserProfile>(getGetMyProfileUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetMyProfileQueryKey = () => {
+  return [`/api/profile/me`] as const;
+};
+
+export const getGetMyProfileQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMyProfile>>,
+  TError = ErrorType<ErrorEnvelope>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMyProfile>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetMyProfileQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getMyProfile>>> = ({
+    signal,
+  }) => getMyProfile({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMyProfile>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMyProfileQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMyProfile>>
+>;
+export type GetMyProfileQueryError = ErrorType<ErrorEnvelope>;
+
+/**
+ * @summary Get the caller's profile (username, display name, username_set flag)
+ */
+
+export function useGetMyProfile<
+  TData = Awaited<ReturnType<typeof getMyProfile>>,
+  TError = ErrorType<ErrorEnvelope>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getMyProfile>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMyProfileQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Set or change the caller's username
+ */
+export const getSetUsernameUrl = () => {
+  return `/api/profile/username`;
+};
+
+export const setUsername = async (
+  setUsernameBody: SetUsernameBody,
+  options?: RequestInit,
+): Promise<SetUsernameResponse> => {
+  return customFetch<SetUsernameResponse>(getSetUsernameUrl(), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(setUsernameBody),
+  });
+};
+
+export const getSetUsernameMutationOptions = <
+  TError = ErrorType<ErrorEnvelope>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setUsername>>,
+    TError,
+    { data: BodyType<SetUsernameBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setUsername>>,
+  TError,
+  { data: BodyType<SetUsernameBody> },
+  TContext
+> => {
+  const mutationKey = ["setUsername"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setUsername>>,
+    { data: BodyType<SetUsernameBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return setUsername(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetUsernameMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setUsername>>
+>;
+export type SetUsernameMutationBody = BodyType<SetUsernameBody>;
+export type SetUsernameMutationError = ErrorType<ErrorEnvelope>;
+
+/**
+ * @summary Set or change the caller's username
+ */
+export const useSetUsername = <
+  TError = ErrorType<ErrorEnvelope>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setUsername>>,
+    TError,
+    { data: BodyType<SetUsernameBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setUsername>>,
+  TError,
+  { data: BodyType<SetUsernameBody> },
+  TContext
+> => {
+  return useMutation(getSetUsernameMutationOptions(options));
+};
+
+/**
+ * @summary Search users by username prefix (case-insensitive). Never returns travel data.
+ */
+export const getSearchUsersUrl = (params: SearchUsersParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/users/search?${stringifiedParams}`
+    : `/api/users/search`;
+};
+
+export const searchUsers = async (
+  params: SearchUsersParams,
+  options?: RequestInit,
+): Promise<UserSearchResponse> => {
+  return customFetch<UserSearchResponse>(getSearchUsersUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getSearchUsersQueryKey = (params?: SearchUsersParams) => {
+  return [`/api/users/search`, ...(params ? [params] : [])] as const;
+};
+
+export const getSearchUsersQueryOptions = <
+  TData = Awaited<ReturnType<typeof searchUsers>>,
+  TError = ErrorType<ErrorEnvelope>,
+>(
+  params: SearchUsersParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof searchUsers>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getSearchUsersQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof searchUsers>>> = ({
+    signal,
+  }) => searchUsers(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof searchUsers>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type SearchUsersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof searchUsers>>
+>;
+export type SearchUsersQueryError = ErrorType<ErrorEnvelope>;
+
+/**
+ * @summary Search users by username prefix (case-insensitive). Never returns travel data.
+ */
+
+export function useSearchUsers<
+  TData = Awaited<ReturnType<typeof searchUsers>>,
+  TError = ErrorType<ErrorEnvelope>,
+>(
+  params: SearchUsersParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof searchUsers>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getSearchUsersQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List all connections split by pending (incoming/outgoing) and accepted
+ */
+export const getListConnectionsUrl = () => {
+  return `/api/connections`;
+};
+
+export const listConnections = async (
+  options?: RequestInit,
+): Promise<ConnectionsResponse> => {
+  return customFetch<ConnectionsResponse>(getListConnectionsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListConnectionsQueryKey = () => {
+  return [`/api/connections`] as const;
+};
+
+export const getListConnectionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listConnections>>,
+  TError = ErrorType<ErrorEnvelope>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listConnections>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListConnectionsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listConnections>>> = ({
+    signal,
+  }) => listConnections({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listConnections>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListConnectionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listConnections>>
+>;
+export type ListConnectionsQueryError = ErrorType<ErrorEnvelope>;
+
+/**
+ * @summary List all connections split by pending (incoming/outgoing) and accepted
+ */
+
+export function useListConnections<
+  TData = Awaited<ReturnType<typeof listConnections>>,
+  TError = ErrorType<ErrorEnvelope>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listConnections>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListConnectionsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Send a connection request to another user
+ */
+export const getRequestConnectionUrl = (userId: string) => {
+  return `/api/connections/request/${userId}`;
+};
+
+export const requestConnection = async (
+  userId: string,
+  options?: RequestInit,
+): Promise<ConnectionRecord> => {
+  return customFetch<ConnectionRecord>(getRequestConnectionUrl(userId), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getRequestConnectionMutationOptions = <
+  TError = ErrorType<ErrorEnvelope>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof requestConnection>>,
+    TError,
+    { userId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof requestConnection>>,
+  TError,
+  { userId: string },
+  TContext
+> => {
+  const mutationKey = ["requestConnection"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof requestConnection>>,
+    { userId: string }
+  > = (props) => {
+    const { userId } = props ?? {};
+
+    return requestConnection(userId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RequestConnectionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof requestConnection>>
+>;
+
+export type RequestConnectionMutationError = ErrorType<ErrorEnvelope>;
+
+/**
+ * @summary Send a connection request to another user
+ */
+export const useRequestConnection = <
+  TError = ErrorType<ErrorEnvelope>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof requestConnection>>,
+    TError,
+    { userId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof requestConnection>>,
+  TError,
+  { userId: string },
+  TContext
+> => {
+  return useMutation(getRequestConnectionMutationOptions(options));
+};
+
+/**
+ * @summary Accept a pending connection request (addressee only)
+ */
+export const getAcceptConnectionUrl = (connectionId: string) => {
+  return `/api/connections/${connectionId}/accept`;
+};
+
+export const acceptConnection = async (
+  connectionId: string,
+  options?: RequestInit,
+): Promise<ConnectionRecord> => {
+  return customFetch<ConnectionRecord>(getAcceptConnectionUrl(connectionId), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getAcceptConnectionMutationOptions = <
+  TError = ErrorType<ErrorEnvelope>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof acceptConnection>>,
+    TError,
+    { connectionId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof acceptConnection>>,
+  TError,
+  { connectionId: string },
+  TContext
+> => {
+  const mutationKey = ["acceptConnection"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof acceptConnection>>,
+    { connectionId: string }
+  > = (props) => {
+    const { connectionId } = props ?? {};
+
+    return acceptConnection(connectionId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AcceptConnectionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof acceptConnection>>
+>;
+
+export type AcceptConnectionMutationError = ErrorType<ErrorEnvelope>;
+
+/**
+ * @summary Accept a pending connection request (addressee only)
+ */
+export const useAcceptConnection = <
+  TError = ErrorType<ErrorEnvelope>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof acceptConnection>>,
+    TError,
+    { connectionId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof acceptConnection>>,
+  TError,
+  { connectionId: string },
+  TContext
+> => {
+  return useMutation(getAcceptConnectionMutationOptions(options));
+};
+
+/**
+ * @summary Decline a pending connection request (addressee only)
+ */
+export const getDeclineConnectionUrl = (connectionId: string) => {
+  return `/api/connections/${connectionId}/decline`;
+};
+
+export const declineConnection = async (
+  connectionId: string,
+  options?: RequestInit,
+): Promise<ConnectionRecord> => {
+  return customFetch<ConnectionRecord>(getDeclineConnectionUrl(connectionId), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getDeclineConnectionMutationOptions = <
+  TError = ErrorType<ErrorEnvelope>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof declineConnection>>,
+    TError,
+    { connectionId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof declineConnection>>,
+  TError,
+  { connectionId: string },
+  TContext
+> => {
+  const mutationKey = ["declineConnection"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof declineConnection>>,
+    { connectionId: string }
+  > = (props) => {
+    const { connectionId } = props ?? {};
+
+    return declineConnection(connectionId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeclineConnectionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof declineConnection>>
+>;
+
+export type DeclineConnectionMutationError = ErrorType<ErrorEnvelope>;
+
+/**
+ * @summary Decline a pending connection request (addressee only)
+ */
+export const useDeclineConnection = <
+  TError = ErrorType<ErrorEnvelope>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof declineConnection>>,
+    TError,
+    { connectionId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof declineConnection>>,
+  TError,
+  { connectionId: string },
+  TContext
+> => {
+  return useMutation(getDeclineConnectionMutationOptions(options));
+};
+
+/**
+ * @summary Remove a connection (either party)
+ */
+export const getDeleteConnectionUrl = (connectionId: string) => {
+  return `/api/connections/${connectionId}`;
+};
+
+export const deleteConnection = async (
+  connectionId: string,
+  options?: RequestInit,
+): Promise<DeletePhotoResponse> => {
+  return customFetch<DeletePhotoResponse>(
+    getDeleteConnectionUrl(connectionId),
+    {
+      ...options,
+      method: "DELETE",
+    },
+  );
+};
+
+export const getDeleteConnectionMutationOptions = <
+  TError = ErrorType<ErrorEnvelope>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteConnection>>,
+    TError,
+    { connectionId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteConnection>>,
+  TError,
+  { connectionId: string },
+  TContext
+> => {
+  const mutationKey = ["deleteConnection"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteConnection>>,
+    { connectionId: string }
+  > = (props) => {
+    const { connectionId } = props ?? {};
+
+    return deleteConnection(connectionId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteConnectionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteConnection>>
+>;
+
+export type DeleteConnectionMutationError = ErrorType<ErrorEnvelope>;
+
+/**
+ * @summary Remove a connection (either party)
+ */
+export const useDeleteConnection = <
+  TError = ErrorType<ErrorEnvelope>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteConnection>>,
+    TError,
+    { connectionId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteConnection>>,
+  TError,
+  { connectionId: string },
+  TContext
+> => {
+  return useMutation(getDeleteConnectionMutationOptions(options));
+};
+
+/**
+ * @summary Compare your destinations with a connected user's. Requires accepted connection.
+ */
+export const getCompareWithUserUrl = (otherUserId: string) => {
+  return `/api/compare/${otherUserId}`;
+};
+
+export const compareWithUser = async (
+  otherUserId: string,
+  options?: RequestInit,
+): Promise<CompareResponse> => {
+  return customFetch<CompareResponse>(getCompareWithUserUrl(otherUserId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getCompareWithUserQueryKey = (otherUserId: string) => {
+  return [`/api/compare/${otherUserId}`] as const;
+};
+
+export const getCompareWithUserQueryOptions = <
+  TData = Awaited<ReturnType<typeof compareWithUser>>,
+  TError = ErrorType<ErrorEnvelope>,
+>(
+  otherUserId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof compareWithUser>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getCompareWithUserQueryKey(otherUserId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof compareWithUser>>> = ({
+    signal,
+  }) => compareWithUser(otherUserId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!otherUserId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof compareWithUser>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type CompareWithUserQueryResult = NonNullable<
+  Awaited<ReturnType<typeof compareWithUser>>
+>;
+export type CompareWithUserQueryError = ErrorType<ErrorEnvelope>;
+
+/**
+ * @summary Compare your destinations with a connected user's. Requires accepted connection.
+ */
+
+export function useCompareWithUser<
+  TData = Awaited<ReturnType<typeof compareWithUser>>,
+  TError = ErrorType<ErrorEnvelope>,
+>(
+  otherUserId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof compareWithUser>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getCompareWithUserQueryOptions(otherUserId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Rank your accepted connections by visited destination count
+ */
+export const getGetLeaderboardUrl = () => {
+  return `/api/leaderboard`;
+};
+
+export const getLeaderboard = async (
+  options?: RequestInit,
+): Promise<LeaderboardResponse> => {
+  return customFetch<LeaderboardResponse>(getGetLeaderboardUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetLeaderboardQueryKey = () => {
+  return [`/api/leaderboard`] as const;
+};
+
+export const getGetLeaderboardQueryOptions = <
+  TData = Awaited<ReturnType<typeof getLeaderboard>>,
+  TError = ErrorType<ErrorEnvelope>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getLeaderboard>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetLeaderboardQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getLeaderboard>>> = ({
+    signal,
+  }) => getLeaderboard({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getLeaderboard>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetLeaderboardQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getLeaderboard>>
+>;
+export type GetLeaderboardQueryError = ErrorType<ErrorEnvelope>;
+
+/**
+ * @summary Rank your accepted connections by visited destination count
+ */
+
+export function useGetLeaderboard<
+  TData = Awaited<ReturnType<typeof getLeaderboard>>,
+  TError = ErrorType<ErrorEnvelope>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getLeaderboard>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetLeaderboardQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

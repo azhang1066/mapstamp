@@ -212,6 +212,239 @@ export const GetPhotoContentParams = zod.object({
 });
 
 /**
+ * @summary Get the caller's profile (username, display name, username_set flag)
+ */
+export const GetMyProfileResponse = zod.object({
+  userId: zod.string(),
+  username: zod.string(),
+  displayName: zod.string().nullish(),
+  usernameSet: zod.boolean(),
+});
+
+/**
+ * @summary Set or change the caller's username
+ */
+export const setUsernameBodyUsernameMin = 3;
+export const setUsernameBodyUsernameMax = 30;
+
+export const SetUsernameBody = zod.object({
+  username: zod
+    .string()
+    .min(setUsernameBodyUsernameMin)
+    .max(setUsernameBodyUsernameMax),
+});
+
+export const SetUsernameResponse = zod.object({
+  ok: zod.boolean(),
+  username: zod.string(),
+  usernameSet: zod.boolean(),
+});
+
+/**
+ * @summary Search users by username prefix (case-insensitive). Never returns travel data.
+ */
+export const searchUsersQueryQMin = 2;
+export const searchUsersQueryQMax = 30;
+
+export const SearchUsersQueryParams = zod.object({
+  q: zod.coerce.string().min(searchUsersQueryQMin).max(searchUsersQueryQMax),
+});
+
+export const SearchUsersResponse = zod.object({
+  users: zod.array(
+    zod.object({
+      userId: zod.string(),
+      username: zod.string(),
+      displayName: zod.string().nullish(),
+    }),
+  ),
+});
+
+/**
+ * @summary List all connections split by pending (incoming/outgoing) and accepted
+ */
+export const ListConnectionsResponse = zod.object({
+  pending: zod.object({
+    incoming: zod.array(
+      zod.object({
+        id: zod.string(),
+        status: zod.enum(["pending", "accepted", "declined"]),
+        direction: zod.enum(["incoming", "outgoing"]),
+        createdAt: zod.coerce.date(),
+        respondedAt: zod.coerce.date().nullish(),
+        otherUser: zod
+          .object({
+            userId: zod.string(),
+            username: zod.string().nullish(),
+            displayName: zod.string().nullish(),
+          })
+          .optional(),
+      }),
+    ),
+    outgoing: zod.array(
+      zod.object({
+        id: zod.string(),
+        status: zod.enum(["pending", "accepted", "declined"]),
+        direction: zod.enum(["incoming", "outgoing"]),
+        createdAt: zod.coerce.date(),
+        respondedAt: zod.coerce.date().nullish(),
+        otherUser: zod
+          .object({
+            userId: zod.string(),
+            username: zod.string().nullish(),
+            displayName: zod.string().nullish(),
+          })
+          .optional(),
+      }),
+    ),
+  }),
+  accepted: zod.array(
+    zod.object({
+      id: zod.string(),
+      status: zod.enum(["pending", "accepted", "declined"]),
+      direction: zod.enum(["incoming", "outgoing"]),
+      createdAt: zod.coerce.date(),
+      respondedAt: zod.coerce.date().nullish(),
+      otherUser: zod
+        .object({
+          userId: zod.string(),
+          username: zod.string().nullish(),
+          displayName: zod.string().nullish(),
+        })
+        .optional(),
+    }),
+  ),
+});
+
+/**
+ * @summary Send a connection request to another user
+ */
+export const RequestConnectionParams = zod.object({
+  userId: zod.coerce.string(),
+});
+
+/**
+ * @summary Accept a pending connection request (addressee only)
+ */
+export const AcceptConnectionParams = zod.object({
+  connectionId: zod.coerce.string(),
+});
+
+export const AcceptConnectionResponse = zod.object({
+  id: zod.string(),
+  status: zod.enum(["pending", "accepted", "declined"]),
+  direction: zod.enum(["incoming", "outgoing"]),
+  createdAt: zod.coerce.date(),
+  respondedAt: zod.coerce.date().nullish(),
+  otherUser: zod
+    .object({
+      userId: zod.string(),
+      username: zod.string().nullish(),
+      displayName: zod.string().nullish(),
+    })
+    .optional(),
+});
+
+/**
+ * @summary Decline a pending connection request (addressee only)
+ */
+export const DeclineConnectionParams = zod.object({
+  connectionId: zod.coerce.string(),
+});
+
+export const DeclineConnectionResponse = zod.object({
+  id: zod.string(),
+  status: zod.enum(["pending", "accepted", "declined"]),
+  direction: zod.enum(["incoming", "outgoing"]),
+  createdAt: zod.coerce.date(),
+  respondedAt: zod.coerce.date().nullish(),
+  otherUser: zod
+    .object({
+      userId: zod.string(),
+      username: zod.string().nullish(),
+      displayName: zod.string().nullish(),
+    })
+    .optional(),
+});
+
+/**
+ * @summary Remove a connection (either party)
+ */
+export const DeleteConnectionParams = zod.object({
+  connectionId: zod.coerce.string(),
+});
+
+export const DeleteConnectionResponse = zod.object({
+  ok: zod.boolean(),
+});
+
+/**
+ * @summary Compare your destinations with a connected user's. Requires accepted connection.
+ */
+export const CompareWithUserParams = zod.object({
+  otherUserId: zod.coerce.string(),
+});
+
+export const CompareWithUserResponse = zod.object({
+  me: zod.object({
+    userId: zod.string(),
+    username: zod.string().nullish(),
+    displayName: zod.string().nullish(),
+    destinations: zod.array(
+      zod.object({
+        userId: zod.string(),
+        category: zod.string(),
+        destinationId: zod.string(),
+        isVisited: zod.boolean(),
+        isBucket: zod.boolean(),
+        firstVisitedYear: zod.number().nullish(),
+        lastVisitedYear: zod.number().nullish(),
+        timesVisited: zod.number().nullish(),
+      }),
+    ),
+  }),
+  other: zod.object({
+    userId: zod.string(),
+    username: zod.string().nullish(),
+    displayName: zod.string().nullish(),
+    destinations: zod.array(
+      zod.object({
+        userId: zod.string(),
+        category: zod.string(),
+        destinationId: zod.string(),
+        isVisited: zod.boolean(),
+        isBucket: zod.boolean(),
+        firstVisitedYear: zod.number().nullish(),
+        lastVisitedYear: zod.number().nullish(),
+        timesVisited: zod.number().nullish(),
+      }),
+    ),
+  }),
+});
+
+/**
+ * @summary Rank your accepted connections by visited destination count
+ */
+export const GetLeaderboardResponse = zod.object({
+  leaderboard: zod.array(
+    zod.object({
+      rank: zod.number(),
+      userId: zod.string(),
+      username: zod.string().nullish(),
+      displayName: zod.string().nullish(),
+      isMe: zod.boolean(),
+      visitedCounts: zod.object({
+        country: zod.number().optional(),
+        us_state: zod.number().optional(),
+        ca_province: zod.number().optional(),
+        tcc: zod.number().optional(),
+      }),
+      totalVisited: zod.number(),
+    }),
+  ),
+});
+
+/**
  * @summary Most/least visited destinations per category
  */
 export const getAggregateStatsQueryLimitDefault = 50;

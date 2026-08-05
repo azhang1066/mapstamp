@@ -243,6 +243,296 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /profile/me:
+    get:
+      tags: [social]
+      operationId: getMyProfile
+      summary: Get the caller's profile (username, display name, username_set flag)
+      responses:
+        '200':
+          description: Profile returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /profile/username:
+    put:
+      tags: [social]
+      operationId: setUsername
+      summary: Set or change the caller's username
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetUsernameBody'
+      responses:
+        '200':
+          description: Username updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SetUsernameResponse'
+        '400':
+          description: Invalid format or reserved word.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Username already taken.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /users/search:
+    get:
+      tags: [social]
+      operationId: searchUsers
+      summary: Search users by username prefix (case-insensitive). Never returns travel data.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 30
+      responses:
+        '200':
+          description: Search results returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSearchResponse'
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /connections:
+    get:
+      tags: [social]
+      operationId: listConnections
+      summary: List all connections split by pending (incoming/outgoing) and accepted
+      responses:
+        '200':
+          description: Connections returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionsResponse'
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /connections/request/{userId}:
+    post:
+      tags: [social]
+      operationId: requestConnection
+      summary: Send a connection request to another user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: Request sent.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionRecord'
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Target user not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Connection already exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /connections/{connectionId}/accept:
+    post:
+      tags: [social]
+      operationId: acceptConnection
+      summary: Accept a pending connection request (addressee only)
+      parameters:
+        - name: connectionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Connection accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionRecord'
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Not the addressee.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Connection not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /connections/{connectionId}/decline:
+    post:
+      tags: [social]
+      operationId: declineConnection
+      summary: Decline a pending connection request (addressee only)
+      parameters:
+        - name: connectionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Connection declined.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionRecord'
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Not the addressee.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Connection not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /connections/{connectionId}:
+    delete:
+      tags: [social]
+      operationId: deleteConnection
+      summary: Remove a connection (either party)
+      parameters:
+        - name: connectionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Connection removed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletePhotoResponse'
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Not a party to this connection.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Connection not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /compare/{otherUserId}:
+    get:
+      tags: [social]
+      operationId: compareWithUser
+      summary: Compare your destinations with a connected user's. Requires accepted connection.
+      parameters:
+        - name: otherUserId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Comparison data returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompareResponse'
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: No accepted connection.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /leaderboard:
+    get:
+      tags: [social]
+      operationId: getLeaderboard
+      summary: Rank your accepted connections by visited destination count
+      responses:
+        '200':
+          description: Leaderboard returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaderboardResponse'
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /stats/aggregate:
     get:
       tags: [stats]
@@ -452,6 +742,195 @@ components:
       properties:
         ok:
           type: boolean
+    UserProfile:
+      type: object
+      required: [userId, username, usernameSet]
+      properties:
+        userId:
+          type: string
+        username:
+          type: string
+        displayName:
+          type: string
+          nullable: true
+        usernameSet:
+          type: boolean
+    SetUsernameBody:
+      type: object
+      required: [username]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 30
+    SetUsernameResponse:
+      type: object
+      required: [ok, username, usernameSet]
+      properties:
+        ok:
+          type: boolean
+        username:
+          type: string
+        usernameSet:
+          type: boolean
+    UserSearchEntry:
+      type: object
+      required: [userId, username]
+      properties:
+        userId:
+          type: string
+        username:
+          type: string
+        displayName:
+          type: string
+          nullable: true
+    UserSearchResponse:
+      type: object
+      required: [users]
+      properties:
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserSearchEntry'
+    ConnectionOtherUser:
+      type: object
+      required: [userId]
+      properties:
+        userId:
+          type: string
+        username:
+          type: string
+          nullable: true
+        displayName:
+          type: string
+          nullable: true
+    ConnectionRecord:
+      type: object
+      required: [id, status, direction, createdAt]
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [pending, accepted, declined]
+        direction:
+          type: string
+          enum: [incoming, outgoing]
+        createdAt:
+          type: string
+          format: date-time
+        respondedAt:
+          type: string
+          format: date-time
+          nullable: true
+        otherUser:
+          $ref: '#/components/schemas/ConnectionOtherUser'
+    ConnectionsResponse:
+      type: object
+      required: [pending, accepted]
+      properties:
+        pending:
+          type: object
+          required: [incoming, outgoing]
+          properties:
+            incoming:
+              type: array
+              items:
+                $ref: '#/components/schemas/ConnectionRecord'
+            outgoing:
+              type: array
+              items:
+                $ref: '#/components/schemas/ConnectionRecord'
+        accepted:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConnectionRecord'
+    DestinationRow:
+      type: object
+      required: [userId, category, destinationId, isVisited, isBucket]
+      properties:
+        userId:
+          type: string
+        category:
+          type: string
+        destinationId:
+          type: string
+        isVisited:
+          type: boolean
+        isBucket:
+          type: boolean
+        firstVisitedYear:
+          type: integer
+          nullable: true
+        lastVisitedYear:
+          type: integer
+          nullable: true
+        timesVisited:
+          type: integer
+          nullable: true
+    CompareUserData:
+      type: object
+      required: [userId, destinations]
+      properties:
+        userId:
+          type: string
+        username:
+          type: string
+          nullable: true
+        displayName:
+          type: string
+          nullable: true
+        destinations:
+          type: array
+          items:
+            $ref: '#/components/schemas/DestinationRow'
+    CompareResponse:
+      type: object
+      required: [me, other]
+      properties:
+        me:
+          $ref: '#/components/schemas/CompareUserData'
+        other:
+          $ref: '#/components/schemas/CompareUserData'
+    LeaderboardVisitedCounts:
+      type: object
+      properties:
+        country:
+          type: integer
+        us_state:
+          type: integer
+        ca_province:
+          type: integer
+        tcc:
+          type: integer
+    LeaderboardEntry:
+      type: object
+      required: [rank, userId, isMe, visitedCounts, totalVisited]
+      properties:
+        rank:
+          type: integer
+        userId:
+          type: string
+        username:
+          type: string
+          nullable: true
+        displayName:
+          type: string
+          nullable: true
+        isMe:
+          type: boolean
+        visitedCounts:
+          $ref: '#/components/schemas/LeaderboardVisitedCounts'
+        totalVisited:
+          type: integer
+    LeaderboardResponse:
+      type: object
+      required: [leaderboard]
+      properties:
+        leaderboard:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaderboardEntry'
     DestinationStatEntry:
       type: object
       required: [destinationId, visitedCount, bucketCount]

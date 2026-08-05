@@ -60,13 +60,15 @@ async function wipeTestUsers() {
 
 describe("GET /api/map-data — authentication", () => {
   it("returns 401 when the user is not authenticated", async () => {
-    vi.mocked(getAuth).mockReturnValueOnce({ userId: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(getAuth).mockReturnValueOnce({ userId: null } as any);
     const res = await request(app).get("/api/map-data");
     expect(res.status).toBe(401);
   });
 
   it("returns 401 on PUT when the user is not authenticated", async () => {
-    vi.mocked(getAuth).mockReturnValueOnce({ userId: null });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(getAuth).mockReturnValueOnce({ userId: null } as any);
     const res = await request(app).put("/api/map-data").send({});
     expect(res.status).toBe(401);
   });
@@ -281,12 +283,14 @@ describe("PUT → GET isolation between users", () => {
       .send({ visitedCountries: ["FRA"], bucketCountries: [] });
 
     // Switch mock to OTHER_USER_ID for next requests
-    vi.mocked(getAuth).mockReturnValue({ userId: OTHER_USER_ID });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(getAuth).mockReturnValue({ userId: OTHER_USER_ID } as any);
 
     const res = await request(app).get("/api/map-data");
     expect(res.body).toEqual({ data: null });
 
     // Restore default mock
-    vi.mocked(getAuth).mockReturnValue({ userId: TEST_USER_ID });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(getAuth).mockReturnValue({ userId: TEST_USER_ID } as any);
   });
 });

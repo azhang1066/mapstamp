@@ -2406,32 +2406,6 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
               ? (yearFilter.mode === "snapshot" ? `As of ${yearFilter.snapshot}` : `${yearFilter.min}–${yearFilter.max}`)
               : "Filter by Year"}
           </button>
-          <div className="w-px bg-slate-700 self-stretch mx-1" />
-          {!isReadOnly && <>
-            <button
-              onClick={downloadTemplate}
-              className="px-3 py-2 text-sm bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors font-medium text-white flex items-center gap-1.5"
-              title="Download a blank .xlsx template"
-            >
-              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 9.5v1.5a1 1 0 001 1h8a1 1 0 001-1V9.5M6.5 1v7M3.5 5.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              Template
-            </button>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="px-3 py-2 text-sm bg-emerald-700 hover:bg-emerald-600 rounded-lg transition-colors font-medium text-white flex items-center gap-1.5"
-              title="Import visited locations from an .xlsx file"
-            >
-              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 9V2M3.5 5l3-3 3 3M1 9.5v1A1.5 1.5 0 002.5 12h8A1.5 1.5 0 0012 10.5v-1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              Import Excel
-            </button>
-            <button
-              onClick={() => setShowExport(true)}
-              className="px-3 py-2 text-sm bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors font-medium text-white flex items-center gap-1.5"
-            >
-              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v7M3.5 5l3 3 3-3M1 9.5v1A1.5 1.5 0 002.5 12h8A1.5 1.5 0 0012 10.5v-1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              Export
-            </button>
-          </>}
           {isAuthenticated && (
             <button
               onClick={() => setShowConnections(true)}
@@ -2492,6 +2466,35 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                       <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="4.5" r="2.5" stroke="currentColor" strokeWidth="1.3"/><path d="M2 13c0-2.761 2.462-5 5.5-5S13 10.239 13 13" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
                       Profile settings
                     </button>
+                  </div>
+                  {!isReadOnly && (
+                    <>
+                      <div className="border-t border-slate-700 py-1">
+                        <button
+                          onClick={() => { downloadTemplate(); setShowProfileMenu(false); }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"
+                        >
+                          <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2 11v1.5A1.5 1.5 0 003.5 14h8A1.5 1.5 0 0013 12.5V11M7.5 2v8M4.5 7l3 3 3-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          Download template
+                        </button>
+                        <button
+                          onClick={() => { fileInputRef.current?.click(); setShowProfileMenu(false); }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"
+                        >
+                          <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 10V2M4.5 5l3-3 3 3M2 11v1.5A1.5 1.5 0 003.5 14h8A1.5 1.5 0 0013 12.5V11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          Import Excel
+                        </button>
+                        <button
+                          onClick={() => { setShowExport(true); setShowProfileMenu(false); }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"
+                        >
+                          <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 2v8M4.5 7l3 3 3-3M2 11v1.5A1.5 1.5 0 003.5 14h8A1.5 1.5 0 0013 12.5V11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          Export data
+                        </button>
+                      </div>
+                    </>
+                  )}
+                  <div className="border-t border-slate-700 py-1">
                     <button
                       onClick={() => { onLogout(); setShowProfileMenu(false); }}
                       className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"

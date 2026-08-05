@@ -1,0 +1,73 @@
+I need to transform the data model of the World Map Travel Tracker (workspace root, 
+pnpm monorepo) to support cross-user aggregation, while preserving current 
+functionality.
+
+CURRENT STATE:
+`lib/db/src/schema/user_map_data.ts` stores each user's entire travel map as a 
+single opaque `data` jsonb column (`user_map_data` table: user_id, data, updated_at). 
+This works fine for loading/saving one user's map but makes it impossible to answer 
+questions like "what % of users have visited Iceland" or "most-visited countries 
+across all users" without deserializing and scanning every row.
+
+GOAL:
+Introduce a new normalized table that becomes the SOURCE OF TRUTH for visited/
+bucket-list status (replacing that role currently held by the jsonb blob), while 
+keeping jsonb for everything else (notes, photo refs, profile name, UI-only state). 
+This table must be queryable/aggregatable with SQL.
+
+REQUIREMENTS:
+1. Schema design in `lib/db`:
+   - New table (e.g. `user_destinations`): user_id, category (country/us_state/
+     ca_province/tcc), destination_id, status (visited/bucket), first_visited_at, 
+     last_visited_at, times_visited, updated_at. Primary key or unique constraint 
+     on (user_id, category, destination_id).
+   - `user_map_data.data` jsonb narrows to hold only notes, photo refs, profile 
+     name, and any other free-text/UI-shaped fields — visited/bucket status is 
+     REMOVED from it going forward and read/written exclusively via the new table.
+   - Indexes to support: per-user full map load (user_id lookup), and aggregate 
+     queries (category + destination_id grouping, status filtering).
+2. Rewrite the write/read path since the new table is authoritative:
+   - `GET /api/map-data` must now assemble its response by joining 
+     `user_destinations` (for status/dates/visit counts) with `user_map_data.data` 
+     (for notes/photos/profile) — response shape to the frontend stays the same.
+   - `PUT /api/map-data` must write status/dates to `user_destinations` and 
+     everything else to the jsonb blob, ideally in a single DB transaction so a 
+     partial failure can't leave them inconsistent.
+   - Flag any performance concern with doing this join/assembly on every load, 
+     and propose a mitigation if the join is expensive at scale (e.g. batched 
+     query, denormalized read view) — implement the simple version first unless 
+     there's an obvious cheap win.
+3. Migration/backfill:
+   - One-time backfill script: read all existing `user_map_data.data` blobs, 
+     extract visited/bucket entries per category, populate `user_destinations`.
+   - Backfill must be verifiable before cutover (row counts, spot-check a sample 
+     of users' pre/post state matches).
+   - Since this is now the source of truth, be explicit about the cutover 
+     sequencing: backfill → verify → switch API to new read/write path → confirm 
+     no regressions → THEN it's safe to stop treating the old jsonb visited/bucket 
+     fields as meaningful (leave them in place but unused, don't delete data).
+4. New API endpoints (add to `lib/api-spec/openapi.yaml` first, then 
+   `pnpm --filter @workspace/api-spec run codegen` — do not hand-edit generated 
+   files):
+   - `GET /api/stats/aggregate` — most/least visited destinations per category, 
+     visited-count distribution
+   - `GET /api/stats/destination/:category/:id` — e.g. "38% of users have visited 
+     Iceland"
+   - These read from `user_destinations` directly and don't require the caller 
+     to own the data (unlike the map-data endpoints).
+5. No frontend UI work yet — data layer and endpoints only.
+6. Add a `schemaVersion` concept to the jsonb payload if one doesn't already exist.
+
+CONSTRAINTS:
+- `GET/PUT /api/map-data` response/request shape to the frontend must not change — 
+  this is a backend-internal restructure.
+- No data loss: verify backfill thoroughly before the API cutover, and don't 
+  delete old jsonb visited/bucket data even after cutover — just stop reading 
+  from it.
+- Follow existing patterns: Drizzle ORM for schema/migrations, Clerk auth via 
+  `getAuth(req)` for authenticated routes, Pino for logging.
+
+Before writing any code or migrations, give me a written plan covering: final 
+schema, the exact read/write path change to /api/map-data, backfill approach and 
+verification method, and cutover sequencing — then wait for my go-ahead before 
+implementing.

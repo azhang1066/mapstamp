@@ -14,6 +14,8 @@ tags:
     description: User travel map data persistence.
   - name: photos
     description: Per-destination photo management.
+  - name: stats
+    description: Cross-user aggregate statistics (no auth required).
 paths:
   /healthz:
     get:
@@ -241,6 +243,68 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /stats/aggregate:
+    get:
+      tags: [stats]
+      operationId: getAggregateStats
+      summary: Most/least visited destinations per category
+      parameters:
+        - name: category
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [country, us_state, ca_province, tcc]
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        '200':
+          description: Aggregate stats returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregateStatsResponse'
+  /stats/destination/{category}/{id}:
+    get:
+      tags: [stats]
+      operationId: getDestinationStats
+      summary: Per-destination visit stats (e.g. "38% of users have visited Iceland")
+      parameters:
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: category
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [country, us_state, ca_province, tcc]
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Destination stats returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DestinationStatsResponse'
+        '404':
+          description: No data found for this destination.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
 components:
   schemas:
     HealthStatus:
@@ -388,3 +452,48 @@ components:
       properties:
         ok:
           type: boolean
+    DestinationStatEntry:
+      type: object
+      required: [destinationId, visitedCount, bucketCount]
+      properties:
+        destinationId:
+          type: string
+        visitedCount:
+          type: integer
+        bucketCount:
+          type: integer
+    AggregateStatsResponse:
+      type: object
+      required: [category, totalUsers, destinations]
+      properties:
+        category:
+          type: string
+        totalUsers:
+          type: integer
+          description: Total distinct users in the system.
+        destinations:
+          type: array
+          items:
+            $ref: '#/components/schemas/DestinationStatEntry'
+    DestinationStatsResponse:
+      type: object
+      required: [category, destinationId, visitedCount, bucketCount, totalUsers, visitedPct, bucketPct]
+      properties:
+        category:
+          type: string
+        destinationId:
+          type: string
+        visitedCount:
+          type: integer
+        bucketCount:
+          type: integer
+        totalUsers:
+          type: integer
+        visitedPct:
+          type: number
+          format: float
+          description: Percentage of total users who have visited (0–100).
+        bucketPct:
+          type: number
+          format: float
+          description: Percentage of total users with this on their bucket list (0–100).

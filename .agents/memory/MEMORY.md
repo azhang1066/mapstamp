@@ -1,2 +1,4 @@
 - [Replit Auth to Clerk migration](replit-auth-to-clerk-migration.md) — manual removal-and-rebuild required; no automated migration path exists.
 - [Clerk custom sign-up forms](replit-auth-to-clerk-migration.md) — `useSignUp()` in `@clerk/react` returns the new "future" API (`signUp.password()`, `.sso()`, `.verifications.sendEmailCode/verifyEmailCode()`, `.finalize()`), not the legacy `create/prepareEmailAddressVerification/attemptEmailAddressVerification` methods.
+- [user_destinations normalized table](user-destinations-schema.md) — source of truth for visited/bucket status; lib/db must be built after schema changes; stadiums/parks remain in jsonb.
+- [lib/db build required](user-destinations-schema.md) — lib/db uses composite:true; run `pnpm --filter @workspace/db run build` after any schema change so downstream packages (api-server) see new declarations.

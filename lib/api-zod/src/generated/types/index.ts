@@ -6,8 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./aggregateStatsResponse";
 export * from "./deletePhotoResponse";
+export * from "./destinationStatEntry";
+export * from "./destinationStatsResponse";
 export * from "./errorEnvelope";
+export * from "./getAggregateStatsCategory";
+export * from "./getAggregateStatsParams";
+export * from "./getDestinationStatsParams";
 export * from "./healthStatus";
 export * from "./listPhotosParams";
 export * from "./mapDataEnvelope";

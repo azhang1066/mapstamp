@@ -210,3 +210,58 @@ export const DeletePhotoResponse = zod.object({
 export const GetPhotoContentParams = zod.object({
   id: zod.coerce.string(),
 });
+
+/**
+ * @summary Most/least visited destinations per category
+ */
+export const getAggregateStatsQueryLimitDefault = 50;
+export const getAggregateStatsQueryLimitMax = 200;
+
+export const GetAggregateStatsQueryParams = zod.object({
+  category: zod.enum(["country", "us_state", "ca_province", "tcc"]),
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(getAggregateStatsQueryLimitMax)
+    .default(getAggregateStatsQueryLimitDefault),
+});
+
+export const GetAggregateStatsResponse = zod.object({
+  category: zod.string(),
+  totalUsers: zod.number().describe("Total distinct users in the system."),
+  destinations: zod.array(
+    zod.object({
+      destinationId: zod.string(),
+      visitedCount: zod.number(),
+      bucketCount: zod.number(),
+    }),
+  ),
+});
+
+/**
+ * @summary Per-destination visit stats (e.g. "38% of users have visited Iceland")
+ */
+export const GetDestinationStatsParams = zod.object({
+  category: zod.enum(["country", "us_state", "ca_province", "tcc"]),
+  id: zod.coerce.string(),
+});
+
+export const GetDestinationStatsQueryParams = zod.object({
+  category: zod.coerce.string().optional(),
+});
+
+export const GetDestinationStatsResponse = zod.object({
+  category: zod.string(),
+  destinationId: zod.string(),
+  visitedCount: zod.number(),
+  bucketCount: zod.number(),
+  totalUsers: zod.number(),
+  visitedPct: zod
+    .number()
+    .describe("Percentage of total users who have visited (0–100)."),
+  bucketPct: zod
+    .number()
+    .describe(
+      "Percentage of total users with this on their bucket list (0–100).",
+    ),
+});

@@ -88,6 +88,31 @@ export interface DeletePhotoResponse {
   ok: boolean;
 }
 
+export interface DestinationStatEntry {
+  destinationId: string;
+  visitedCount: number;
+  bucketCount: number;
+}
+
+export interface AggregateStatsResponse {
+  category: string;
+  /** Total distinct users in the system. */
+  totalUsers: number;
+  destinations: DestinationStatEntry[];
+}
+
+export interface DestinationStatsResponse {
+  category: string;
+  destinationId: string;
+  visitedCount: number;
+  bucketCount: number;
+  totalUsers: number;
+  /** Percentage of total users who have visited (0–100). */
+  visitedPct: number;
+  /** Percentage of total users with this on their bucket list (0–100). */
+  bucketPct: number;
+}
+
 export type ListPhotosParams = {
   /**
    * Destination category (country, state, province, tcc, etc.)
@@ -110,4 +135,27 @@ export type UploadPhotoBody = {
   position?: number;
   /** @maxLength 120 */
   caption?: string;
+};
+
+export type GetAggregateStatsParams = {
+  category: GetAggregateStatsCategory;
+  /**
+   * @minimum 1
+   * @maximum 200
+   */
+  limit?: number;
+};
+
+export type GetAggregateStatsCategory =
+  (typeof GetAggregateStatsCategory)[keyof typeof GetAggregateStatsCategory];
+
+export const GetAggregateStatsCategory = {
+  country: "country",
+  us_state: "us_state",
+  ca_province: "ca_province",
+  tcc: "tcc",
+} as const;
+
+export type GetDestinationStatsParams = {
+  category?: string;
 };

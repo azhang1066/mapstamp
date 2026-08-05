@@ -17,8 +17,12 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AggregateStatsResponse,
   DeletePhotoResponse,
+  DestinationStatsResponse,
   ErrorEnvelope,
+  GetAggregateStatsParams,
+  GetDestinationStatsParams,
   HealthStatus,
   ListPhotosParams,
   MapDataEnvelope,
@@ -716,6 +720,230 @@ export function useGetPhotoContent<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetPhotoContentQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Most/least visited destinations per category
+ */
+export const getGetAggregateStatsUrl = (params: GetAggregateStatsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/stats/aggregate?${stringifiedParams}`
+    : `/api/stats/aggregate`;
+};
+
+export const getAggregateStats = async (
+  params: GetAggregateStatsParams,
+  options?: RequestInit,
+): Promise<AggregateStatsResponse> => {
+  return customFetch<AggregateStatsResponse>(getGetAggregateStatsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAggregateStatsQueryKey = (
+  params?: GetAggregateStatsParams,
+) => {
+  return [`/api/stats/aggregate`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetAggregateStatsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAggregateStats>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetAggregateStatsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAggregateStats>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAggregateStatsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAggregateStats>>
+  > = ({ signal }) => getAggregateStats(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAggregateStats>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAggregateStatsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAggregateStats>>
+>;
+export type GetAggregateStatsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Most/least visited destinations per category
+ */
+
+export function useGetAggregateStats<
+  TData = Awaited<ReturnType<typeof getAggregateStats>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetAggregateStatsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAggregateStats>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAggregateStatsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Per-destination visit stats (e.g. "38% of users have visited Iceland")
+ */
+export const getGetDestinationStatsUrl = (
+  category: "country" | "us_state" | "ca_province" | "tcc",
+  id: string,
+  params?: GetDestinationStatsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/stats/destination/${category}/${id}?${stringifiedParams}`
+    : `/api/stats/destination/${category}/${id}`;
+};
+
+export const getDestinationStats = async (
+  category: "country" | "us_state" | "ca_province" | "tcc",
+  id: string,
+  params?: GetDestinationStatsParams,
+  options?: RequestInit,
+): Promise<DestinationStatsResponse> => {
+  return customFetch<DestinationStatsResponse>(
+    getGetDestinationStatsUrl(category, id, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetDestinationStatsQueryKey = (
+  category: "country" | "us_state" | "ca_province" | "tcc",
+  id: string,
+  params?: GetDestinationStatsParams,
+) => {
+  return [
+    `/api/stats/destination/${category}/${id}`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetDestinationStatsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getDestinationStats>>,
+  TError = ErrorType<ErrorEnvelope>,
+>(
+  category: "country" | "us_state" | "ca_province" | "tcc",
+  id: string,
+  params?: GetDestinationStatsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getDestinationStats>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetDestinationStatsQueryKey(category, id, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getDestinationStats>>
+  > = ({ signal }) =>
+    getDestinationStats(category, id, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(category && id),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getDestinationStats>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetDestinationStatsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getDestinationStats>>
+>;
+export type GetDestinationStatsQueryError = ErrorType<ErrorEnvelope>;
+
+/**
+ * @summary Per-destination visit stats (e.g. "38% of users have visited Iceland")
+ */
+
+export function useGetDestinationStats<
+  TData = Awaited<ReturnType<typeof getDestinationStats>>,
+  TError = ErrorType<ErrorEnvelope>,
+>(
+  category: "country" | "us_state" | "ca_province" | "tcc",
+  id: string,
+  params?: GetDestinationStatsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getDestinationStats>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetDestinationStatsQueryOptions(
+    category,
+    id,
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

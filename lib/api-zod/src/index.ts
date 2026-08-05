@@ -1,8 +1,14 @@
 export * from "./generated/api";
 // Re-export TS interfaces, excluding SaveMapDataResponse which collides with the Zod schema
 export type {
+  AggregateStatsResponse,
   DeletePhotoResponse,
+  DestinationStatEntry,
+  DestinationStatsResponse,
   ErrorEnvelope,
+  GetAggregateStatsCategory,
+  GetAggregateStatsParams,
+  GetDestinationStatsParams,
   HealthStatus,
   ListPhotosParams,
   MapDataEnvelope,

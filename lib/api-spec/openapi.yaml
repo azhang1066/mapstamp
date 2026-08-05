@@ -12,6 +12,8 @@ tags:
     description: Health operations
   - name: map-data
     description: User travel map data persistence.
+  - name: photos
+    description: Per-destination photo management.
 paths:
   /healthz:
     get:
@@ -67,6 +69,178 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /photos:
+    get:
+      tags: [photos]
+      operationId: listPhotos
+      summary: List photos for a destination
+      parameters:
+        - name: category
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Destination category (country, state, province, tcc, etc.)
+        - name: destinationId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Destination identifier within its category.
+      responses:
+        '200':
+          description: Photos listed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoListResponse'
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      tags: [photos]
+      operationId: uploadPhoto
+      summary: Upload a photo for a destination (multipart/form-data)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, category, destinationId]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                category:
+                  type: string
+                destinationId:
+                  type: string
+                position:
+                  type: integer
+                  minimum: 0
+                  maximum: 2
+                caption:
+                  type: string
+                  maxLength: 120
+      responses:
+        '200':
+          description: Photo uploaded successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoRecord'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /photos/{id}:
+    patch:
+      tags: [photos]
+      operationId: updatePhoto
+      summary: Update a photo's caption
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePhotoBody'
+      responses:
+        '200':
+          description: Photo updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoRecord'
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Photo not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    delete:
+      tags: [photos]
+      operationId: deletePhoto
+      summary: Delete a photo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Photo deleted successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletePhotoResponse'
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Photo not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /photos/{id}/content:
+    get:
+      tags: [photos]
+      operationId: getPhotoContent
+      summary: Stream photo binary content (auth-gated proxy)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Photo content streamed with correct Content-Type.
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Photo not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
 components:
   schemas:
     HealthStatus:
@@ -85,6 +259,9 @@ components:
     MapDataPayload:
       type: object
       properties:
+        schemaVersion:
+          type: integer
+          description: Schema version for forward-compatibility tracking.
         visitedCountries:
           type: array
           items:
@@ -166,6 +343,46 @@ components:
             - $ref: '#/components/schemas/MapDataPayload'
             - type: 'null'
     SaveMapDataResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+    PhotoRecord:
+      type: object
+      required: [id, url, caption, position, createdAt]
+      properties:
+        id:
+          type: string
+          description: UUID of the photo record.
+        url:
+          type: string
+          description: Relative URL to fetch the photo content, e.g. /api/photos/<id>/content.
+        caption:
+          type: string
+          maxLength: 120
+        position:
+          type: integer
+          minimum: 0
+          maximum: 2
+        createdAt:
+          type: string
+          format: date-time
+    PhotoListResponse:
+      type: object
+      required: [photos]
+      properties:
+        photos:
+          type: array
+          items:
+            $ref: '#/components/schemas/PhotoRecord'
+    UpdatePhotoBody:
+      type: object
+      properties:
+        caption:
+          type: string
+          maxLength: 120
+    DeletePhotoResponse:
       type: object
       required: [ok]
       properties:

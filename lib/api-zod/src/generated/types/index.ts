@@ -6,8 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./deletePhotoResponse";
 export * from "./errorEnvelope";
 export * from "./healthStatus";
+export * from "./listPhotosParams";
 export * from "./mapDataEnvelope";
 export * from "./mapDataPayload";
 export * from "./mapDataPayloadCountryDetails";
@@ -17,4 +19,8 @@ export * from "./mapDataPayloadProvinceDetails";
 export * from "./mapDataPayloadStadiumDetails";
 export * from "./mapDataPayloadStateDetails";
 export * from "./mapDataPayloadTccDetails";
+export * from "./photoListResponse";
+export * from "./photoRecord";
 export * from "./saveMapDataResponse";
+export * from "./updatePhotoBody";
+export * from "./uploadPhotoBody";

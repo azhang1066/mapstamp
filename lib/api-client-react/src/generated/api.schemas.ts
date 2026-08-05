@@ -28,6 +28,8 @@ export type MapDataPayloadTccDetails = { [key: string]: unknown };
 export type MapDataPayloadNotesByKey = { [key: string]: string };
 
 export interface MapDataPayload {
+  /** Schema version for forward-compatibility tracking. */
+  schemaVersion?: number;
   visitedCountries?: string[];
   visitedStates?: string[];
   visitedProvinces?: string[];
@@ -57,3 +59,55 @@ export interface MapDataEnvelope {
 export interface SaveMapDataResponse {
   ok: boolean;
 }
+
+export interface PhotoRecord {
+  /** UUID of the photo record. */
+  id: string;
+  /** Relative URL to fetch the photo content, e.g. /api/photos/<id>/content. */
+  url: string;
+  /** @maxLength 120 */
+  caption: string;
+  /**
+   * @minimum 0
+   * @maximum 2
+   */
+  position: number;
+  createdAt: string;
+}
+
+export interface PhotoListResponse {
+  photos: PhotoRecord[];
+}
+
+export interface UpdatePhotoBody {
+  /** @maxLength 120 */
+  caption?: string;
+}
+
+export interface DeletePhotoResponse {
+  ok: boolean;
+}
+
+export type ListPhotosParams = {
+  /**
+   * Destination category (country, state, province, tcc, etc.)
+   */
+  category: string;
+  /**
+   * Destination identifier within its category.
+   */
+  destinationId: string;
+};
+
+export type UploadPhotoBody = {
+  file: Blob;
+  category: string;
+  destinationId: string;
+  /**
+   * @minimum 0
+   * @maximum 2
+   */
+  position?: number;
+  /** @maxLength 120 */
+  caption?: string;
+};

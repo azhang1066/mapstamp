@@ -1,14 +1,10 @@
 export * from "./generated/api";
 // Re-export TS interfaces, excluding SaveMapDataResponse which collides with the Zod schema
 export type {
-  AuthorizationSessionHeaderParameter,
-  AuthUser,
-  AuthUserEnvelope,
-  BeginBrowserLoginParams,
+  DeletePhotoResponse,
   ErrorEnvelope,
-  HandleBrowserLoginCallbackParams,
   HealthStatus,
-  LogoutSuccess,
+  ListPhotosParams,
   MapDataEnvelope,
   MapDataPayload,
   MapDataPayloadCountryDetails,
@@ -18,6 +14,8 @@ export type {
   MapDataPayloadStadiumDetails,
   MapDataPayloadStateDetails,
   MapDataPayloadTccDetails,
-  MobileTokenExchangeRequest,
-  MobileTokenExchangeSuccess,
+  PhotoListResponse,
+  PhotoRecord,
+  UpdatePhotoBody,
+  UploadPhotoBody,
 } from "./generated/types";

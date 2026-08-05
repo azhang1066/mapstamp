@@ -14,6 +14,8 @@ import type { MapDataPayloadStateDetails } from "./mapDataPayloadStateDetails";
 import type { MapDataPayloadTccDetails } from "./mapDataPayloadTccDetails";
 
 export interface MapDataPayload {
+  /** Schema version for forward-compatibility tracking. */
+  schemaVersion?: number;
   visitedCountries?: string[];
   visitedStates?: string[];
   visitedProvinces?: string[];

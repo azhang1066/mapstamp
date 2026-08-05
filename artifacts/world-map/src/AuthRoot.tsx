@@ -402,6 +402,78 @@ function SignUpSSOCallbackPage() {
   );
 }
 
+// ─── Legacy localStorage photo migration ──────────────────────────────────────
+
+const _migratedKeys = new Set<string>();
+
+function dataUrlToBlob(dataUrl: string): Blob {
+  const [header, b64] = dataUrl.split(",");
+  const mimeMatch = header.match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : "image/jpeg";
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
+async function migrateLocalStoragePhotos(apiBase: string): Promise<void> {
+  const photoKeys: string[] = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k?.startsWith("photos:") && !_migratedKeys.has(k)) photoKeys.push(k);
+    }
+  } catch { return; }
+
+  for (const key of photoKeys) {
+    // key format: photos:<category>:<destinationId>
+    const withoutPrefix = key.slice("photos:".length);
+    const firstColon = withoutPrefix.indexOf(":");
+    if (firstColon === -1) continue;
+    const category = withoutPrefix.slice(0, firstColon);
+    const destinationId = withoutPrefix.slice(firstColon + 1);
+
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) { _migratedKeys.add(key); localStorage.removeItem(key); continue; }
+      const photos = JSON.parse(raw) as Array<{
+        id: string;
+        base64: string;
+        caption: string;
+        uploadedAt: number;
+      }>;
+
+      let allOk = true;
+      for (let pos = 0; pos < photos.length; pos++) {
+        const photo = photos[pos];
+        if (!photo.base64?.startsWith("data:")) continue;
+        try {
+          const blob = dataUrlToBlob(photo.base64);
+          const fd = new FormData();
+          fd.append("file", blob, "photo.jpg");
+          fd.append("category", category);
+          fd.append("destinationId", destinationId);
+          fd.append("position", String(pos));
+          fd.append("caption", photo.caption ?? "");
+          const resp = await fetch(`${apiBase}/api/photos`, {
+            method: "POST",
+            body: fd,
+            credentials: "include",
+          });
+          if (!resp.ok) { allOk = false; }
+        } catch { allOk = false; }
+      }
+
+      if (allOk) {
+        _migratedKeys.add(key);
+        localStorage.removeItem(key);
+      }
+    } catch { /* silently skip malformed entries */ }
+  }
+}
+
+// ─── Server data sync ─────────────────────────────────────────────────────────
+
 type ServerData = Record<string, unknown>;
 
 function applyServerDataToLocalStorage(data: ServerData) {
@@ -489,8 +561,10 @@ function AppWithSync() {
     }
     fetch(`${basePath}/api/map-data`, { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((envelope: { data: ServerData | null } | null) => {
+      .then(async (envelope: { data: ServerData | null } | null) => {
         if (envelope?.data) applyServerDataToLocalStorage(envelope.data);
+        // Migrate any legacy localStorage photos to backend storage (runs once per key).
+        await migrateLocalStoragePhotos(basePath).catch(() => {});
         setReady(true);
       })
       .catch(() => setReady(true));

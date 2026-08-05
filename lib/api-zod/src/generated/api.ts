@@ -21,6 +21,10 @@ export const HealthCheckResponse = zod.object({
 export const GetMapDataResponse = zod.object({
   data: zod.union([
     zod.object({
+      schemaVersion: zod
+        .number()
+        .optional()
+        .describe("Schema version for forward-compatibility tracking."),
       visitedCountries: zod.array(zod.string()).optional(),
       visitedStates: zod.array(zod.string()).optional(),
       visitedProvinces: zod.array(zod.string()).optional(),
@@ -50,6 +54,10 @@ export const GetMapDataResponse = zod.object({
  * @summary Save the authenticated user's travel map data
  */
 export const SaveMapDataBody = zod.object({
+  schemaVersion: zod
+    .number()
+    .optional()
+    .describe("Schema version for forward-compatibility tracking."),
   visitedCountries: zod.array(zod.string()).optional(),
   visitedStates: zod.array(zod.string()).optional(),
   visitedProvinces: zod.array(zod.string()).optional(),
@@ -74,4 +82,131 @@ export const SaveMapDataBody = zod.object({
 
 export const SaveMapDataResponse = zod.object({
   ok: zod.boolean(),
+});
+
+/**
+ * @summary List photos for a destination
+ */
+export const ListPhotosQueryParams = zod.object({
+  category: zod.coerce
+    .string()
+    .describe("Destination category (country, state, province, tcc, etc.)"),
+  destinationId: zod.coerce
+    .string()
+    .describe("Destination identifier within its category."),
+});
+
+export const listPhotosResponsePhotosItemCaptionMax = 120;
+
+export const listPhotosResponsePhotosItemPositionMin = 0;
+export const listPhotosResponsePhotosItemPositionMax = 2;
+
+export const ListPhotosResponse = zod.object({
+  photos: zod.array(
+    zod.object({
+      id: zod.string().describe("UUID of the photo record."),
+      url: zod
+        .string()
+        .describe(
+          "Relative URL to fetch the photo content, e.g. \/api\/photos\/<id>\/content.",
+        ),
+      caption: zod.string().max(listPhotosResponsePhotosItemCaptionMax),
+      position: zod
+        .number()
+        .min(listPhotosResponsePhotosItemPositionMin)
+        .max(listPhotosResponsePhotosItemPositionMax),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Upload a photo for a destination (multipart/form-data)
+ */
+export const uploadPhotoBodyPositionMin = 0;
+export const uploadPhotoBodyPositionMax = 2;
+
+export const uploadPhotoBodyCaptionMax = 120;
+
+export const UploadPhotoBody = zod.object({
+  file: zod.instanceof(File),
+  category: zod.string(),
+  destinationId: zod.string(),
+  position: zod
+    .number()
+    .min(uploadPhotoBodyPositionMin)
+    .max(uploadPhotoBodyPositionMax)
+    .optional(),
+  caption: zod.string().max(uploadPhotoBodyCaptionMax).optional(),
+});
+
+export const uploadPhotoResponseCaptionMax = 120;
+
+export const uploadPhotoResponsePositionMin = 0;
+export const uploadPhotoResponsePositionMax = 2;
+
+export const UploadPhotoResponse = zod.object({
+  id: zod.string().describe("UUID of the photo record."),
+  url: zod
+    .string()
+    .describe(
+      "Relative URL to fetch the photo content, e.g. \/api\/photos\/<id>\/content.",
+    ),
+  caption: zod.string().max(uploadPhotoResponseCaptionMax),
+  position: zod
+    .number()
+    .min(uploadPhotoResponsePositionMin)
+    .max(uploadPhotoResponsePositionMax),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Update a photo's caption
+ */
+export const UpdatePhotoParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const updatePhotoBodyCaptionMax = 120;
+
+export const UpdatePhotoBody = zod.object({
+  caption: zod.string().max(updatePhotoBodyCaptionMax).optional(),
+});
+
+export const updatePhotoResponseCaptionMax = 120;
+
+export const updatePhotoResponsePositionMin = 0;
+export const updatePhotoResponsePositionMax = 2;
+
+export const UpdatePhotoResponse = zod.object({
+  id: zod.string().describe("UUID of the photo record."),
+  url: zod
+    .string()
+    .describe(
+      "Relative URL to fetch the photo content, e.g. \/api\/photos\/<id>\/content.",
+    ),
+  caption: zod.string().max(updatePhotoResponseCaptionMax),
+  position: zod
+    .number()
+    .min(updatePhotoResponsePositionMin)
+    .max(updatePhotoResponsePositionMax),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete a photo
+ */
+export const DeletePhotoParams = zod.object({
+  id: zod.coerce.string(),
+});
+
+export const DeletePhotoResponse = zod.object({
+  ok: zod.boolean(),
+});
+
+/**
+ * @summary Stream photo binary content (auth-gated proxy)
+ */
+export const GetPhotoContentParams = zod.object({
+  id: zod.coerce.string(),
 });

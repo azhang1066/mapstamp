@@ -179,46 +179,19 @@ type PhotoCategory = "country" | "state" | "province" | "stadium" | "tcc" | "par
 
 interface VisitPhoto {
   id: string;
-  base64: string;
+  url: string;       // /api/photos/<uuid>/content — proxied through the API server
   caption: string;
   uploadedAt: number;
+  position: number;
 }
 
-const photoKey = (cat: PhotoCategory, id: string) => `photos:${cat}:${id}`;
 const MAX_PHOTOS_PER_DEST = 3;
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 const ACCEPTED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const STORAGE_WARN_BYTES = 4 * 1024 * 1024; // ~4MB → near typical 5MB origin quota
+const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-function loadPhotos(cat: PhotoCategory, id: string): VisitPhoto[] {
-  try {
-    const raw = localStorage.getItem(photoKey(cat, id));
-    return raw ? (JSON.parse(raw) as VisitPhoto[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function savePhotos(cat: PhotoCategory, id: string, photos: VisitPhoto[]): { ok: boolean; warning?: string; error?: string } {
-  try {
-    if (photos.length === 0) localStorage.removeItem(photoKey(cat, id));
-    else localStorage.setItem(photoKey(cat, id), JSON.stringify(photos));
-  } catch {
-    return { ok: false, error: "Storage is full — couldn't save photo. Try removing existing photos." };
-  }
-  let total = 0;
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (!k) continue;
-      const v = localStorage.getItem(k) ?? "";
-      total += k.length + v.length;
-    }
-  } catch { /* ignore */ }
-  return { ok: true, warning: total > STORAGE_WARN_BYTES ? "Storage nearly full — consider removing some photos" : undefined };
-}
-
-async function resizeImageToBase64(file: File): Promise<string> {
+/** Resize a File to max 1200px JPEG and return a Blob (unchanged resize logic). */
+async function resizeImageToBlob(file: File): Promise<Blob> {
   const dataUrl: string = await new Promise((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => resolve(r.result as string);
@@ -240,20 +213,39 @@ async function resizeImageToBase64(file: File): Promise<string> {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("canvas context unavailable");
   ctx.drawImage(img, 0, 0, w, h);
-  return canvas.toDataURL("image/jpeg", 0.8);
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("toBlob failed"))),
+      "image/jpeg",
+      0.8,
+    );
+  });
 }
 
-function usePhotos(category: PhotoCategory, locationId: string) {
-  const [photos, setPhotos] = useState<VisitPhoto[]>(() => loadPhotos(category, locationId));
-  useEffect(() => {
-    setPhotos(loadPhotos(category, locationId));
-  }, [category, locationId]);
-  const update = useCallback((next: VisitPhoto[]): { ok: boolean; warning?: string; error?: string } => {
-    const result = savePhotos(category, locationId, next);
-    if (result.ok) setPhotos(next);
-    return result;
-  }, [category, locationId]);
-  return { photos, update };
+function usePhotosApi(category: PhotoCategory, locationId: string, isAuthenticated: boolean) {
+  const [photos, setPhotos] = useState<VisitPhoto[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!isAuthenticated || !locationId) { setPhotos([]); return; }
+    setLoading(true);
+    try {
+      const resp = await fetch(
+        `${API_BASE}/api/photos?category=${encodeURIComponent(category)}&destinationId=${encodeURIComponent(locationId)}`,
+        { credentials: "include" },
+      );
+      if (resp.ok) {
+        const data = await resp.json() as { photos: VisitPhoto[] };
+        setPhotos(data.photos);
+      }
+    } catch { /* ignore */ } finally {
+      setLoading(false);
+    }
+  }, [category, locationId, isAuthenticated]);
+
+  useEffect(() => { load(); }, [load]);
+
+  return { photos, setPhotos, reload: load, loading };
 }
 
 function PhotoLightbox({
@@ -306,7 +298,7 @@ function PhotoLightbox({
       <div className="flex flex-col items-center max-w-full max-h-full gap-4">
         <div className="bg-black rounded-lg overflow-hidden flex items-center justify-center"
              style={{ width: "min(800px, 90vw)", height: "min(600px, 65vh)" }}>
-          <img src={photo.base64} alt={photo.caption || "Visit photo"} className="max-w-full max-h-full object-contain" />
+          <img src={photo.url} alt={photo.caption || "Visit photo"} className="max-w-full max-h-full object-contain" />
         </div>
         <div className="w-full max-w-[800px]">
           {isReadOnly ? (
@@ -331,16 +323,24 @@ function PhotoLightbox({
   );
 }
 
-function PhotoGrid({ category, locationId, isReadOnly }: { category: PhotoCategory; locationId: string; isReadOnly: boolean }) {
-  const { photos, update } = usePhotos(category, locationId);
+function PhotoGrid({
+  category,
+  locationId,
+  isReadOnly,
+  isAuthenticated,
+}: {
+  category: PhotoCategory;
+  locationId: string;
+  isReadOnly: boolean;
+  isAuthenticated: boolean;
+}) {
+  const { photos, setPhotos, reload } = usePhotosApi(category, locationId, isAuthenticated && !isReadOnly);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [warning, setWarning] = useState<string | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const flashError = (m: string) => { setError(m); setTimeout(() => setError(null), 4000); };
-  const flashWarning = (m: string) => { setWarning(m); setTimeout(() => setWarning(null), 5000); };
 
   const onPickFile = async (file: File | undefined) => {
     if (!file) return;
@@ -359,17 +359,23 @@ function PhotoGrid({ category, locationId, isReadOnly }: { category: PhotoCatego
     }
     setUploading(true);
     try {
-      const base64 = await resizeImageToBase64(file);
-      const newPhoto: VisitPhoto = {
-        id: `p${Date.now()}${Math.random().toString(36).slice(2, 7)}`,
-        base64,
-        caption: "",
-        uploadedAt: Date.now(),
-      };
-      const next = [...photos, newPhoto];
-      const result = update(next);
-      if (!result.ok) flashError(result.error ?? "Failed to save photo");
-      else if (result.warning) flashWarning(result.warning);
+      const blob = await resizeImageToBlob(file);
+      const fd = new FormData();
+      fd.append("file", blob, "photo.jpg");
+      fd.append("category", category);
+      fd.append("destinationId", locationId);
+      fd.append("position", String(photos.length));
+      const resp = await fetch(`${API_BASE}/api/photos`, {
+        method: "POST",
+        body: fd,
+        credentials: "include",
+      });
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => ({})) as { error?: string };
+        flashError(body.error ?? "Failed to upload photo");
+      } else {
+        await reload();
+      }
     } catch {
       flashError("Couldn't process that image");
     } finally {
@@ -377,12 +383,19 @@ function PhotoGrid({ category, locationId, isReadOnly }: { category: PhotoCatego
     }
   };
 
-  const handleDelete = (id: string) => {
-    const next = photos.filter(p => p.id !== id);
-    const result = update(next);
-    if (!result.ok) flashError(result.error ?? "Failed to remove photo");
-    if (lightboxIndex !== null && lightboxIndex >= next.length) {
-      setLightboxIndex(next.length === 0 ? null : next.length - 1);
+  const handleDelete = async (id: string) => {
+    try {
+      await fetch(`${API_BASE}/api/photos/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const next = photos.filter(p => p.id !== id);
+      setPhotos(next);
+      if (lightboxIndex !== null && lightboxIndex >= next.length) {
+        setLightboxIndex(next.length === 0 ? null : next.length - 1);
+      }
+    } catch {
+      flashError("Failed to delete photo");
     }
   };
 
@@ -394,14 +407,33 @@ function PhotoGrid({ category, locationId, isReadOnly }: { category: PhotoCatego
     handleCaptionChange(id, updated.slice(0, 120));
   };
 
-  const handleCaptionChange = (id: string, caption: string) => {
-    const next = photos.map(p => p.id === id ? { ...p, caption: caption.slice(0, 120) } : p);
-    const result = update(next);
-    if (!result.ok) flashError(result.error ?? "Failed to save caption");
+  const handleCaptionChange = async (id: string, caption: string) => {
+    const trimmed = caption.slice(0, 120);
+    try {
+      const resp = await fetch(`${API_BASE}/api/photos/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ caption: trimmed }),
+      });
+      if (resp.ok) {
+        setPhotos(prev => prev.map(p => p.id === id ? { ...p, caption: trimmed } : p));
+      }
+    } catch { /* ignore */ }
   };
 
   const slots: (VisitPhoto | null)[] = [];
   for (let i = 0; i < MAX_PHOTOS_PER_DEST; i++) slots.push(photos[i] ?? null);
+
+  // Don't render the section in read-only/share mode (unchanged behaviour)
+  // or for unauthenticated users viewing non-shared maps.
+  if (isReadOnly) return null;
+  if (!isAuthenticated) return (
+    <div className="mt-5 pt-5 border-t border-slate-800">
+      <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Photos</p>
+      <p className="text-xs text-slate-500">Sign in to add photos to your visits.</p>
+    </div>
+  );
 
   return (
     <div className="mt-5 pt-5 border-t border-slate-800">
@@ -417,35 +449,27 @@ function PhotoGrid({ category, locationId, isReadOnly }: { category: PhotoCatego
                   className="block w-full aspect-square rounded-lg overflow-hidden bg-slate-800 border border-slate-700 hover:border-slate-500 transition-colors"
                   style={{ width: "120px", height: "120px" }}
                 >
-                  <img src={photo.base64} alt={photo.caption || "Visit photo"} className="w-full h-full object-cover" />
+                  <img src={photo.url} alt={photo.caption || "Visit photo"} className="w-full h-full object-cover" />
                 </button>
-                {!isReadOnly && (
-                  <div className="absolute inset-0 rounded-lg bg-black/0 group-hover:bg-black/50 transition-colors pointer-events-none flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100"
-                       style={{ width: "120px", height: "120px" }}>
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); handleEditCaption(photo.id); }}
-                      className="w-8 h-8 rounded-full bg-slate-900/90 hover:bg-slate-700 text-white text-sm flex items-center justify-center pointer-events-auto"
-                      title="Edit caption"
-                    >✏️</button>
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); handleDelete(photo.id); }}
-                      className="w-8 h-8 rounded-full bg-red-700/90 hover:bg-red-600 text-white text-sm flex items-center justify-center pointer-events-auto"
-                      title="Delete photo"
-                    >🗑</button>
-                  </div>
-                )}
+                <div className="absolute inset-0 rounded-lg bg-black/0 group-hover:bg-black/50 transition-colors pointer-events-none flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100"
+                     style={{ width: "120px", height: "120px" }}>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); handleEditCaption(photo.id); }}
+                    className="w-8 h-8 rounded-full bg-slate-900/90 hover:bg-slate-700 text-white text-sm flex items-center justify-center pointer-events-auto"
+                    title="Edit caption"
+                  >✏️</button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); void handleDelete(photo.id); }}
+                    className="w-8 h-8 rounded-full bg-red-700/90 hover:bg-red-600 text-white text-sm flex items-center justify-center pointer-events-auto"
+                    title="Delete photo"
+                  >🗑</button>
+                </div>
                 {photo.caption && (
                   <p className="mt-1 text-[10px] text-slate-400 truncate" style={{ width: "120px" }} title={photo.caption}>{photo.caption}</p>
                 )}
               </div>
-            );
-          }
-          if (isReadOnly) {
-            return (
-              <div key={`empty-${idx}`} className="rounded-lg border border-dashed border-slate-800 bg-slate-900/40"
-                   style={{ width: "120px", height: "120px" }} />
             );
           }
           return (
@@ -472,24 +496,19 @@ function PhotoGrid({ category, locationId, isReadOnly }: { category: PhotoCatego
           );
         })}
       </div>
-      {!isReadOnly && (
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            onPickFile(file);
-            e.target.value = "";
-          }}
-        />
-      )}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          void onPickFile(file);
+          e.target.value = "";
+        }}
+      />
       {error && (
         <p className="mt-2 text-xs text-red-400 bg-red-950/40 border border-red-900/50 rounded-md px-2 py-1.5">{error}</p>
-      )}
-      {warning && (
-        <p className="mt-2 text-xs text-amber-300 bg-amber-950/40 border border-amber-900/50 rounded-md px-2 py-1.5">⚠ {warning}</p>
       )}
       {lightboxIndex !== null && photos[lightboxIndex] && (
         <PhotoLightbox
@@ -499,7 +518,7 @@ function PhotoGrid({ category, locationId, isReadOnly }: { category: PhotoCatego
           onPrev={() => setLightboxIndex((i) => (i === null ? null : (i - 1 + photos.length) % photos.length))}
           onNext={() => setLightboxIndex((i) => (i === null ? null : (i + 1) % photos.length))}
           onCaptionChange={handleCaptionChange}
-          isReadOnly={isReadOnly}
+          isReadOnly={false}
         />
       )}
     </div>
@@ -643,12 +662,14 @@ function VisitDetailsPanel({
   locationId,
   category,
   isReadOnly,
+  isAuthenticated,
   details,
   onUpdate,
 }: {
   locationId: string;
   category: PhotoCategory;
   isReadOnly: boolean;
+  isAuthenticated: boolean;
   details: VisitDetails | undefined;
   onUpdate: (id: string, patch: VisitDetails) => void;
 }) {
@@ -702,7 +723,7 @@ function VisitDetailsPanel({
           </p>
         )}
       </div>
-      <PhotoGrid category={category} locationId={locationId} isReadOnly={isReadOnly} />
+      <PhotoGrid category={category} locationId={locationId} isReadOnly={isReadOnly} isAuthenticated={isAuthenticated} />
     </div>
   );
 }
@@ -2903,7 +2924,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                             </div>
                           </div>
                         )}
-                        {isVisited && <VisitDetailsPanel locationId={selectedTcc.name} category="tcc" isReadOnly={isReadOnly} details={tccDetails[selectedTcc.name]} onUpdate={setTccDetail} />}
+                        {isVisited && <VisitDetailsPanel locationId={selectedTcc.name} category="tcc" isReadOnly={isReadOnly} isAuthenticated={isAuthenticated} details={tccDetails[selectedTcc.name]} onUpdate={setTccDetail} />}
                       </>
                     )}
                     <NoteField category="tcc" locationId={selectedTcc.name} isReadOnly={isReadOnly} readOnlyValue={getReadOnlyNote("tcc", selectedTcc.name)} onSaved={handleNoteSaved} />
@@ -3038,7 +3059,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                         </div>
                       </div>
                     )}
-                    {isVisited && <VisitDetailsPanel locationId={rawId} category={isCountry ? "country" : isState ? "state" : "province"} isReadOnly={isReadOnly} details={details} onUpdate={setter} />}
+                    {isVisited && <VisitDetailsPanel locationId={rawId} category={isCountry ? "country" : isState ? "state" : "province"} isReadOnly={isReadOnly} isAuthenticated={isAuthenticated} details={details} onUpdate={setter} />}
                   </>
                 );
               })()}

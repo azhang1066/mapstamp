@@ -30,6 +30,21 @@ if (!clerkPubKey) {
   throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY in .env file");
 }
 
+function clearLocalTravelData() {
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith("wm_") || key?.startsWith("shortnote:") || key?.startsWith("photos:")) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+  } catch {
+    // Storage may be unavailable in restricted browser contexts.
+  }
+}
+
 const clerkAppearance = {
   theme: shadcn,
   cssLayerName: "clerk",
@@ -628,6 +643,19 @@ function AppWithSync() {
     }
   }
 
+  function handleLogout() {
+    // Unmount the map before signing out so its debounced sync cannot write
+    // stale in-memory data back to the server during the transition.
+    clearLocalTravelData();
+    setShowUserProfile(false);
+    setNeedsUsername(false);
+    setReady(false);
+    void signOut({ redirectUrl: basePath || "/" }).catch(() => {
+      // If sign-out fails, reload the signed-in data from the server.
+      setReady(true);
+    });
+  }
+
   useEffect(() => {
     if (!isLoaded) return;
     if (!isSignedIn) {
@@ -704,10 +732,11 @@ function AppWithSync() {
   return (
     <>
       <App
+        key={isSignedIn ? user?.id ?? "signed-in" : "signed-out"}
         authUser={authUser}
         isAuthenticated={!!isSignedIn}
         onLogin={() => setLocation("/sign-in")}
-        onLogout={() => signOut({ redirectUrl: basePath || "/" })}
+        onLogout={handleLogout}
         onOpenProfile={() => setShowUserProfile(true)}
       />
       {showUserProfile && (

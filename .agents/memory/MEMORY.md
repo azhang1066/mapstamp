@@ -3,3 +3,4 @@
 - [user_destinations normalized table](user-destinations-schema.md) — source of truth for visited/bucket status; lib/db must be built after schema changes; stadiums/parks remain in jsonb.
 - [lib/db build required](user-destinations-schema.md) — lib/db uses composite:true; run `pnpm --filter @workspace/db run build` after any schema change so downstream packages (api-server) see new declarations.
 - [Social comparison schema](social-comparison-schema.md) — user_profiles + user_connections tables; username prompt hook location in AuthRoot.tsx; requireAcceptedConnection auth helper pattern.
+- [Generated API client declarations](generated-api-client-declarations.md) — rebuild api-client-react declarations after OpenAPI codegen so consumers see regenerated social hooks and types.

@@ -899,7 +899,7 @@ export const useSetUsername = <
 };
 
 /**
- * @summary Search users by username prefix (case-insensitive). Never returns travel data.
+ * @summary Search users by username or display name prefix (case-insensitive). Never returns travel data.
  */
 export const getSearchUsersUrl = (params: SearchUsersParams) => {
   const normalizedParams = new URLSearchParams();
@@ -966,7 +966,7 @@ export type SearchUsersQueryResult = NonNullable<
 export type SearchUsersQueryError = ErrorType<ErrorEnvelope>;
 
 /**
- * @summary Search users by username prefix (case-insensitive). Never returns travel data.
+ * @summary Search users by username or display name prefix (case-insensitive). Never returns travel data.
  */
 
 export function useSearchUsers<

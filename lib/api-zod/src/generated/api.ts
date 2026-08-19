@@ -241,7 +241,7 @@ export const SetUsernameResponse = zod.object({
 });
 
 /**
- * @summary Search users by username prefix (case-insensitive). Never returns travel data.
+ * @summary Search users by username or display name prefix (case-insensitive). Never returns travel data.
  */
 export const searchUsersQueryQMin = 2;
 export const searchUsersQueryQMax = 30;

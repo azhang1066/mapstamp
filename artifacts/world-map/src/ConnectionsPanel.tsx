@@ -12,6 +12,7 @@ import {
 } from "@workspace/api-client-react";
 import type {
   ConnectionRecord,
+  ConnectionsResponse,
   UserSearchEntry,
 } from "@workspace/api-client-react";
 
@@ -58,7 +59,7 @@ function Spinner() {
 // ── Search tab ────────────────────────────────────────────────────────────────
 
 interface SearchTabProps {
-  connectionsData: ReturnType<typeof useListConnections>["data"];
+  connectionsData: ConnectionsResponse | undefined;
   showToast: Props["showToast"];
 }
 
@@ -79,7 +80,13 @@ function SearchTab({ connectionsData, showToast }: SearchTabProps) {
   const enabled = debouncedQuery.length >= 2;
   const { data: searchData, isFetching } = useSearchUsers(
     { q: debouncedQuery },
-    { query: { enabled }, request: REQ },
+    {
+      query: {
+        queryKey: getSearchUsersQueryKey({ q: debouncedQuery }),
+        enabled,
+      },
+      request: REQ,
+    },
   );
 
   // Build a map of known connections keyed by otherUser.userId
@@ -180,7 +187,7 @@ function SearchTab({ connectionsData, showToast }: SearchTabProps) {
           autoFocus
           value={rawQuery}
           onChange={e => setRawQuery(e.target.value)}
-          placeholder="Search by username…"
+          placeholder="Search by username or display name…"
           className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 transition-colors"
         />
         {isFetching && (
@@ -213,7 +220,7 @@ function SearchTab({ connectionsData, showToast }: SearchTabProps) {
 // ── Pending tab ───────────────────────────────────────────────────────────────
 
 interface PendingTabProps {
-  data: ReturnType<typeof useListConnections>["data"];
+  data: ConnectionsResponse | undefined;
   isLoading: boolean;
   showToast: Props["showToast"];
 }
@@ -332,7 +339,7 @@ function PendingTab({ data, isLoading, showToast }: PendingTabProps) {
 // ── Connections tab ───────────────────────────────────────────────────────────
 
 interface ConnectionsTabProps {
-  data: ReturnType<typeof useListConnections>["data"];
+  data: ConnectionsResponse | undefined;
   isLoading: boolean;
   showToast: Props["showToast"];
 }
@@ -416,8 +423,11 @@ function ConnectionsTab({ data, isLoading, showToast }: ConnectionsTabProps) {
 export default function ConnectionsPanel({ onClose, showToast }: Props) {
   const [tab, setTab] = useState<Tab>("search");
 
-  const { data, isLoading } = useListConnections({
-    query: { staleTime: 20_000 },
+  const { data, isLoading } = useListConnections<ConnectionsResponse>({
+    query: {
+      queryKey: getListConnectionsQueryKey(),
+      staleTime: 20_000,
+    },
     request: REQ,
   });
 

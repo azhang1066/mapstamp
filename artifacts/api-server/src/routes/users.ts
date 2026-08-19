@@ -1,12 +1,12 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
 import { db, userProfilesTable } from "@workspace/db";
-import { sql, ne } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
 // ─── GET /users/search?q= ─────────────────────────────────────────────────────
-// Prefix-match on username (case-insensitive). Never returns travel data.
+// Prefix-match on username or display name (case-insensitive). Never returns travel data.
 
 router.get("/users/search", async (req: Request, res: Response) => {
   const { userId } = getAuth(req);
@@ -34,7 +34,10 @@ router.get("/users/search", async (req: Request, res: Response) => {
       })
       .from(userProfilesTable)
       .where(
-        sql`lower(${userProfilesTable.username}) LIKE ${q + "%"} AND ${userProfilesTable.userId} != ${userId}`,
+        sql`(
+          lower(${userProfilesTable.username}) LIKE ${q + "%"}
+          OR lower(${userProfilesTable.displayName}) LIKE ${q + "%"}
+        ) AND ${userProfilesTable.userId} != ${userId}`,
       )
       .limit(20);
 

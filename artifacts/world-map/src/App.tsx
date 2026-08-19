@@ -1869,7 +1869,11 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
 
   // Badge count populated lazily after first open — hook always runs, enabled only when signed in
   const { data: connectionsData } = useListConnections({
-    query: { enabled: isAuthenticated, staleTime: 30_000 },
+    query: {
+      queryKey: getListConnectionsQueryKey(),
+      enabled: isAuthenticated,
+      staleTime: 30_000,
+    },
     request: { credentials: "include" },
   });
   const incomingPendingCount = connectionsData?.pending.incoming.length ?? 0;

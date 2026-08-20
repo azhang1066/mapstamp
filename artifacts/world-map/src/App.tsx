@@ -60,9 +60,7 @@ const YEARS: number[] = Array.from({ length: CURRENT_YEAR - 1950 + 1 }, (_, i) =
 
 interface YearFilterState {
   enabled: boolean;
-  mode: "range" | "snapshot";
-  min: number;
-  max: number;
+  mode: "snapshot";
   snapshot: number;
 }
 
@@ -79,8 +77,7 @@ function detailMatchesFilter(d: VisitDetails | undefined, f: YearFilterState): b
   if (!f.enabled) return true;
   const { min, max } = detailYearRange(d);
   if (min === undefined || max === undefined) return true;
-  if (f.mode === "snapshot") return min <= f.snapshot;
-  return max >= f.min && min <= f.max;
+  return min <= f.snapshot;
 }
 
 function useLocalStorageRecord(key: string): [Record<string, VisitDetails>, (id: string, details: VisitDetails | null) => void] {
@@ -1895,9 +1892,16 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
   const [yearFilter, setYearFilterRaw] = useState<YearFilterState>(() => {
     try {
       const v = localStorage.getItem("wm_year_filter");
-      if (v) return JSON.parse(v) as YearFilterState;
+      if (v) {
+        const parsed = JSON.parse(v) as Partial<YearFilterState>;
+        return {
+          enabled: parsed.enabled === true,
+          mode: "snapshot",
+          snapshot: typeof parsed.snapshot === "number" ? parsed.snapshot : CURRENT_YEAR,
+        };
+      }
     } catch { /* ignore */ }
-    return { enabled: false, mode: "range", min: CURRENT_YEAR - 10, max: CURRENT_YEAR, snapshot: CURRENT_YEAR };
+    return { enabled: false, mode: "snapshot", snapshot: CURRENT_YEAR };
   });
   const setYearFilter = useCallback((updater: YearFilterState | ((p: YearFilterState) => YearFilterState)) => {
     setYearFilterRaw(prev => {
@@ -2013,11 +2017,9 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
   // Clamp filter values when earliestYear changes
   useEffect(() => {
     setYearFilter(p => {
-      const min = Math.max(p.min, earliestYear);
-      const max = Math.min(Math.max(p.max, min), CURRENT_YEAR);
       const snapshot = Math.min(Math.max(p.snapshot, earliestYear), CURRENT_YEAR);
-      if (min === p.min && max === p.max && snapshot === p.snapshot) return p;
-      return { ...p, min, max, snapshot };
+      if (snapshot === p.snapshot) return p;
+      return { ...p, snapshot };
     });
   }, [earliestYear, setYearFilter]);
 
@@ -2407,7 +2409,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
             title="Filter map by year"
           >
             📅 {yearFilter.enabled
-              ? (yearFilter.mode === "snapshot" ? `As of ${yearFilter.snapshot}` : `${yearFilter.min}–${yearFilter.max}`)
+              ? `As of ${yearFilter.snapshot}`
               : "Filter by Year"}
           </button>
           <button
@@ -2532,80 +2534,40 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
             />
             <span>Enable year filter</span>
           </label>
-          <div className="flex items-center gap-0.5 bg-slate-800/80 rounded-lg p-0.5 border border-slate-700">
-            <button
-              onClick={() => { setYearFilter(p => ({ ...p, mode: "range" })); setFilterPlaying(false); }}
-              className={`px-3 py-1 text-xs rounded font-medium transition-colors ${yearFilter.mode === "range" ? "bg-amber-600 text-white" : "text-slate-400 hover:text-white"}`}
-            >Range</button>
-            <button
-              onClick={() => setYearFilter(p => ({ ...p, mode: "snapshot" }))}
-              className={`px-3 py-1 text-xs rounded font-medium transition-colors ${yearFilter.mode === "snapshot" ? "bg-amber-600 text-white" : "text-slate-400 hover:text-white"}`}
-            >Snapshot</button>
-          </div>
+          <span className="px-3 py-1 text-xs rounded font-medium bg-amber-600 text-white">
+            Snapshot
+          </span>
           <div className="flex-1 min-w-[280px] flex flex-col gap-1">
             <div className="text-xs text-amber-300 font-mono">
-              {yearFilter.mode === "snapshot" ? `As of ${yearFilter.snapshot}` : `${yearFilter.min} – ${yearFilter.max}`}
+              As of {yearFilter.snapshot}
               <span className="text-slate-500 ml-2">({earliestYear} – {CURRENT_YEAR})</span>
             </div>
-            {yearFilter.mode === "range" ? (
-              <div className="flex flex-col gap-1">
-                <div className="flex gap-3 items-center">
-                  <span className="text-[10px] text-slate-400 w-8 text-right">From</span>
-                  <input
-                    type="range"
-                    min={earliestYear}
-                    max={CURRENT_YEAR}
-                    value={yearFilter.min}
-                    onChange={e => setYearFilter(p => ({ ...p, min: Math.min(Number(e.target.value), p.max) }))}
-                    disabled={!yearFilter.enabled}
-                    className="flex-1 accent-amber-500 disabled:opacity-40"
-                  />
-                  <span className="text-xs text-slate-300 font-mono w-10">{yearFilter.min}</span>
-                </div>
-                <div className="flex gap-3 items-center">
-                  <span className="text-[10px] text-slate-400 w-8 text-right">To</span>
-                  <input
-                    type="range"
-                    min={earliestYear}
-                    max={CURRENT_YEAR}
-                    value={yearFilter.max}
-                    onChange={e => setYearFilter(p => ({ ...p, max: Math.max(Number(e.target.value), p.min) }))}
-                    disabled={!yearFilter.enabled}
-                    className="flex-1 accent-amber-500 disabled:opacity-40"
-                  />
-                  <span className="text-xs text-slate-300 font-mono w-10">{yearFilter.max}</span>
-                </div>
-              </div>
-            ) : (
-              <div className="flex gap-3 items-center">
-                <span className="text-xs text-slate-500 w-10 text-right">{earliestYear}</span>
-                <input
-                  type="range"
-                  min={earliestYear}
-                  max={CURRENT_YEAR}
-                  value={yearFilter.snapshot}
-                  onChange={e => setYearFilter(p => ({ ...p, snapshot: Number(e.target.value) }))}
-                  disabled={!yearFilter.enabled}
-                  className="flex-1 accent-amber-500 disabled:opacity-40"
-                />
-                <span className="text-xs text-slate-500 w-10">{CURRENT_YEAR}</span>
-              </div>
-            )}
+            <div className="flex gap-3 items-center">
+              <span className="text-xs text-slate-500 w-10 text-right">{earliestYear}</span>
+              <input
+                type="range"
+                min={earliestYear}
+                max={CURRENT_YEAR}
+                value={yearFilter.snapshot}
+                onChange={e => setYearFilter(p => ({ ...p, snapshot: Number(e.target.value) }))}
+                disabled={!yearFilter.enabled}
+                className="flex-1 accent-amber-500 disabled:opacity-40"
+              />
+              <span className="text-xs text-slate-500 w-10">{CURRENT_YEAR}</span>
+            </div>
           </div>
-          {yearFilter.mode === "snapshot" && (
-            <button
-              onClick={() => setFilterPlaying(p => !p)}
-              disabled={!yearFilter.enabled}
-              className="px-3 py-1.5 text-sm bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-white font-medium transition-colors"
-              title="Auto-advance the snapshot year"
-            >
-              {filterPlaying ? "⏸ Pause" : "▶ Play"}
-            </button>
-          )}
+          <button
+            onClick={() => setFilterPlaying(p => !p)}
+            disabled={!yearFilter.enabled}
+            className="px-3 py-1.5 text-sm bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-white font-medium transition-colors"
+            title="Auto-advance the snapshot year"
+          >
+            {filterPlaying ? "⏸ Pause" : "▶ Play"}
+          </button>
           <button
             onClick={() => {
               setFilterPlaying(false);
-              setYearFilter({ enabled: false, mode: "range", min: earliestYear, max: CURRENT_YEAR, snapshot: CURRENT_YEAR });
+              setYearFilter({ enabled: false, mode: "snapshot", snapshot: CURRENT_YEAR });
             }}
             className="px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-600 rounded-lg text-white font-medium transition-colors"
           >

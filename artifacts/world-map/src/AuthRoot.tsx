@@ -45,6 +45,40 @@ function clearLocalTravelData() {
   }
 }
 
+// Cloud progress is authoritative for signed-in travelers. Keep view-only
+// preferences (for example, the selected map mode) and unsynced legacy photos,
+// but discard progress that belongs to a prior browser session before hydration.
+function clearLocalProgressForHydration() {
+  const destinationKeys = new Set([
+    "wm_visited_countries",
+    "wm_visited_states",
+    "wm_visited_provinces",
+    "wm_tcc_visited",
+    "wm_bucket_countries",
+    "wm_bucket_states",
+    "wm_bucket_provinces",
+    "wm_tcc_bucket",
+    "wm_details_countries",
+    "wm_details_states",
+    "wm_details_provinces",
+    "wm_details_tcc",
+    "wm_profile_name",
+  ]);
+
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (destinationKeys.has(key) || key.startsWith("shortnote:"))) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+  } catch {
+    // Storage may be unavailable in restricted browser contexts.
+  }
+}
+
 const clerkAppearance = {
   theme: shadcn,
   cssLayerName: "clerk",
@@ -494,14 +528,14 @@ type ServerData = Record<string, unknown>;
 
 function applyServerDataToLocalStorage(data: ServerData) {
   const setArr = (key: string, val: unknown) => {
-    if (Array.isArray(val) && val.length > 0) {
+    if (Array.isArray(val)) {
       try {
         localStorage.setItem(key, JSON.stringify(val));
       } catch {}
     }
   };
   const setObj = (key: string, val: unknown) => {
-    if (val && typeof val === "object" && Object.keys(val).length > 0) {
+    if (val && typeof val === "object" && !Array.isArray(val)) {
       try {
         localStorage.setItem(key, JSON.stringify(val));
       } catch {}
@@ -543,7 +577,12 @@ function AppWithSync() {
   const { user, isLoaded, isSignedIn } = useUser();
   const { signOut } = useClerk();
   const [, setLocation] = useLocation();
-  const [ready, setReady] = useState(false);
+  const [hydratedUserId, setHydratedUserId] = useState<string | null>(null);
+  const [hydrationError, setHydrationError] = useState<{
+    userId: string;
+    message: string;
+  } | null>(null);
+  const [hydrationAttempt, setHydrationAttempt] = useState(0);
   const [needsUsername, setNeedsUsername] = useState(false);
   const [placeholderUsername, setPlaceholderUsername] = useState("");
   // Tracks the confirmed username across the session
@@ -554,6 +593,15 @@ function AppWithSync() {
   const [nameSaving, setNameSaving] = useState(false);
   const [nameSaved, setNameSaved] = useState(false);
   const [profileName, setProfileName] = useState<string | null>(() => localStorage.getItem("wm_profile_name") || null);
+  const signedInUserId = isSignedIn ? user?.id : undefined;
+  const ready =
+    isLoaded &&
+    (!isSignedIn ||
+      (signedInUserId !== undefined && hydratedUserId === signedInUserId));
+  const currentHydrationError =
+    signedInUserId !== undefined && hydrationError?.userId === signedInUserId
+      ? hydrationError.message
+      : null;
 
   // Username edit state (profile modal)
   const [usernameInput, setUsernameInput] = useState("");
@@ -649,26 +697,44 @@ function AppWithSync() {
     clearLocalTravelData();
     setShowUserProfile(false);
     setNeedsUsername(false);
-    setReady(false);
+    setHydratedUserId(null);
     void signOut({ redirectUrl: basePath || "/" }).catch(() => {
       // If sign-out fails, reload the signed-in data from the server.
-      setReady(true);
+      setHydrationAttempt((attempt) => attempt + 1);
     });
   }
 
   useEffect(() => {
     if (!isLoaded) return;
+
     if (!isSignedIn) {
-      setReady(true);
+      setHydrationError(null);
+      setHydratedUserId(null);
       return;
     }
+    if (!signedInUserId) return;
+
+    const userId = signedInUserId;
+    let cancelled = false;
+    setHydrationError(null);
+    setNeedsUsername(false);
+
     fetch(`${basePath}/api/map-data`, { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : null))
+      .then(async (r) => {
+        if (!r.ok) {
+          throw new Error(`Failed to load travel data: ${r.status}`);
+        }
+        return r.json() as Promise<{ data: ServerData | null }>;
+      })
       .then(async (envelope: { data: ServerData | null } | null) => {
+        if (cancelled) return;
+        clearLocalProgressForHydration();
         if (envelope?.data) applyServerDataToLocalStorage(envelope.data);
+        setProfileName(localStorage.getItem("wm_profile_name") || null);
         // Migrate any legacy localStorage photos to backend storage (runs once per key).
         await migrateLocalStoragePhotos(basePath).catch(() => {});
 
+        if (cancelled) return;
         // Check whether the user still has an auto-generated placeholder username.
         // Failure is non-fatal — let the user into the app rather than hard-blocking.
         try {
@@ -689,12 +755,46 @@ function AppWithSync() {
           // Network/server error — skip the prompt this session, retry next load.
         }
 
-        setReady(true);
+        if (!cancelled) setHydratedUserId(userId);
       })
-      .catch(() => setReady(true));
-  }, [isLoaded, isSignedIn]);
+      .catch(() => {
+        if (!cancelled) {
+          setHydrationError(
+            {
+              userId,
+              message:
+                "We couldn't load your cloud travel data. Nothing has been changed.",
+            },
+          );
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, isSignedIn, signedInUserId, hydrationAttempt]);
 
   if (!ready) {
+    if (currentHydrationError) {
+      return (
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
+          <div className="max-w-md rounded-2xl border border-red-800 bg-slate-900 p-6 text-center shadow-2xl">
+            <h1 className="text-lg font-semibold text-slate-100">
+              Travel data unavailable
+            </h1>
+            <p className="mt-2 text-sm text-slate-400">{currentHydrationError}</p>
+            <button
+              type="button"
+              onClick={() => setHydrationAttempt((attempt) => attempt + 1)}
+              className="mt-5 rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-600"
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">

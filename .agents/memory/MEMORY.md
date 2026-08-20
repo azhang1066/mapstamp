@@ -6,3 +6,4 @@
 - [Generated API client declarations](generated-api-client-declarations.md) — rebuild api-client-react declarations after OpenAPI codegen so consumers see regenerated social hooks and types.
 - [World Map port binding](world-map-port-binding.md) — keep Vite on the artifact’s injected port so the preview proxy cannot drift to a fallback server.
 - [Playwright Chromium on Nix](playwright-chromium-nix.md) — downloaded Chromium needs explicit system libraries before browser tests can launch.
+- [Signed-in map hydration](signed-in-map-hydration.md) — block cloud writes until each authenticated traveler’s progress has hydrated successfully.

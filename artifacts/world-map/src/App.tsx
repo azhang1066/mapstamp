@@ -32,6 +32,22 @@ import {
 
 type MapMode = "world" | "tcc";
 
+type MapGeography = {
+  id: string | number;
+  rsmKey: string;
+  properties: Record<string, string | undefined>;
+  svgPath: string;
+};
+
+type GeographiesRenderProps = {
+  geographies: MapGeography[];
+};
+
+type MapMoveEndState = {
+  coordinates: [number, number];
+  zoom: number;
+};
+
 function useLocalStorageSet(key: string): [Set<string>, React.Dispatch<React.SetStateAction<Set<string>>>] {
   const [value, setValue] = useState<Set<string>>(() => {
     try {
@@ -2232,8 +2248,9 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
   }, [setVisitedCountries, setVisitedStates, setVisitedProvinces, setTccVisited,
       setCountryDetail, setStateDetail, setProvinceDetail, setTccDetail, showToast]);
 
-  const handleCountryClick = useCallback((geo: { id: string }) => {
-    const code = geo.id === "304" ? "208" : geo.id; // Greenland → Denmark
+  const handleCountryClick = useCallback((geo: Pick<MapGeography, "id">) => {
+    const countryId = String(geo.id);
+    const code = countryId === "304" ? "208" : countryId; // Greenland → Denmark
     const info = COUNTRY_DATA[code];
     setConfirmBucket(null);
     if (!info) { setSelected(null); return; }
@@ -2241,7 +2258,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
     setSelected(prev => prev?.key === key ? null : { key, info });
   }, []);
 
-  const handleStateClick = useCallback((geo: { id: string }) => {
+  const handleStateClick = useCallback((geo: Pick<MapGeography, "id">) => {
     const fips = String(geo.id).padStart(2, "0");
     const info = US_STATE_DATA[fips];
     setConfirmBucket(null);
@@ -2250,8 +2267,8 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
     setSelected(prev => prev?.key === key ? null : { key, info });
   }, []);
 
-  const handleProvinceClick = useCallback((geo: { properties: Record<string, string> }) => {
-    const name = geo.properties.name || geo.properties.NAME_1 || geo.properties.NAME;
+  const handleProvinceClick = useCallback((geo: Pick<MapGeography, "properties">) => {
+    const name = geo.properties.name || geo.properties.NAME_1 || geo.properties.NAME || "";
     const info = CA_PROVINCE_DATA[name];
     setConfirmBucket(null);
     if (!info) return;
@@ -2590,12 +2607,19 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
             style={{ width: "100%", height: "100%" }}
             projectionConfig={{ scale: 130, center: [0, 20] }}
           >
-            <ZoomableGroup zoom={zoom} center={center} onMoveEnd={({ zoom: z, coordinates }) => { setZoom(z); setCenter(coordinates); }}>
+            <ZoomableGroup
+              zoom={zoom}
+              center={center}
+              onMoveEnd={({ zoom: z, coordinates }: MapMoveEndState) => {
+                setZoom(z);
+                setCenter(coordinates);
+              }}
+            >
               {mapMode === "tcc" && (
                 <>
                   {/* TCC: world geographies tinted by region — skip USA (840); handled by states layer */}
                   <Geographies geography={WORLD_URL}>
-                    {({ geographies }) =>
+                    {({ geographies }: GeographiesRenderProps) =>
                       geographies.filter(geo => String(geo.id) !== "840").map((geo) => {
                         const tcc = TCC_BY_GEO_ID.get(String(geo.id));
                         const tccName = tcc?.name;
@@ -2614,7 +2638,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                             key={geo.rsmKey}
                             geography={geo}
                             onClick={() => { if (tcc) handleTccGeoClick(tcc); }}
-                            onMouseEnter={(evt) => { if (tccName) { setHoveredTcc(tccName); handleMouseEnter(tccName, evt); } }}
+                            onMouseEnter={(evt: React.MouseEvent<SVGPathElement>) => { if (tccName) { setHoveredTcc(tccName); handleMouseEnter(tccName, evt); } }}
                             onMouseMove={handleMouseMove}
                             onMouseLeave={() => { setHoveredTcc(null); handleMouseLeave(); }}
                             style={{
@@ -2659,7 +2683,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                   {/* TCC: US States layer — splits the USA into three independent TCC entries:
                       "United States (Contiguous)", "Alaska", and "Hawaiian Islands" */}
                   <Geographies geography={US_STATES_URL}>
-                    {({ geographies }) =>
+                    {({ geographies }: GeographiesRenderProps) =>
                       geographies.map((geo) => {
                         const fips = String(geo.id).padStart(2, "0");
                         const tccName = FIPS_TO_TCC_NAME[fips] ?? "United States (Contiguous)";
@@ -2678,7 +2702,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                             key={geo.rsmKey}
                             geography={geo}
                             onClick={() => handleTccGeoClick(tccEntry)}
-                            onMouseEnter={(evt) => { setHoveredTcc(tccName); handleMouseEnter(tccName, evt); }}
+                            onMouseEnter={(evt: React.MouseEvent<SVGPathElement>) => { setHoveredTcc(tccName); handleMouseEnter(tccName, evt); }}
                             onMouseMove={handleMouseMove}
                             onMouseLeave={() => { setHoveredTcc(null); handleMouseLeave(); }}
                             style={{
@@ -2697,27 +2721,28 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
               {mapMode === "world" && (<>
               {/* World countries — excluding US (840) and Canada (124) */}
               <Geographies geography={WORLD_URL}>
-                {({ geographies }) =>
+                {({ geographies }: GeographiesRenderProps) =>
                   geographies
-                    .filter(geo => geo.id !== "840" && geo.id !== "124")
+                    .filter(geo => String(geo.id) !== "840" && String(geo.id) !== "124")
                     .map((geo) => {
-                      const key = `country-${geo.id}`;
+                      const countryId = String(geo.id);
+                      const key = `country-${countryId}`;
                       const isSelected = selected?.key === key;
-                      const isVisited = visitedCountries.has(geo.id);
-                      const isBucketList = !isVisited && bucketCountries.has(geo.id);
-                      const countryName = COUNTRY_DATA[geo.id]?.name ?? "";
+                      const isVisited = visitedCountries.has(countryId);
+                      const isBucketList = !isVisited && bucketCountries.has(countryId);
+                      const countryName = COUNTRY_DATA[countryId]?.name ?? "";
                       const isHovered = hovered === countryName;
                       return (
                         <Geography
                           key={geo.rsmKey}
                           geography={geo}
                           onClick={() => handleCountryClick(geo)}
-                          onMouseEnter={(evt) => handleMouseEnter(countryName || "Unknown territory", evt)}
+                          onMouseEnter={(evt: React.MouseEvent<SVGPathElement>) => handleMouseEnter(countryName || "Unknown territory", evt)}
                           onMouseMove={handleMouseMove}
                           onMouseLeave={handleMouseLeave}
                           style={{
-                            default: { fill: getCountryFill(geo.id, isSelected, false, isVisited, isBucketList), stroke: isBucketList ? BUCKET_LIST_STROKE : "#1e293b", strokeWidth: isBucketList ? 0.8 : 0.5, strokeDasharray: isBucketList ? "3 2" : undefined, outline: "none", cursor: "pointer", transition: "fill 0.15s" },
-                            hover: { fill: getCountryFill(geo.id, isSelected, true, isVisited, isBucketList), stroke: isBucketList ? BUCKET_LIST_STROKE : "#334155", strokeWidth: isBucketList ? 1 : 0.7, outline: "none", cursor: "pointer" },
+                            default: { fill: getCountryFill(countryId, isSelected, false, isVisited, isBucketList), stroke: isBucketList ? BUCKET_LIST_STROKE : "#1e293b", strokeWidth: isBucketList ? 0.8 : 0.5, strokeDasharray: isBucketList ? "3 2" : undefined, outline: "none", cursor: "pointer", transition: "fill 0.15s" },
+                            hover: { fill: getCountryFill(countryId, isSelected, true, isVisited, isBucketList), stroke: isBucketList ? BUCKET_LIST_STROKE : "#334155", strokeWidth: isBucketList ? 1 : 0.7, outline: "none", cursor: "pointer" },
                             pressed: { fill: SELECTED_COLOR, outline: "none" },
                           }}
                         />
@@ -2728,7 +2753,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
 
               {/* US States */}
               <Geographies geography={US_STATES_URL}>
-                {({ geographies }) =>
+                {({ geographies }: GeographiesRenderProps) =>
                   geographies.map((geo) => {
                     const fips = String(geo.id).padStart(2, "0");
                     const key = `state-${fips}`;
@@ -2742,7 +2767,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                         key={geo.rsmKey}
                         geography={geo}
                         onClick={() => handleStateClick(geo)}
-                        onMouseEnter={(evt) => handleMouseEnter(stateName, evt)}
+                        onMouseEnter={(evt: React.MouseEvent<SVGPathElement>) => handleMouseEnter(stateName, evt)}
                         onMouseMove={handleMouseMove}
                         onMouseLeave={handleMouseLeave}
                         style={{
@@ -2758,7 +2783,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
 
               {/* Canadian Provinces */}
               <Geographies geography={CA_PROVINCES_URL}>
-                {({ geographies }) =>
+                {({ geographies }: GeographiesRenderProps) =>
                   geographies.map((geo) => {
                     const name = geo.properties.name || geo.properties.NAME_1 || geo.properties.NAME || "";
                     const key = `province-${name}`;
@@ -2771,7 +2796,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                         key={geo.rsmKey}
                         geography={geo}
                         onClick={() => handleProvinceClick(geo)}
-                        onMouseEnter={(evt) => handleMouseEnter(name || "Canadian Province", evt)}
+                        onMouseEnter={(evt: React.MouseEvent<SVGPathElement>) => handleMouseEnter(name || "Canadian Province", evt)}
                         onMouseMove={handleMouseMove}
                         onMouseLeave={handleMouseLeave}
                         style={{

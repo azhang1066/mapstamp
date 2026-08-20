@@ -3589,7 +3589,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
             <div className="px-6 py-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-1.5">
                 {allItems.map(item => (
-                  <div key={item.key} className="flex items-start gap-2 px-2.5 py-2 rounded-lg text-sm bg-amber-900/20 border border-amber-700/30 hover:bg-amber-900/30 transition-colors">
+                  <div data-testid="bucket-list-item" key={item.key} className="flex items-start gap-2 px-2.5 py-2 rounded-lg text-sm bg-amber-900/20 border border-amber-700/30 hover:bg-amber-900/30 transition-colors">
                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide shrink-0 mt-0.5 ${item.badgeClass}`}>{item.badge}</span>
                     <button
                       className="text-left flex-1 min-w-0"

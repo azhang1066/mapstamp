@@ -11,6 +11,7 @@ import {
   Marker,
   ZoomableGroup,
 } from "react-simple-maps";
+import type { RsmGeography } from "react-simple-maps";
 import {
   TCC_DATA,
   TCC_REGIONS,
@@ -32,12 +33,7 @@ import {
 
 type MapMode = "world" | "tcc";
 
-type MapGeography = {
-  id: string | number;
-  rsmKey: string;
-  properties: Record<string, string | undefined>;
-  svgPath: string;
-};
+type MapGeography = RsmGeography;
 
 type GeographiesRenderProps = {
   geographies: MapGeography[];

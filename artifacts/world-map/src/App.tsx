@@ -2165,9 +2165,20 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
   // Debounced server sync — runs 3s after any data change when logged in
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (!isAuthenticated) return;
+    const syncingUserId = authUser?.id;
+    if (!isAuthenticated || !syncingUserId) return;
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
     syncTimerRef.current = setTimeout(() => {
+      // Clerk can change the active session before React unmounts this
+      // account's map. Never let a pending save write one traveler's state
+      // through another traveler's authenticated browser session.
+      const activeClerkUserId = (
+        window as typeof window & {
+          Clerk?: { user?: { id?: string } | null };
+        }
+      ).Clerk?.user?.id;
+      if (activeClerkUserId !== syncingUserId) return;
+
       const notesByKey: Record<string, string> = {};
       try {
         for (let i = 0; i < localStorage.length; i++) {
@@ -2200,7 +2211,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
     }, 3000);
     return () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current); };
   }, [
-    isAuthenticated,
+    isAuthenticated, authUser?.id,
     rawVisitedCountries, rawVisitedStates, rawVisitedProvinces, rawTccVisited,
     rawBucketCountries, rawBucketStates, rawBucketProvinces, rawTccBucket,
     countryDetails, stateDetails, provinceDetails, tccDetails,

@@ -718,6 +718,13 @@ function AppWithSync() {
     let cancelled = false;
     setHydrationError(null);
     setNeedsUsername(false);
+    // A browser can retain the prior traveler's storage while Clerk changes
+    // sessions. Remove only account-scoped progress before loading the new
+    // traveler's authoritative cloud data.
+    if (hydratedUserId !== userId) {
+      clearLocalProgressForHydration();
+      setProfileName(null);
+    }
 
     fetch(`${basePath}/api/map-data`, { credentials: "include" })
       .then(async (r) => {
@@ -728,7 +735,6 @@ function AppWithSync() {
       })
       .then(async (envelope: { data: ServerData | null } | null) => {
         if (cancelled) return;
-        clearLocalProgressForHydration();
         if (envelope?.data) applyServerDataToLocalStorage(envelope.data);
         setProfileName(localStorage.getItem("wm_profile_name") || null);
         // Migrate any legacy localStorage photos to backend storage (runs once per key).

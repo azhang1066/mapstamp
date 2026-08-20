@@ -1,4 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
+import { clerk } from "@clerk/testing/playwright";
+
+const SECOND_TRAVELER_EMAIL = "world-map-e2e-second+clerk_test@example.com";
 
 const CLOUD_PROGRESS = {
   schemaVersion: 2,
@@ -22,6 +25,23 @@ const STALE_BROWSER_PROGRESS = {
   "wm_bucket_states": [],
   "wm_bucket_provinces": [],
   "wm_tcc_bucket": ["Aland Islands"],
+} as const;
+
+const FIRST_TRAVELER_PROGRESS = {
+  schemaVersion: 2,
+  visitedCountries: ["250"], // France
+  visitedStates: [],
+  visitedProvinces: [],
+  tccVisited: [],
+  bucketCountries: ["036"], // Australia
+  bucketStates: [],
+  bucketProvinces: [],
+  tccBucket: [],
+  countryDetails: {},
+  stateDetails: {},
+  provinceDetails: {},
+  tccDetails: {},
+  notesByKey: {},
 } as const;
 
 test("does not save browser progress while cloud hydration is unavailable", async ({
@@ -149,4 +169,66 @@ test("restores cloud bucket totals in TCC mode without changing World totals", a
   );
   await expect(page.getByTestId("bucket-list-total")).toHaveText("3");
   await expectBucketTabToMatchTotal(page);
+});
+
+test("does not show or save one traveler's progress after switching accounts", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const firstSeedStatus = await page.evaluate(async (cloudProgress) => {
+    const response = await fetch("/api/map-data", {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cloudProgress),
+    });
+    return response.status;
+  }, FIRST_TRAVELER_PROGRESS);
+  expect(
+    firstSeedStatus === 200,
+    `seed first traveler map data (${firstSeedStatus})`,
+  ).toBeTruthy();
+
+  await page.reload();
+  await expect(page.getByTestId("bucket-list-total")).toHaveText("1");
+  await page.getByRole("button", { name: "★ Bucket List", exact: true }).click();
+  await expect(
+    page.getByTestId("bucket-list-item").getByRole("button", {
+      name: "Australia",
+      exact: true,
+    }),
+  ).toBeVisible();
+
+  await clerk.signOut({ page });
+  await page.waitForFunction(() => window.Clerk?.user === null);
+  await clerk.signIn({ page, emailAddress: SECOND_TRAVELER_EMAIL });
+
+  await expect(page.getByTestId("map-canvas")).toBeVisible();
+  await expect(page.getByTestId("bucket-list-total")).toHaveText("1");
+  await page.getByRole("button", { name: "★ Bucket List", exact: true }).click();
+  await expect(
+    page.getByTestId("bucket-list-item").getByRole("button", {
+      name: "New Zealand",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByTestId("bucket-list-item").getByRole("button", {
+      name: "Australia",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+
+  // Wait beyond the debounce window and verify the second traveler's cloud
+  // fixture is unchanged until they make an intentional edit.
+  await page.waitForTimeout(3500);
+  const secondTravelerData = await page.evaluate(async () => {
+    const response = await fetch("/api/map-data", { credentials: "include" });
+    return response.json() as Promise<{
+      data: { visitedCountries: string[]; bucketCountries: string[] };
+    }>;
+  });
+  expect(secondTravelerData.data.visitedCountries).toEqual(["124"]);
+  expect(secondTravelerData.data.bucketCountries).toEqual(["554"]);
 });

@@ -80,6 +80,7 @@ async function seedSavedProgress(page: Page) {
 
 async function expectWorldSavedProgress(page: Page) {
   await expectActiveModeWithRenderedMap(page, "world");
+  await expect(page.getByTestId("bucket-list-total")).toHaveText("2");
   await page.getByRole("button", { name: "Countries", exact: true }).click();
 
   const france = page.getByRole("button", { name: "France", exact: true }).locator("..");
@@ -98,6 +99,7 @@ async function expectWorldSavedProgress(page: Page) {
 async function expectTccSavedProgress(page: Page) {
   await expectActiveModeWithRenderedMap(page, "tcc");
   await expect(page.getByTestId("map-mode-tcc")).toContainText("1/330");
+  await expect(page.getByTestId("bucket-list-total")).toHaveText("2");
 
   await page.getByRole("button", { name: "★ Bucket List", exact: true }).click();
   await expect(page.getByRole("button", { name: /^Abkhazia\b/ })).toBeVisible();

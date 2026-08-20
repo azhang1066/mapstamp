@@ -3284,11 +3284,14 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
               </div>
             ))}
             {(() => {
-              const bucketTotal = bucketCountries.size + bucketStates.size + bucketProvinces.size;
+              const bucketTotal = bucketCountries.size + bucketStates.size + bucketProvinces.size + tccBucket.size;
               return (
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-amber-400">★ Bucket List</span>
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-900/40 text-amber-300 border border-amber-700/50">
+                  <span
+                    data-testid="bucket-list-total"
+                    className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-900/40 text-amber-300 border border-amber-700/50"
+                  >
                     {bucketTotal}
                   </span>
                 </div>

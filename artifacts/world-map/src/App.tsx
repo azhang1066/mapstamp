@@ -2614,9 +2614,9 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                             key={geo.rsmKey}
                             geography={geo}
                             onClick={() => { if (tcc) handleTccGeoClick(tcc); }}
-                            onMouseEnter={(evt) => { if (tccName) { setHoveredTcc(tccName); setTooltipName(tccName); setTooltipPos({ x: evt.clientX, y: evt.clientY }); } }}
-                            onMouseMove={(evt) => setTooltipPos({ x: evt.clientX, y: evt.clientY })}
-                            onMouseLeave={() => { setHoveredTcc(null); setTooltipName(""); }}
+                            onMouseEnter={(evt) => { if (tccName) { setHoveredTcc(tccName); handleMouseEnter(tccName, evt); } }}
+                            onMouseMove={handleMouseMove}
+                            onMouseLeave={() => { setHoveredTcc(null); handleMouseLeave(); }}
                             style={{
                               default: { fill, stroke, strokeWidth: isBucketList ? 0.9 : (tcc ? 0.5 : 0.3), strokeDasharray: isBucketList ? "3 2" : undefined, outline: "none", cursor: tcc ? "pointer" : "default", transition: "fill 0.15s" },
                               hover:   { fill: isSelected ? SELECTED_COLOR : (region ? region.color : "#1f2937"), stroke: isBucketList ? BUCKET_LIST_STROKE : (tcc ? "#334155" : "#1e293b"), strokeWidth: isBucketList ? 1 : (tcc ? 0.7 : 0.3), outline: "none", cursor: tcc ? "pointer" : "default" },
@@ -2645,9 +2645,9 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                           transform={`scale(${s})`}
                           style={{ cursor: "pointer" }}
                           onClick={(e) => { e.stopPropagation(); handleTccGeoClick(entry); }}
-                          onMouseEnter={(e) => { setHoveredTcc(entry.name); setTooltipName(entry.name); setTooltipPos({ x: e.clientX, y: e.clientY }); }}
-                          onMouseMove={(e) => setTooltipPos({ x: e.clientX, y: e.clientY })}
-                          onMouseLeave={() => { setHoveredTcc(null); setTooltipName(""); }}
+                          onMouseEnter={(e) => { setHoveredTcc(entry.name); handleMouseEnter(entry.name, e); }}
+                          onMouseMove={handleMouseMove}
+                          onMouseLeave={() => { setHoveredTcc(null); handleMouseLeave(); }}
                         >
                           <circle r={isHov || isSelected ? 5 : 3.5} fill={ringColor} opacity={0.4} />
                           <circle r={isHov || isSelected ? 3 : 2.2} fill={dotFill} stroke={ringColor} strokeWidth={1} />
@@ -2678,9 +2678,9 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                             key={geo.rsmKey}
                             geography={geo}
                             onClick={() => handleTccGeoClick(tccEntry)}
-                            onMouseEnter={(evt) => { setHoveredTcc(tccName); setTooltipName(tccName); setTooltipPos({ x: evt.clientX, y: evt.clientY }); }}
-                            onMouseMove={(evt) => setTooltipPos({ x: evt.clientX, y: evt.clientY })}
-                            onMouseLeave={() => { setHoveredTcc(null); setTooltipName(""); }}
+                            onMouseEnter={(evt) => { setHoveredTcc(tccName); handleMouseEnter(tccName, evt); }}
+                            onMouseMove={handleMouseMove}
+                            onMouseLeave={() => { setHoveredTcc(null); handleMouseLeave(); }}
                             style={{
                               default: { fill, stroke, strokeWidth: isBucketList ? 0.9 : 0.4, strokeDasharray: isBucketList ? "3 2" : undefined, outline: "none", cursor: "pointer", transition: "fill 0.15s" },
                               hover:   { fill: isSelected ? SELECTED_COLOR : region.color, stroke: isBucketList ? BUCKET_LIST_STROKE : "#334155", strokeWidth: isBucketList ? 1 : 0.6, outline: "none", cursor: "pointer" },

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import UsernameOnboardingModal from "./UsernameOnboardingModal";
 import {
@@ -40,6 +40,33 @@ function clearLocalTravelData() {
       }
     }
     keysToRemove.forEach((key) => localStorage.removeItem(key));
+  } catch {
+    // Storage may be unavailable in restricted browser contexts.
+  }
+}
+
+const legacyPhotoOwnerKey = "wm_legacy_photo_owner";
+
+function clearLegacyLocalStoragePhotos() {
+  try {
+    const photoKeys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith("photos:")) photoKeys.push(key);
+    }
+    photoKeys.forEach((key) => localStorage.removeItem(key));
+  } catch {
+    // Storage may be unavailable in restricted browser contexts.
+  }
+}
+
+function claimLegacyLocalStoragePhotos(userId: string) {
+  try {
+    const previousOwner = localStorage.getItem(legacyPhotoOwnerKey);
+    if (previousOwner !== null && previousOwner !== userId) {
+      clearLegacyLocalStoragePhotos();
+    }
+    localStorage.setItem(legacyPhotoOwnerKey, userId);
   } catch {
     // Storage may be unavailable in restricted browser contexts.
   }
@@ -455,6 +482,13 @@ function SignUpSSOCallbackPage() {
 // ─── Legacy localStorage photo migration ──────────────────────────────────────
 
 const _migratedKeys = new Set<string>();
+type PhotoMigration = {
+  userId: string;
+  controller: AbortController;
+  promise: Promise<void>;
+};
+
+let activePhotoMigration: PhotoMigration | null = null;
 
 function dataUrlToBlob(dataUrl: string): Blob {
   const [header, b64] = dataUrl.split(",");
@@ -466,8 +500,23 @@ function dataUrlToBlob(dataUrl: string): Blob {
   return new Blob([bytes], { type: mime });
 }
 
-async function migrateLocalStoragePhotos(apiBase: string): Promise<void> {
+function legacyPhotoOwnerMatches(userId: string): boolean {
+  try {
+    return localStorage.getItem(legacyPhotoOwnerKey) === userId;
+  } catch {
+    return false;
+  }
+}
+
+async function migrateLocalStoragePhotos(
+  apiBase: string,
+  userId: string,
+  signal: AbortSignal,
+): Promise<void> {
+  const canContinue = () =>
+    !signal.aborted && legacyPhotoOwnerMatches(userId);
   const photoKeys: string[] = [];
+  if (!canContinue()) return;
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
@@ -476,6 +525,7 @@ async function migrateLocalStoragePhotos(apiBase: string): Promise<void> {
   } catch { return; }
 
   for (const key of photoKeys) {
+    if (!canContinue()) return;
     // key format: photos:<category>:<destinationId>
     const withoutPrefix = key.slice("photos:".length);
     const firstColon = withoutPrefix.indexOf(":");
@@ -485,7 +535,13 @@ async function migrateLocalStoragePhotos(apiBase: string): Promise<void> {
 
     try {
       const raw = localStorage.getItem(key);
-      if (!raw) { _migratedKeys.add(key); localStorage.removeItem(key); continue; }
+      if (!raw) {
+        if (canContinue()) {
+          _migratedKeys.add(key);
+          localStorage.removeItem(key);
+        }
+        continue;
+      }
       const photos = JSON.parse(raw) as Array<{
         id: string;
         base64: string;
@@ -495,6 +551,7 @@ async function migrateLocalStoragePhotos(apiBase: string): Promise<void> {
 
       let allOk = true;
       for (let pos = 0; pos < photos.length; pos++) {
+        if (!canContinue()) return;
         const photo = photos[pos];
         if (!photo.base64?.startsWith("data:")) continue;
         try {
@@ -509,16 +566,52 @@ async function migrateLocalStoragePhotos(apiBase: string): Promise<void> {
             method: "POST",
             body: fd,
             credentials: "include",
+            signal,
           });
           if (!resp.ok) { allOk = false; }
-        } catch { allOk = false; }
+        } catch {
+          if (!canContinue()) return;
+          allOk = false;
+        }
       }
 
-      if (allOk) {
+      if (allOk && canContinue()) {
         _migratedKeys.add(key);
         localStorage.removeItem(key);
       }
     } catch { /* silently skip malformed entries */ }
+  }
+}
+
+async function migrateLocalStoragePhotosForUser(
+  apiBase: string,
+  userId: string,
+  hydrationSignal: AbortSignal,
+): Promise<void> {
+  if (activePhotoMigration) {
+    if (activePhotoMigration.userId !== userId) {
+      activePhotoMigration.controller.abort();
+      await activePhotoMigration.promise.catch(() => {});
+    } else {
+      await activePhotoMigration.promise.catch(() => {});
+    }
+  }
+  if (hydrationSignal.aborted || !legacyPhotoOwnerMatches(userId)) return;
+
+  const controller = new AbortController();
+  const abortMigration = () => controller.abort();
+  hydrationSignal.addEventListener("abort", abortMigration, { once: true });
+  if (hydrationSignal.aborted) controller.abort();
+
+  const promise = migrateLocalStoragePhotos(apiBase, userId, controller.signal);
+  activePhotoMigration = { userId, controller, promise };
+  try {
+    await promise;
+  } finally {
+    hydrationSignal.removeEventListener("abort", abortMigration);
+    if (activePhotoMigration?.promise === promise) {
+      activePhotoMigration = null;
+    }
   }
 }
 
@@ -577,6 +670,7 @@ function AppWithSync() {
   const { user, isLoaded, isSignedIn } = useUser();
   const { signOut } = useClerk();
   const [, setLocation] = useLocation();
+  const lastSignedInUserId = useRef<string | null>(null);
   const [hydratedUserId, setHydratedUserId] = useState<string | null>(null);
   const [hydrationError, setHydrationError] = useState<{
     userId: string;
@@ -708,6 +802,14 @@ function AppWithSync() {
     if (!isLoaded) return;
 
     if (!isSignedIn) {
+      // Legacy photo keys have no owner metadata. Preserve them on the
+      // initial signed-out visit so the first traveler can migrate them, but
+      // discard them after an authenticated session ends before another
+      // traveler can claim them.
+      if (lastSignedInUserId.current !== null) {
+        clearLegacyLocalStoragePhotos();
+      }
+      lastSignedInUserId.current = null;
       setHydrationError(null);
       setHydratedUserId(null);
       return;
@@ -715,7 +817,23 @@ function AppWithSync() {
     if (!signedInUserId) return;
 
     const userId = signedInUserId;
+    // A full page reload can happen during an account change, so retain the
+    // legacy-photo owner in storage as well as the in-memory session ref.
+    // This deliberately preserves first-time offline photo migration while
+    // preventing a later traveler from claiming a prior traveler's keys.
+    claimLegacyLocalStoragePhotos(userId);
+    if (
+      lastSignedInUserId.current !== null &&
+      lastSignedInUserId.current !== userId
+    ) {
+      // Clerk can replace sessions without React committing a signed-out
+      // render between them. Legacy photo keys are ownerless, so clear them
+      // before the new traveler's hydration can migrate them.
+      clearLegacyLocalStoragePhotos();
+    }
+    lastSignedInUserId.current = userId;
     let cancelled = false;
+    const photoMigrationController = new AbortController();
     setHydrationError(null);
     setNeedsUsername(false);
     // A browser can retain the prior traveler's storage while Clerk changes
@@ -738,7 +856,11 @@ function AppWithSync() {
         if (envelope?.data) applyServerDataToLocalStorage(envelope.data);
         setProfileName(localStorage.getItem("wm_profile_name") || null);
         // Migrate any legacy localStorage photos to backend storage (runs once per key).
-        await migrateLocalStoragePhotos(basePath).catch(() => {});
+        await migrateLocalStoragePhotosForUser(
+          basePath,
+          userId,
+          photoMigrationController.signal,
+        ).catch(() => {});
 
         if (cancelled) return;
         // Check whether the user still has an auto-generated placeholder username.
@@ -777,6 +899,7 @@ function AppWithSync() {
 
     return () => {
       cancelled = true;
+      photoMigrationController.abort();
     };
   }, [isLoaded, isSignedIn, signedInUserId, hydrationAttempt]);
 

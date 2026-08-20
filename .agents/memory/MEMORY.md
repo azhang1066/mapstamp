@@ -8,3 +8,4 @@
 - [Authenticated Playwright routing](authenticated-playwright-routing.md) — full-stack browser tests need the managed artifact preview so `/api` reaches the API service.
 - [Playwright Chromium on Nix](playwright-chromium-nix.md) — downloaded Chromium needs explicit system libraries before browser tests can launch.
 - [Signed-in map hydration](signed-in-map-hydration.md) — block cloud writes until each authenticated traveler’s progress has hydrated successfully.
+- [Legacy photo ownership](legacy-photo-ownership.md) — bind ownerless browser photo migrations to a persisted account marker before uploading.

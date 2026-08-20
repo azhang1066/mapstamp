@@ -2,6 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { clerk } from "@clerk/testing/playwright";
 
 const SECOND_TRAVELER_EMAIL = "world-map-e2e-second+clerk_test@example.com";
+const SECOND_TRAVELER_PHOTO_DATA_URL =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/1pW8WQAAAABJRU5ErkJggg==";
 
 const CLOUD_PROGRESS = {
   schemaVersion: 2,
@@ -231,4 +233,112 @@ test("does not show or save one traveler's progress after switching accounts", a
   });
   expect(secondTravelerData.data.visitedCountries).toEqual(["124"]);
   expect(secondTravelerData.data.bucketCountries).toEqual(["554"]);
+});
+
+test("does not migrate an in-flight first traveler's legacy photo to the next account", async ({
+  page,
+}) => {
+  const destinationId = `photo-switch-${Date.now()}`;
+
+  await page.goto("/");
+  await expect(page.getByTestId("map-canvas")).toBeVisible();
+  await clerk.signOut({ page });
+  await page.waitForFunction(() => window.Clerk?.user === null);
+  await clerk.signIn({ page, emailAddress: SECOND_TRAVELER_EMAIL });
+  await expect(page.getByTestId("map-canvas")).toBeVisible();
+
+  const secondTravelerPhotoStatus = await page.evaluate(
+    async ({ destinationId, dataUrl }) => {
+      const blob = await (await fetch(dataUrl)).blob();
+      const form = new FormData();
+      form.append("file", blob, "second-traveler.png");
+      form.append("category", "country");
+      form.append("destinationId", destinationId);
+      form.append("position", "0");
+      form.append("caption", "Second traveler photo");
+      const response = await fetch("/api/photos", {
+        method: "POST",
+        credentials: "include",
+        body: form,
+      });
+      return response.status;
+    },
+    { destinationId, dataUrl: SECOND_TRAVELER_PHOTO_DATA_URL },
+  );
+  expect(
+    secondTravelerPhotoStatus === 200,
+    `seed second traveler photo (${secondTravelerPhotoStatus})`,
+  ).toBeTruthy();
+
+  await clerk.signOut({ page });
+  await page.waitForFunction(() => window.Clerk?.user === null);
+  await clerk.signIn({ page, emailAddress: "world-map-e2e+clerk_test@example.com" });
+  await expect(page.getByTestId("map-canvas")).toBeVisible();
+
+  const legacyPhotoKey = `photos:country:${destinationId}`;
+  await page.evaluate(
+    ({ key, dataUrl }) => {
+      localStorage.setItem(
+        key,
+        JSON.stringify([
+          {
+            id: "legacy-first-traveler-photo",
+            base64: dataUrl,
+            caption: "First traveler legacy photo",
+            uploadedAt: Date.now(),
+          },
+        ]),
+      );
+    },
+    { key: legacyPhotoKey, dataUrl: SECOND_TRAVELER_PHOTO_DATA_URL },
+  );
+
+  let releaseUpload: (() => void) | undefined;
+  const uploadReleased = new Promise<void>((resolve) => {
+    releaseUpload = resolve;
+  });
+  const legacyUploadStarted = page.waitForRequest(
+    (request) =>
+      request.method() === "POST" &&
+      request.url().endsWith("/api/photos"),
+  );
+  await page.route("**/api/photos", async (route) => {
+    if (route.request().method() === "POST") {
+      await uploadReleased;
+    }
+    try {
+      await route.continue();
+    } catch {
+      // The migration aborts its request when traveler A signs out.
+    }
+  });
+
+  // Reload under traveler A so their hydration begins the legacy upload.
+  await page.reload();
+  await legacyUploadStarted;
+
+  await clerk.signOut({ page });
+  await page.waitForFunction(() => window.Clerk?.user === null);
+  await clerk.signIn({ page, emailAddress: SECOND_TRAVELER_EMAIL });
+  releaseUpload?.();
+  await expect(page.getByTestId("map-canvas")).toBeVisible();
+  await page.unroute("**/api/photos");
+
+  const secondTravelerPhotos = await page.evaluate(async (destinationId) => {
+    const response = await fetch(
+      `/api/photos?category=country&destinationId=${encodeURIComponent(destinationId)}`,
+      { credentials: "include" },
+    );
+    return response.json() as Promise<{
+      photos: Array<{ caption: string }>;
+    }>;
+  }, destinationId);
+
+  expect(secondTravelerPhotos.photos).toHaveLength(1);
+  expect(secondTravelerPhotos.photos).toMatchObject([
+    { caption: "Second traveler photo" },
+  ]);
+  await expect
+    .poll(() => page.evaluate((key) => localStorage.getItem(key), legacyPhotoKey))
+    .toBeNull();
 });

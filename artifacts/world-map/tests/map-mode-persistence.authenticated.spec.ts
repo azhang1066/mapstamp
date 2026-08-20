@@ -24,6 +24,73 @@ const STALE_BROWSER_PROGRESS = {
   "wm_tcc_bucket": ["Aland Islands"],
 } as const;
 
+test("does not save browser progress while cloud hydration is unavailable", async ({
+  page,
+}) => {
+  const putRequests: string[] = [];
+  let mapDataGetCount = 0;
+
+  page.on("request", (request) => {
+    if (
+      request.method() === "PUT" &&
+      request.url().endsWith("/api/map-data")
+    ) {
+      putRequests.push(request.url());
+    }
+  });
+
+  await page.route("**/api/map-data", async (route) => {
+    if (route.request().method() === "GET") {
+      mapDataGetCount += 1;
+      if (mapDataGetCount === 1) {
+        await route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "temporary failure" }),
+        });
+        return;
+      }
+    }
+
+    await route.continue();
+  });
+
+  await page.addInitScript((staleProgress) => {
+    for (const [key, value] of Object.entries(staleProgress)) {
+      localStorage.setItem(key, JSON.stringify(value));
+    }
+  }, STALE_BROWSER_PROGRESS);
+
+  await page.goto("/");
+
+  await expect(
+    page.getByRole("heading", { name: "Travel data unavailable" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "We couldn't load your cloud travel data. Nothing has been changed.",
+    ),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+  await expect(page.getByTestId("map-canvas")).toHaveCount(0);
+
+  // The failed request must not mount App, so its debounced sync cannot run.
+  await page.waitForTimeout(3500);
+  expect(putRequests).toHaveLength(0);
+
+  const putAfterRetry = page.waitForRequest(
+    (request) =>
+      request.method() === "PUT" &&
+      request.url().endsWith("/api/map-data"),
+    { timeout: 10_000 },
+  );
+  await page.getByRole("button", { name: "Try again" }).click();
+
+  await expect(page.getByTestId("map-canvas")).toBeVisible();
+  expect(mapDataGetCount).toBe(2);
+  await putAfterRetry;
+});
+
 async function expectBucketTabToMatchTotal(page: Page) {
   await page.getByRole("button", { name: "★ Bucket List", exact: true }).click();
   await expect(page.getByTestId("bucket-list-item")).toHaveCount(3);

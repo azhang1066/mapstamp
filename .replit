@@ -69,3 +69,7 @@ externalPort = 4200
 
 [objectStorage]
 defaultBucketID = "replit-objstore-14970148-5033-4931-9c0f-4f7dcc948976"
+
+[nix]
+channel = "stable-25_05"
+packages = ["glib", "nspr", "nss", "atk", "at-spi2-atk", "at-spi2-core", "dbus", "xorg.libX11", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXext", "xorg.libXfixes", "xorg.libXrandr", "mesa", "xorg.libxcb", "libxkbcommon", "alsa-lib", "libgbm"]

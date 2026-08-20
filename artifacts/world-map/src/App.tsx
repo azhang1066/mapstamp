@@ -2378,6 +2378,8 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
               setSelectedTcc(null);
               if (listTab === "tcc") setListTab("countries");
             }}
+            aria-pressed={mapMode === "world"}
+            data-testid="map-mode-world"
             className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
               mapMode === "world"
                 ? "bg-blue-600 text-white shadow-sm"
@@ -2393,6 +2395,8 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
               setSelected(null);
               setListTab("tcc");
             }}
+            aria-pressed={mapMode === "tcc"}
+            data-testid="map-mode-tcc"
             className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-1.5 ${
               mapMode === "tcc"
                 ? "bg-purple-600 text-white shadow-sm"
@@ -2599,6 +2603,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
       <div className="flex overflow-hidden" style={{ height: "calc(100vh - 72px - 260px)", minHeight: "400px" }}>
         <div className="flex-1 relative overflow-hidden bg-slate-950">
           <ComposableMap
+            data-testid="map-canvas"
             projection="geoMercator"
             style={{ width: "100%", height: "100%" }}
             projectionConfig={{ scale: 130, center: [0, 20] }}

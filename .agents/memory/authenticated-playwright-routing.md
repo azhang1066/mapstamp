@@ -3,8 +3,8 @@ name: Authenticated Playwright routing
 description: Routing requirement for World Map browser tests that exercise Clerk-authenticated API requests.
 ---
 
-Authenticated World Map browser tests must run against the managed artifact preview URL, not the standalone Vite test server, because the preview router forwards `/api` requests to the API service.
+Authenticated World Map browser tests run against a standalone Vite server that proxies `/api` to a separately launched local API server; they do not need the managed artifact preview router.
 
-**Why:** the standalone Vite server serves the frontend but returns 404 for the API routes, and Playwright’s out-of-page request context does not reliably carry the newly created Clerk session.
+**Why:** routing API calls through Vite keeps Clerk cookies and browser-origin requests intact while making the browser suite portable to local development and CI. Playwright’s out-of-page request context does not reliably carry a newly created Clerk session.
 
-**How to apply:** point authenticated Playwright setup and test projects at the managed preview (or provide an equivalent API proxy), and seed cloud fixtures with in-page `fetch` so the browser’s real Clerk credentials are used.
+**How to apply:** start the API service alongside Vite in Playwright, configure Vite’s `/api` proxy target for that API port, and seed cloud fixtures with in-page `fetch` so the browser’s real Clerk credentials are used. The authenticated runner must own isolated ports rather than reusing an artifact Vite process, because its normal preview configuration has no test proxy.

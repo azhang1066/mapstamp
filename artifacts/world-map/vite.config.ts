@@ -18,6 +18,7 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
+const apiProxyTarget = process.env.API_PROXY_TARGET;
 const basePath = process.env.BASE_PATH;
 
 if (!basePath) {
@@ -63,6 +64,16 @@ export default defineConfig({
     strictPort: true,
     host: "0.0.0.0",
     allowedHosts: true,
+    ...(apiProxyTarget
+      ? {
+          proxy: {
+            "/api": {
+              target: apiProxyTarget,
+              changeOrigin: true,
+            },
+          },
+        }
+      : {}),
     fs: {
       strict: true,
       deny: ["**/.*"],

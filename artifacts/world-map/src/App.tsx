@@ -2535,7 +2535,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
             <span>Enable year filter</span>
           </label>
           <span className="px-3 py-1 text-xs rounded font-medium bg-amber-600 text-white">
-            Snapshot
+            Regions visited by
           </span>
           <div className="flex-1 min-w-[280px] flex flex-col gap-1">
             <div className="text-xs text-amber-300 font-mono">

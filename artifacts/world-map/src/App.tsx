@@ -1,7 +1,5 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { lazy, Suspense, useState, useCallback, useEffect, useRef, useMemo } from "react";
 import type { AuthProps } from "./auth-types";
-import { useListConnections, getListConnectionsQueryKey } from "@workspace/api-client-react";
-import ConnectionsPanel from "./ConnectionsPanel";
 import type * as XLSX from "xlsx";
 import {
   ComposableMap,
@@ -29,6 +27,8 @@ import {
   CA_PROVINCE_DATA,
   CONTINENT_COLORS,
 } from "./countryData";
+
+const ConnectionsPanel = lazy(() => import("./ConnectionsPanel"));
 
 type MapMode = "world" | "tcc";
 
@@ -1877,16 +1877,6 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
   const [showConnections, setShowConnections] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
-  // Badge count populated lazily after first open — hook always runs, enabled only when signed in
-  const { data: connectionsData } = useListConnections({
-    query: {
-      queryKey: getListConnectionsQueryKey(),
-      enabled: isAuthenticated,
-      staleTime: 30_000,
-    },
-    request: { credentials: "include" },
-  });
-  const incomingPendingCount = connectionsData?.pending.incoming.length ?? 0;
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const [sharedData, setSharedData] = useState<ShareData | null>(null);
   const [toast, setToast] = useState<{ message: string; kind: "success" | "warning" } | null>(null);
@@ -2494,11 +2484,6 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                     >
                       <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M10 8c1.657 0 3 .895 3 2v1M8 5a2 2 0 11-4 0 2 2 0 014 0zM2 10c0-1.105 1.343-2 3-2h2c1.657 0 3 .895 3 2v1H2v-1z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/><circle cx="10.5" cy="3.5" r="1.5" stroke="currentColor" strokeWidth="1.3"/></svg>
                       Connections
-                      {incomingPendingCount > 0 && (
-                        <span className="ml-auto min-w-[1.1rem] h-[1.1rem] px-1 bg-rose-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
-                          {incomingPendingCount}
-                        </span>
-                      )}
                     </button>
                   </div>
                   {!isReadOnly && (
@@ -3656,10 +3641,22 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
       )}
 
       {showConnections && isAuthenticated && (
-        <ConnectionsPanel
-          onClose={() => setShowConnections(false)}
-          showToast={showToast}
-        />
+        <Suspense
+          fallback={
+            <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
+              <div className="min-h-full max-w-2xl mx-auto p-6 md:p-10">
+                <div className="flex justify-center py-24">
+                  <div className="w-8 h-8 rounded-full border-2 border-slate-600 border-t-slate-300 animate-spin" />
+                </div>
+              </div>
+            </div>
+          }
+        >
+          <ConnectionsPanel
+            onClose={() => setShowConnections(false)}
+            showToast={showToast}
+          />
+        </Suspense>
       )}
 
       {showStats && (

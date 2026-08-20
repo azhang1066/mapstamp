@@ -2,8 +2,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import type { AuthProps } from "./auth-types";
 import { useListConnections, getListConnectionsQueryKey } from "@workspace/api-client-react";
 import ConnectionsPanel from "./ConnectionsPanel";
-import * as XLSX from "xlsx";
-import { toPng } from "html-to-image";
+import type * as XLSX from "xlsx";
 import {
   ComposableMap,
   Geographies,
@@ -1194,6 +1193,7 @@ function StatsDashboard(props: StatsDashboardProps) {
     if (!cardRef.current) return;
     setCopyStatus("copying");
     try {
+      const { toPng } = await import("html-to-image");
       const dataUrl = await toPng(cardRef.current, { pixelRatio: 2, backgroundColor: "#0f172a", cacheBust: true });
       try {
         const blob = await (await fetch(dataUrl)).blob();
@@ -1525,9 +1525,9 @@ function parseYear(raw: unknown): number | undefined {
   return Number.isFinite(n) && n >= 1900 && n <= 2100 ? n : undefined;
 }
 
-function parseExcelRows(wb: XLSX.WorkBook): ParsedRow[] {
+function parseExcelRows(wb: XLSX.WorkBook, xlsx: typeof import("xlsx")): ParsedRow[] {
   const sheet = wb.Sheets[wb.SheetNames[0]];
-  const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
+  const raw = xlsx.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
   return raw.map(r => {
     const key = (k: string) => {
       const match = Object.keys(r).find(rk => rk.toLowerCase().trim() === k);
@@ -1621,7 +1621,8 @@ function processImport(
   return { matched, unmatched };
 }
 
-function downloadTemplate() {
+async function downloadTemplate() {
+  const XLSX = await import("xlsx");
   const headers = ["Name", "Type", "Times Visited", "First Year", "Most Recent Year"];
   const examples = [
     ["France", "country", 3, 2010, 2023],
@@ -2223,11 +2224,12 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
     if (!file) return;
     e.target.value = "";
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       try {
+        const XLSX = await import("xlsx");
         const data = ev.target?.result;
         const wb = XLSX.read(data, { type: "array" });
-        const rows = parseExcelRows(wb);
+        const rows = parseExcelRows(wb, XLSX);
         if (rows.length === 0) {
           showToast("No data rows found in the file.", "warning");
           return;
@@ -2503,7 +2505,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                     <>
                       <div className="border-t border-slate-700 py-1">
                         <button
-                          onClick={() => { downloadTemplate(); setShowProfileMenu(false); }}
+                          onClick={() => { void downloadTemplate(); setShowProfileMenu(false); }}
                           className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"
                         >
                           <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2 11v1.5A1.5 1.5 0 003.5 14h8A1.5 1.5 0 0013 12.5V11M7.5 2v8M4.5 7l3 3 3-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>

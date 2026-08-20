@@ -1,0 +1,39 @@
+Please generate a file called PROJECT.md that fully documents this application for someone picking it up for the first time (a new collaborator, client, or future me). Base everything on the actual code in this repo — don't guess or invent details. If something is genuinely unclear from the code, note it as "unclear/needs confirmation" rather than making it up.
+
+Structure the file with these sections:
+
+1. Overview
+   - What the application does, in plain language
+   - Who it's for / the core user flow
+
+2. Tech Stack
+   - Languages, frameworks, and major libraries actually used (check package.json / requirements.txt / etc.)
+   - Database(s) and how they're accessed (ORM, raw SQL, etc.)
+   - Hosting/deployment setup as configured in this Repl
+
+3. Architecture
+   - High-level structure (frontend/backend split, folder layout, key modules)
+   - How the major pieces talk to each other (API calls, websockets, background jobs, etc.)
+   - Any notable design patterns or conventions used in the code
+
+4. Data Model
+   - Key database tables/collections/schemas and how they relate
+   - Pull this directly from actual schema files, migrations, or ORM models
+
+5. API / Routes
+   - List actual endpoints or routes found in the code, with method, path, and purpose
+   - Note auth requirements per route if applicable
+
+6. Environment & Configuration
+   - Required environment variables / secrets (names only, never values)
+   - Any external services or APIs this app depends on
+
+7. Setup & Running Locally
+   - Exact steps to install dependencies and run the app in this environment
+   - How to run tests, if tests exist
+
+8. Known Gaps / TODOs
+   - Incomplete features, obvious bugs, or TODO comments found in the code
+   - Anything hardcoded that should probably be configurable
+
+Keep the tone factual and concise — this is technical documentation, not marketing copy. Use headers, short paragraphs, and tables where a table is clearer than prose (e.g., the API route list, the env var list). Write the final output to PROJECT.md at the project root.

@@ -1,0 +1,66 @@
+# Workspace
+
+## Overview
+
+pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+
+## Stack
+
+- **Monorepo tool**: pnpm workspaces
+- **Node.js version**: 24
+- **Package manager**: pnpm
+- **TypeScript version**: 5.9
+- **API framework**: Express 5
+- **Database**: PostgreSQL + Drizzle ORM
+- **Validation**: Zod (`zod/v4`), `drizzle-zod`
+- **API codegen**: Orval (from OpenAPI spec)
+- **Build**: esbuild (CJS bundle)
+
+## Artifacts
+
+### World Map (`artifacts/world-map`)
+Interactive travel tracker built with React + Vite + TypeScript, react-simple-maps, Tailwind CSS.
+
+**Features:**
+- Clickable world map with 195 countries (continent-color-coded)
+- US States and Canadian Provinces via zoomed sub-layers
+- MLB Stadium flag markers (30 teams)
+- Microstate dot markers (Vatican, Monaco, San Marino, etc.)
+- Visited tracking with scratch-off style color reveals
+- **Bucket List mode** — golden dashed-border map styling; ★ toggle on every list item; dedicated ★ Bucket List tab aggregating all categories
+- Visit details panel (dates, notes, times visited) — shown only for visited items
+- Progress counters + progress bars for all 4 categories + bucket list count
+- localStorage persistence (wm_visited_*, wm_bucket_*, wm_details_*, wm_year_filter)
+- **Year filter / time slider** — collapsible 📅 header toggle; Range mode (dual sliders, one per row) or Snapshot mode (single slider + ▶ Play / ⏸ Pause auto-advance, 1 yr/sec); destinations with no recorded year are always visible per spec; bucket list unaffected; sidebar counts and bottom list tabs reactively reflect filtered visited counts
+- CSV export and Excel import (xlsx) with download template
+- Search bar with autocomplete + fly-to (zoom + pan) behavior
+- Tooltip on hover, zoom controls, reset
+- Share URL — encodes visited/bucket sets (incl. TCC) into a compressed URL hash for read-only sharing
+- **Short notes** per destination — independent of visit status (works on visited, bucket-listed, and unmarked items). Stored as plain strings under `shortnote:<category>:<id>`, max 280 chars. Auto-expanding textarea (2-5 rows) with live char counter, auto-save on blur, "Saved ✓" inline flash. 📝 indicator beside item names in all 5 list tabs (countries/states/provinces/stadiums/tcc) and a Notes total in the legend (only shown when > 0). Read-only mode renders notes as plain text. Notes included in Share URL payload (`n` field) when total URL length stays ≤ `SHARE_URL_BUDGET` (6000 chars), otherwise omitted with "📝 Notes are not included in shared links" notice. App-level `notesIndex` keeps `📝` indicators reactive without re-scanning localStorage on every render.
+- **Photo attachments** in Visit Details panel — up to 3 photos per destination across all categories (country/state/province/stadium/tcc). Stored as base64 in localStorage under `photos:<category>:<id>`. Client-side canvas resize to 1200px max + JPEG q=0.8 before save. 5MB upload cap, JPEG/PNG/WebP only with inline error toasts. 3-column 120×120px thumbnail grid with hover ✏️/🗑 overlay; placeholder "+ Add Photo" tiles for empty slots; lightbox modal with prev/next, ✕ close, Esc/arrow keys, and inline editable caption (max 120 chars, saves on blur). Storage usage tracked — soft warning at >4MB ("Storage nearly full"). Read-only/Share mode hides all add/edit/delete controls; share modal notes "📷 Photos are not included in shared links" since photos are intentionally omitted from share-URL payload to keep links small.
+- **Statistics Dashboard** (📊 Stats header button) — full-screen overlay with 5 sections: headline tiles (countries/TCC/MLB/states/provinces/bucket), continent bar chart (uses CONTINENT_COLORS), travel timeline (visits grouped by year with Undated section + relative-volume bars), fun-facts cards (gracefully hidden when data insufficient), and shareable summary card with editable profile name (`wm_profile_name`) and 📋 Copy as Image via dynamic html-to-image (clipboard with download fallback). Uses BASE/raw sets so stats reflect lifetime data, not year-filtered shadows.
+- **TCC mode** (Travelers' Century Club) — second map mode tracking 330 countries/territories across 12 regions:
+  - Header toggle: 🌍 World ↔ ✈️ TCC X/330
+  - Map repaints with TCC region colors (full-saturation = visited, muted = unvisited, amber-dashed = bucket)
+  - Country shapes (where geoId maps) tinted; non-geo entries (microstates, oceans, territories) shown as small region-colored dots
+  - Dedicated TCC list tab with region-pill legend (per-region X/Y counts), checkbox toggle, ★ bucket, 🗺 indicator for entries with map shapes
+  - Sidebar TCC info panel with region badge, region/location/membership cards, Mark Visited/Bucket List buttons, VisitDetailsPanel for visited entries
+  - Milestone celebratory banner above header at 100 visited (TCC membership threshold)
+  - US Territory split: "United States (Contiguous)", "Alaska", and "Hawaiian Islands" are rendered as independent, separately-clickable polygons via the US States geo-layer (FIPS 02→Alaska, FIPS 15→Hawaiian Islands, rest→Contiguous). The full USA country polygon (840) is excluded from the TCC world pass to prevent Alaska/Hawaii being swallowed. Defined in `TCC_US_STATE_ENTRIES` + `FIPS_TO_TCC_NAME` constants.
+  - Independent localStorage: `wm_map_mode`, `wm_tcc_visited`, `wm_tcc_bucket`, `wm_details_tcc`
+  - Bucket-list tab aggregates TCC entries (purple "TCC" badge); navigating to one auto-switches mapMode to "tcc"
+  - Read-only mode (when viewing a Share URL) hides all TCC mutation controls and toggle handlers no-op
+
+**Key state:** visited/bucket Sets per category, details Records per category, confirmBucket string|null for UX confirmation when moving visited → bucket. mapMode "world"|"tcc" persisted across reloads.
+
+**Key constants:** BUCKET_LIST_COLOR="#a37c1a", BUCKET_LIST_STROKE="#fbbf24", TCC_TOTAL=330, TCC_MEMBERSHIP_THRESHOLD=100
+
+## Key Commands
+
+- `pnpm run typecheck` — full typecheck across all packages
+- `pnpm run build` — typecheck + build all packages
+- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
+- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
+- `pnpm --filter @workspace/api-server run dev` — run API server locally
+
+See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.

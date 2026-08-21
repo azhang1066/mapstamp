@@ -118,11 +118,19 @@ router.post("/connections/request/:userId", async (req: Request, res: Response) 
       .limit(1);
 
     if (existing) {
-      res.status(409).json({
-        error: "A connection request already exists between these users",
-        status: existing.status,
-      });
-      return;
+      // A previously declined connection can be re-initiated: remove the stale
+      // record and fall through to create a fresh pending request below.
+      if (existing.status === "declined") {
+        await db
+          .delete(userConnectionsTable)
+          .where(eq(userConnectionsTable.id, existing.id));
+      } else {
+        res.status(409).json({
+          error: "A connection request already exists between these users",
+          status: existing.status,
+        });
+        return;
+      }
     }
 
     const [created] = await db

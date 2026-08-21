@@ -16,6 +16,7 @@ import { shadcn } from "@clerk/themes";
 import { Switch, Route, useLocation, Router as WouterRouter } from "wouter";
 import App from "./App";
 import type { AuthUser } from "./auth-types";
+import NotFound from "./pages/not-found";
 
 const clerkPubKey = publishableKeyFromHost(
   window.location.hostname,
@@ -1107,7 +1108,8 @@ function ClerkProviderWithRoutes() {
         <Route path="/sign-in/*?" component={SignInPage} />
         <Route path="/sign-up/sso-callback" component={SignUpSSOCallbackPage} />
         <Route path="/sign-up/*?" component={SignUpPage} />
-        <Route component={AppWithSync} />
+        <Route path="/" component={AppWithSync} />
+        <Route component={NotFound} />
       </Switch>
     </ClerkProvider>
   );

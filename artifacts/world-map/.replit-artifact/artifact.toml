@@ -23,7 +23,23 @@ publicDir = "artifacts/world-map/dist/public"
 serve = "static"
 
 [[services.production.rewrites]]
-from = "/*"
+from = "/"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/sign-in"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/sign-in/*"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/sign-up"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/sign-up/*"
 to = "/index.html"
 
 [services.env]

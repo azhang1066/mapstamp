@@ -3,14 +3,128 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <title>World Map</title>
+    <title>World Map Travel Tracker | Countries, States & Places</title>
+    <meta
+      name="description"
+      content="Track the countries, U.S. states, Canadian provinces, and travel destinations you have visited or want to explore with a personal interactive world map."
+    />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://world-map-click--az59765.replit.app/" />
+
+    <meta property="og:title" content="World Map Travel Tracker" />
+    <meta
+      property="og:description"
+      content="Create a personal map of the countries, states, provinces, and destinations you have visited or want to explore."
+    />
+    <meta property="og:url" content="https://world-map-click--az59765.replit.app/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="World Map" />
+    <meta property="og:image" content="https://world-map-click--az59765.replit.app/opengraph.jpg" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="720" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:alt" content="World Map travel tracker interface" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="World Map Travel Tracker" />
+    <meta
+      name="twitter:description"
+      content="Create a personal map of the countries, states, provinces, and destinations you have visited or want to explore."
+    />
+    <meta name="twitter:image" content="https://world-map-click--az59765.replit.app/opengraph.jpg" />
+    <meta name="twitter:image:alt" content="World Map travel tracker interface" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://world-map-click--az59765.replit.app/#website",
+            "name": "World Map",
+            "url": "https://world-map-click--az59765.replit.app/",
+            "description": "An interactive travel tracker for mapping places you have visited and destinations you want to explore."
+          },
+          {
+            "@type": "SoftwareApplication",
+            "@id": "https://world-map-click--az59765.replit.app/#software",
+            "name": "World Map Travel Tracker",
+            "url": "https://world-map-click--az59765.replit.app/",
+            "description": "An interactive travel tracker for mapping countries, U.S. states, Canadian provinces, and destinations you have visited or want to explore.",
+            "applicationCategory": "TravelApplication",
+            "operatingSystem": "Web",
+            "image": "https://world-map-click--az59765.replit.app/opengraph.jpg"
+          }
+        ]
+      }
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
+      body { margin: 0; background: #0f172a; color: #f8fafc; }
+      .landing { min-height: 100vh; box-sizing: border-box; padding: 2rem; }
+      .landing__inner { width: min(100%, 66rem); margin: 0 auto; }
+      .landing__header, .landing__footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+      .landing__brand { color: inherit; font-weight: 700; text-decoration: none; }
+      .landing__nav { display: flex; gap: 1rem; }
+      .landing a { color: #fdba74; }
+      .landing__hero { max-width: 48rem; padding: clamp(5rem, 16vh, 10rem) 0 5rem; }
+      .landing__eyebrow { margin: 0 0 1rem; color: #fdba74; font-size: .875rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+      .landing h1 { max-width: 14ch; margin: 0; font-size: clamp(2.5rem, 7vw, 4.75rem); line-height: 1.05; }
+      .landing__summary { max-width: 42rem; margin: 1.5rem 0 0; color: #cbd5e1; font-size: clamp(1.125rem, 2.5vw, 1.35rem); line-height: 1.6; }
+      .landing__cta { display: inline-block; margin-top: 2rem; padding: .8rem 1.1rem; border-radius: .5rem; background: #f97316; color: #fff !important; font-weight: 700; text-decoration: none; }
+      .landing__features { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 1rem; margin: 0 0 5rem; }
+      .landing__feature { padding: 1.25rem; border: 1px solid #334155; border-radius: .75rem; background: #172033; }
+      .landing__feature h2 { margin: 0; font-size: 1rem; }
+      .landing__feature p { margin: .5rem 0 0; color: #cbd5e1; line-height: 1.5; }
+      .landing__footer { padding-top: 1.5rem; border-top: 1px solid #334155; color: #94a3b8; font-size: .875rem; }
+      @media (max-width: 40rem) { .landing { padding: 1.25rem; } .landing__header { align-items: flex-start; } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="landing">
+        <header class="landing__header landing__inner">
+          <a class="landing__brand" href="/">World Map</a>
+          <nav class="landing__nav" aria-label="Primary navigation">
+            <a href="#features">Explore features</a>
+            <a href="/sign-in">Sign in</a>
+          </nav>
+        </header>
+        <main class="landing__inner">
+          <section class="landing__hero" aria-labelledby="world-map-title">
+            <p class="landing__eyebrow">Personal travel tracker</p>
+            <h1 id="world-map-title">World Map Travel Tracker</h1>
+            <p class="landing__summary">
+              Keep a visual record of the countries, U.S. states, Canadian provinces, and
+              travel destinations you have visited — then save the places you want to explore next.
+            </p>
+            <a class="landing__cta" href="/sign-up">Start tracking your travels</a>
+          </section>
+          <section id="features" class="landing__features" aria-label="World Map features">
+            <article class="landing__feature">
+              <h2>Map your journeys</h2>
+              <p>Mark places you have visited on an interactive map and keep your travel history in one view.</p>
+            </article>
+            <article class="landing__feature">
+              <h2>Plan what’s next</h2>
+              <p>Build a bucket list of countries, states, provinces, and destinations still waiting to be explored.</p>
+            </article>
+            <article class="landing__feature">
+              <h2>Make it your own</h2>
+              <p>Add notes and details to your visits, then return to your map whenever you are ready to plan again.</p>
+            </article>
+          </section>
+        </main>
+        <footer class="landing__footer landing__inner">
+          <span>World Map Travel Tracker</span>
+          <a href="/sign-up">Create your travel map</a>
+        </footer>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

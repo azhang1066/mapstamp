@@ -16,7 +16,8 @@
 
 ## Rendering and crawler assumptions
 - The World Map production service is a Vite static SPA with a catch-all rewrite to `index.html`.
-- Public routes should make essential metadata and content available in initial HTML to search, social, and AI crawlers.
+- `index.html` now provides a static, crawlable landing page with the core heading, product summary, feature copy, navigation, and sign-up calls to action, plus site-level metadata and structured data.
+- The interactive map and query-string share snapshots remain client-rendered. Public routes should make any route-specific content and social metadata available in their initial HTML to search, social, and AI crawlers.
 
 ## Dismissed categories
 - (None yet)

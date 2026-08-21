@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { lazy, Suspense, useState, useCallback, useEffect, useRef, useMemo, useId } from "react";
 import type { AuthProps } from "./auth-types";
 import type * as XLSX from "xlsx";
 import {
@@ -601,6 +601,7 @@ function NoteField({
   readOnlyValue?: string;
   onSaved?: (cat: PhotoCategory, id: string, text: string) => void;
 }) {
+  const noteFieldId = useId();
   const initial = isReadOnly ? (readOnlyValue ?? "") : loadNote(category, locationId);
   const [text, setText] = useState(initial);
   const [savedFlash, setSavedFlash] = useState(false);
@@ -646,11 +647,12 @@ function NoteField({
   return (
     <div className="mt-5 pt-5 border-t border-slate-800">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">📝 Note</p>
+        <label htmlFor={noteFieldId} className="text-xs font-semibold text-slate-400 uppercase tracking-widest">📝 Note</label>
         {savedFlash && <span className="text-xs text-emerald-400 transition-opacity">Saved ✓</span>}
       </div>
       <div className="relative">
         <textarea
+          id={noteFieldId}
           ref={taRef}
           rows={2}
           maxLength={MAX_NOTE_LENGTH}
@@ -683,6 +685,7 @@ function VisitDetailsPanel({
   details: VisitDetails | undefined;
   onUpdate: (id: string, patch: VisitDetails) => void;
 }) {
+  const fieldIdPrefix = useId();
   const d = details ?? {};
   const showWarning = d.firstYear && d.lastYear && d.firstYear > d.lastYear;
 
@@ -694,8 +697,9 @@ function VisitDetailsPanel({
       <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">My Visit</p>
       <div className="space-y-3">
         <div>
-          <label className="text-xs text-slate-400 mb-1 block">Times Visited</label>
+          <label htmlFor={`${fieldIdPrefix}-times-visited`} className="text-xs text-slate-400 mb-1 block">Times Visited</label>
           <select
+            id={`${fieldIdPrefix}-times-visited`}
             className={selectClass}
             value={d.timesVisited ?? ""}
             onChange={e => onUpdate(locationId, { timesVisited: e.target.value === "" ? undefined : Number(e.target.value) })}
@@ -706,8 +710,9 @@ function VisitDetailsPanel({
           </select>
         </div>
         <div>
-          <label className="text-xs text-slate-400 mb-1 block">First Visit</label>
+          <label htmlFor={`${fieldIdPrefix}-first-visit`} className="text-xs text-slate-400 mb-1 block">First Visit</label>
           <select
+            id={`${fieldIdPrefix}-first-visit`}
             className={selectClass}
             value={d.firstYear ?? ""}
             onChange={e => onUpdate(locationId, { firstYear: e.target.value === "" ? undefined : Number(e.target.value) })}
@@ -717,8 +722,9 @@ function VisitDetailsPanel({
           </select>
         </div>
         <div>
-          <label className="text-xs text-slate-400 mb-1 block">Most Recent Visit</label>
+          <label htmlFor={`${fieldIdPrefix}-most-recent-visit`} className="text-xs text-slate-400 mb-1 block">Most Recent Visit</label>
           <select
+            id={`${fieldIdPrefix}-most-recent-visit`}
             className={selectClass}
             value={d.lastYear ?? ""}
             onChange={e => onUpdate(locationId, { lastYear: e.target.value === "" ? undefined : Number(e.target.value) })}
@@ -1762,6 +1768,7 @@ const CATEGORY_LABEL: Record<SearchItem["category"], string> = {
 };
 
 function SearchBar({ onSelect }: { onSelect: (item: SearchItem) => void }) {
+  const listboxId = useId();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
@@ -1804,6 +1811,8 @@ function SearchBar({ onSelect }: { onSelect: (item: SearchItem) => void }) {
     }
   }, [activeIdx]);
 
+  const hasOpenSuggestions = open && suggestions.length > 0;
+
   return (
     <div className="relative flex-1 max-w-sm">
       <div className="relative">
@@ -1816,6 +1825,12 @@ function SearchBar({ onSelect }: { onSelect: (item: SearchItem) => void }) {
           type="text"
           value={query}
           placeholder="Search countries, states, provinces…"
+          aria-label="Search destinations"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={hasOpenSuggestions}
+          aria-controls={listboxId}
+          aria-activedescendant={activeIdx >= 0 && hasOpenSuggestions ? `${listboxId}-option-${activeIdx}` : undefined}
           className="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-lg pl-9 pr-8 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           onChange={e => { setQuery(e.target.value); setOpen(true); setActiveIdx(-1); }}
           onFocus={() => setOpen(true)}
@@ -1831,13 +1846,20 @@ function SearchBar({ onSelect }: { onSelect: (item: SearchItem) => void }) {
           </button>
         )}
       </div>
-      {open && suggestions.length > 0 && (
+      {hasOpenSuggestions && (
         <ul
+          id={listboxId}
           ref={listRef}
+          role="listbox"
           className="absolute top-full mt-1.5 w-full bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-auto max-h-72 py-1"
         >
           {suggestions.map((item, i) => (
-            <li key={`${item.category}-${item.id}`}>
+            <li
+              key={`${item.category}-${item.id}`}
+              id={`${listboxId}-option-${i}`}
+              role="option"
+              aria-selected={i === activeIdx}
+            >
               <button
                 className={`w-full text-left px-3 py-2.5 flex items-center gap-3 hover:bg-slate-700 transition-colors ${i === activeIdx ? "bg-slate-700" : ""}`}
                 onMouseDown={e => { e.preventDefault(); commit(item); }}
@@ -2559,11 +2581,16 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
             </div>
             <div className="flex gap-3 items-center">
               <span className="text-xs text-slate-500 w-10 text-right">{earliestYear}</span>
+              <label htmlFor="year-filter-snapshot" className="sr-only">
+                Show regions visited as of year
+              </label>
               <input
                 type="range"
+                id="year-filter-snapshot"
                 min={earliestYear}
                 max={CURRENT_YEAR}
                 value={yearFilter.snapshot}
+                aria-valuetext={`As of ${yearFilter.snapshot}`}
                 onChange={e => setYearFilter(p => ({ ...p, snapshot: Number(e.target.value) }))}
                 disabled={!yearFilter.enabled}
                 className="flex-1 accent-amber-500 disabled:opacity-40"
@@ -3322,6 +3349,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                     {!isReadOnly && <input
                       type="checkbox"
                       checked={isVisited}
+                      aria-label={`Mark ${country.name} as visited`}
                       onChange={() => toggleCountryVisited(country.id)}
                       className="w-3.5 h-3.5 flex-shrink-0 accent-emerald-500 cursor-pointer"
                     />}
@@ -3374,6 +3402,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                     {!isReadOnly && <input
                       type="checkbox"
                       checked={isVisited}
+                      aria-label={`Mark ${state.name} as visited`}
                       onChange={() => toggleStateVisited(state.fips)}
                       className="w-3.5 h-3.5 flex-shrink-0 accent-red-500 cursor-pointer"
                     />}
@@ -3426,6 +3455,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                     {!isReadOnly && <input
                       type="checkbox"
                       checked={isVisited}
+                      aria-label={`Mark ${province.name} as visited`}
                       onChange={() => toggleProvinceVisited(province.key)}
                       className="w-3.5 h-3.5 flex-shrink-0 accent-orange-500 cursor-pointer"
                     />}
@@ -3525,6 +3555,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                               {!isReadOnly && <input
                                 type="checkbox"
                                 checked={isVisited}
+                                aria-label={`Mark ${entry.name} as visited`}
                                 onChange={() => toggleTccVisited(entry.name)}
                                 className="w-3.5 h-3.5 flex-shrink-0 accent-purple-500 cursor-pointer"
                               />}
@@ -3717,8 +3748,8 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
             )}
           </span>
           <span className="flex-1 leading-snug">{toast.message}</span>
-          <button onClick={() => setToast(null)} className="flex-shrink-0 opacity-70 hover:opacity-100 ml-1">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+          <button aria-label="Dismiss notification" onClick={() => setToast(null)} className="flex-shrink-0 opacity-70 hover:opacity-100 ml-1">
+            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
           </button>
         </div>
       )}

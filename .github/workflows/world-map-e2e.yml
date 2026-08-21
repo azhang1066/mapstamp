@@ -49,6 +49,9 @@ jobs:
       - name: Install Playwright browser runtime
         run: pnpm --filter @workspace/world-map exec playwright install --with-deps chromium
 
+      - name: Run World Map production bundle regression
+        run: pnpm --filter @workspace/world-map run test:connections-build
+
       - name: Run World Map end-to-end suite
         run: pnpm --filter @workspace/world-map run test:e2e
 

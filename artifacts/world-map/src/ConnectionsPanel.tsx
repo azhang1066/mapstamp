@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useSearchUsers,
@@ -420,8 +421,32 @@ function ConnectionsTab({ data, isLoading, showToast }: ConnectionsTabProps) {
 
 // ── Main panel ────────────────────────────────────────────────────────────────
 
+const TAB_ORDER: Tab[] = ["search", "pending", "connections"];
+
+const TITLE_ID = "connections-panel-title";
+const tabId = (t: Tab) => `connections-tab-${t}`;
+const panelId = (t: Tab) => `connections-tabpanel-${t}`;
+
+// Selector for focusable elements used by the focus trap.
+const FOCUSABLE_SELECTOR = [
+  "a[href]",
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  '[tabindex]:not([tabindex="-1"])',
+].join(",");
+
 export default function ConnectionsPanel({ onClose, showToast }: Props) {
   const [tab, setTab] = useState<Tab>("search");
+
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({
+    search: null,
+    pending: null,
+    connections: null,
+  });
 
   const { data, isLoading } = useListConnections<ConnectionsResponse>({
     query: {
@@ -441,14 +466,83 @@ export default function ConnectionsPanel({ onClose, showToast }: Props) {
     { id: "connections", label: "Connections", badge: acceptedCount > 0 ? acceptedCount : undefined },
   ];
 
-  // Close on Escape
+  // Move initial focus to the close control when the dialog mounts.
+  useEffect(() => {
+    closeButtonRef.current?.focus();
+  }, []);
+
+  // Close on Escape + robust Tab/Shift+Tab focus trap (no background escape).
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (e.key !== "Tab") return;
+
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+
+      const focusable = Array.from(
+        dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+      ).filter(el => el.offsetParent !== null || el === document.activeElement);
+
+      if (focusable.length === 0) {
+        e.preventDefault();
+        dialog.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+
+      if (e.shiftKey) {
+        if (active === first || !dialog.contains(active)) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (active === last || !dialog.contains(active)) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [onClose]);
+
+  // Arrow-left/right + Home/End keyboard navigation for the tablist.
+  function handleTabKeyDown(e: ReactKeyboardEvent<HTMLButtonElement>) {
+    const currentIndex = TAB_ORDER.indexOf(tab);
+    let nextIndex: number | null = null;
+
+    switch (e.key) {
+      case "ArrowRight":
+        nextIndex = (currentIndex + 1) % TAB_ORDER.length;
+        break;
+      case "ArrowLeft":
+        nextIndex = (currentIndex - 1 + TAB_ORDER.length) % TAB_ORDER.length;
+        break;
+      case "Home":
+        nextIndex = 0;
+        break;
+      case "End":
+        nextIndex = TAB_ORDER.length - 1;
+        break;
+      default:
+        return;
+    }
+
+    e.preventDefault();
+    const nextTab = TAB_ORDER[nextIndex];
+    setTab(nextTab);
+    tabRefs.current[nextTab]?.focus();
+  }
 
   return (
     <div
@@ -459,17 +553,26 @@ export default function ConnectionsPanel({ onClose, showToast }: Props) {
         className="min-h-full max-w-2xl mx-auto p-6 md:p-10"
         onClick={e => e.stopPropagation()}
       >
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl">
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={TITLE_ID}
+          tabIndex={-1}
+          className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl focus:outline-none"
+        >
           {/* Header */}
           <div className="flex items-center justify-between px-6 md:px-8 py-5 border-b border-slate-800 sticky top-6 md:top-10 bg-slate-900/95 backdrop-blur-sm rounded-t-2xl z-10">
             <div>
-              <h2 className="text-xl font-bold text-white">Connections</h2>
+              <h2 id={TITLE_ID} className="text-xl font-bold text-white">Connections</h2>
               <p className="text-sm text-slate-400 mt-0.5">
                 Search for travelers, manage requests
               </p>
             </div>
             <button
+              ref={closeButtonRef}
               onClick={onClose}
+              aria-label="Close"
               className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
               title="Close"
             >
@@ -480,52 +583,94 @@ export default function ConnectionsPanel({ onClose, showToast }: Props) {
           </div>
 
           {/* Tab bar */}
-          <div className="flex gap-1 px-6 md:px-8 pt-4 border-b border-slate-800">
-            {tabs.map(t => (
-              <button
-                key={t.id}
-                data-testid={`connections-tab-${t.id}`}
-                onClick={() => setTab(t.id)}
-                className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-                  tab === t.id
-                    ? "bg-slate-800 text-white border border-b-0 border-slate-700"
-                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                }`}
-              >
-                {t.label}
-                {t.badge != null && t.badge > 0 && (
-                  <span className={`inline-flex items-center justify-center min-w-[1.1rem] h-[1.1rem] px-1 text-xs rounded-full font-semibold ${
-                    t.id === "pending" ? "bg-rose-600 text-white" : "bg-slate-600 text-slate-300"
-                  }`}>
-                    {t.badge}
-                  </span>
-                )}
-              </button>
-            ))}
+          <div
+            role="tablist"
+            aria-label="Connections views"
+            className="flex gap-1 px-6 md:px-8 pt-4 border-b border-slate-800"
+          >
+            {tabs.map(t => {
+              const selected = tab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  ref={el => { tabRefs.current[t.id] = el; }}
+                  id={tabId(t.id)}
+                  role="tab"
+                  type="button"
+                  aria-selected={selected}
+                  aria-controls={panelId(t.id)}
+                  tabIndex={selected ? 0 : -1}
+                  data-testid={`connections-tab-${t.id}`}
+                  onClick={() => setTab(t.id)}
+                  onKeyDown={handleTabKeyDown}
+                  className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                    selected
+                      ? "bg-slate-800 text-white border border-b-0 border-slate-700"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                  }`}
+                >
+                  {t.label}
+                  {t.badge != null && t.badge > 0 && (
+                    <span className={`inline-flex items-center justify-center min-w-[1.1rem] h-[1.1rem] px-1 text-xs rounded-full font-semibold ${
+                      t.id === "pending" ? "bg-rose-600 text-white" : "bg-slate-600 text-slate-300"
+                    }`}>
+                      {t.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Tab body */}
+          {/* Tab body — stable tabpanels; inactive panels hidden and their content not rendered */}
           <div className="px-6 md:px-8 py-6">
-            {tab === "search" && (
-              <SearchTab
-                connectionsData={data}
-                showToast={showToast}
-              />
-            )}
-            {tab === "pending" && (
-              <PendingTab
-                data={data}
-                isLoading={isLoading}
-                showToast={showToast}
-              />
-            )}
-            {tab === "connections" && (
-              <ConnectionsTab
-                data={data}
-                isLoading={isLoading}
-                showToast={showToast}
-              />
-            )}
+            <div
+              id={panelId("search")}
+              role="tabpanel"
+              aria-labelledby={tabId("search")}
+              tabIndex={0}
+              hidden={tab !== "search"}
+              className="focus:outline-none"
+            >
+              {tab === "search" && (
+                <SearchTab
+                  connectionsData={data}
+                  showToast={showToast}
+                />
+              )}
+            </div>
+            <div
+              id={panelId("pending")}
+              role="tabpanel"
+              aria-labelledby={tabId("pending")}
+              tabIndex={0}
+              hidden={tab !== "pending"}
+              className="focus:outline-none"
+            >
+              {tab === "pending" && (
+                <PendingTab
+                  data={data}
+                  isLoading={isLoading}
+                  showToast={showToast}
+                />
+              )}
+            </div>
+            <div
+              id={panelId("connections")}
+              role="tabpanel"
+              aria-labelledby={tabId("connections")}
+              tabIndex={0}
+              hidden={tab !== "connections"}
+              className="focus:outline-none"
+            >
+              {tab === "connections" && (
+                <ConnectionsTab
+                  data={data}
+                  isLoading={isLoading}
+                  showToast={showToast}
+                />
+              )}
+            </div>
           </div>
         </div>
       </div>

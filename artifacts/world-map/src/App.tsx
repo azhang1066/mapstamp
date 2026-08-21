@@ -828,6 +828,9 @@ function ExportModal({
   tccDetails: Record<string, VisitDetails>;
 }) {
   const [copied, setCopied] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  useModalFocusTrap(dialogRef, closeButtonRef, onClose);
 
   const csv = buildTravelCSV(
     visitedCountries, visitedStates, visitedProvinces, visitedTcc,
@@ -856,13 +859,27 @@ function ExportModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh]">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="export-dialog-title"
+        tabIndex={-1}
+        className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh]"
+      >
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
           <div>
-            <h2 className="text-lg font-bold text-white">Export Travel Log</h2>
+            <h2 id="export-dialog-title" className="text-lg font-bold text-white">Export Travel Log</h2>
             <p className="text-xs text-slate-400 mt-0.5">CSV format — opens directly in Excel or Google Sheets</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors text-xl leading-none">✕</button>
+          <button
+            ref={closeButtonRef}
+            onClick={onClose}
+            aria-label="Close export dialog"
+            className="text-slate-400 hover:text-white transition-colors text-xl leading-none"
+          >
+            ✕
+          </button>
         </div>
 
         <pre className="flex-1 overflow-y-auto px-6 py-4 text-xs text-slate-300 font-mono leading-relaxed whitespace-pre bg-slate-950/50 rounded-none">
@@ -927,6 +944,50 @@ function buildShareUrl(data: ShareData): string {
   return `${window.location.origin}${window.location.pathname}?share=${encodeShareData(data)}`;
 }
 
+function useModalFocusTrap(
+  dialogRef: React.RefObject<HTMLDivElement | null>,
+  initialFocusRef: React.RefObject<HTMLButtonElement | null>,
+  onClose: () => void,
+) {
+  useEffect(() => {
+    initialFocusRef.current?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const focusableElements = Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'a[href], area[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute("hidden") && element.getAttribute("aria-hidden") !== "true");
+
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+
+      const first = focusableElements[0];
+      const last = focusableElements[focusableElements.length - 1];
+      const activeElement = document.activeElement;
+      if (event.shiftKey && (activeElement === first || !dialog.contains(activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (activeElement === last || !dialog.contains(activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [dialogRef, initialFocusRef, onClose]);
+}
+
 function ShareModal({
   onClose, visitedCountries, visitedStates, visitedProvinces,
   bucketCountries, bucketStates, bucketProvinces,
@@ -941,6 +1002,9 @@ function ShareModal({
   notesByKey: Record<string, string>;
 }) {
   const [copied, setCopied] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  useModalFocusTrap(dialogRef, closeButtonRef, onClose);
   const baseData: ShareData = {
     vc: [...visitedCountries],
     vs: [...visitedStates],   vp: [...visitedProvinces],
@@ -969,13 +1033,27 @@ function ShareModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
          onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="share-dialog-title"
+        tabIndex={-1}
+        className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg"
+      >
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
           <div>
-            <h2 className="text-lg font-bold text-white">Share Your Travel Map</h2>
+            <h2 id="share-dialog-title" className="text-lg font-bold text-white">Share Your Travel Map</h2>
             <p className="text-xs text-slate-400 mt-0.5">Anyone with the link sees a read-only snapshot of your map</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors text-xl leading-none">✕</button>
+          <button
+            ref={closeButtonRef}
+            onClick={onClose}
+            aria-label="Close share dialog"
+            className="text-slate-400 hover:text-white transition-colors text-xl leading-none"
+          >
+            ✕
+          </button>
         </div>
 
         <div className="px-6 py-5 space-y-5">
@@ -1093,6 +1171,8 @@ function StatsDashboard(props: StatsDashboardProps) {
   } = props;
 
   const cardRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const [favorites] = useState<FavoriteEntry[]>(loadStatsFavorites);
   const [profileName, setProfileName] = useState<string>(() => {
     try { return localStorage.getItem("wm_profile_name") || "My Travels"; } catch { return "My Travels"; }
@@ -1102,6 +1182,7 @@ function StatsDashboard(props: StatsDashboardProps) {
     try { localStorage.setItem("wm_profile_name", n); } catch { /* ignore */ }
   };
   const [copyStatus, setCopyStatus] = useState<"idle" | "copying" | "copied" | "downloaded" | "error">("idle");
+  useModalFocusTrap(dialogRef, closeButtonRef, onClose);
 
   // Build flat visited items list with year extracted
   const items: VisitedItem[] = useMemo(() => {
@@ -1241,15 +1322,24 @@ function StatsDashboard(props: StatsDashboardProps) {
         className="min-h-full max-w-6xl mx-auto p-6 md:p-10"
         onClick={e => e.stopPropagation()}
       >
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl">
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="stats-dialog-title"
+          tabIndex={-1}
+          className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl"
+        >
           {/* Header */}
           <div className="flex items-center justify-between px-6 md:px-8 py-5 border-b border-slate-800 sticky top-0 bg-slate-900/95 backdrop-blur-sm rounded-t-2xl z-10">
             <div>
-              <h2 className="text-2xl font-bold text-white flex items-center gap-2">📊 Travel Statistics</h2>
+              <h2 id="stats-dialog-title" className="text-2xl font-bold text-white flex items-center gap-2">📊 Travel Statistics</h2>
               <p className="text-sm text-slate-400 mt-0.5">A snapshot of your journey so far</p>
             </div>
             <button
+              ref={closeButtonRef}
               onClick={onClose}
+              aria-label="Close travel statistics dialog"
               className="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition-colors"
             >
               ✕ Close
@@ -1883,6 +1973,66 @@ function SearchBar({ onSelect }: { onSelect: (item: SearchItem) => void }) {
 
 // ─── End search ───────────────────────────────────────────────────────────────
 
+type ListTabId = "countries" | "us-states" | "ca-provinces" | "tcc" | "bucket-list";
+
+function ListTabPanel({
+  tabId,
+  active,
+  children,
+}: {
+  tabId: ListTabId;
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      id={`list-panel-${tabId}`}
+      role="tabpanel"
+      aria-labelledby={`list-tab-${tabId}`}
+      hidden={!active}
+      tabIndex={active ? 0 : -1}
+    >
+      {children}
+    </div>
+  );
+}
+
+function ConnectionsLoadingDialog({ onClose }: { onClose: () => void }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  useModalFocusTrap(dialogRef, closeButtonRef, onClose);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
+      <div className="min-h-full max-w-2xl mx-auto p-6 md:p-10">
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="connections-loading-title"
+          tabIndex={-1}
+          className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl focus:outline-none"
+        >
+          <div className="flex items-center justify-between px-6 md:px-8 py-5">
+            <h2 id="connections-loading-title" className="text-xl font-bold text-white">Loading Connections</h2>
+            <button
+              ref={closeButtonRef}
+              onClick={onClose}
+              aria-label="Close connections dialog"
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="flex justify-center py-16">
+            <div className="w-8 h-8 rounded-full border-2 border-slate-600 border-t-slate-300 animate-spin" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOpenProfile }: AuthProps) {
   const [selected, setSelected] = useState<{ key: string; info: RegionInfo } | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -1890,7 +2040,13 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
   const [tooltipName, setTooltipName] = useState<string>("");
   const [zoom, setZoom] = useState(1);
   const [center, setCenter] = useState<[number, number]>([0, 20]);
-  const [listTab, setListTab] = useState<"countries" | "us-states" | "ca-provinces" | "tcc" | "bucket-list">("countries");
+  const [listTab, setListTab] = useState<ListTabId>(() => {
+    try {
+      return localStorage.getItem("wm_map_mode") === "tcc" ? "tcc" : "countries";
+    } catch {
+      return "countries";
+    }
+  });
   const [expandedTccRegions, setExpandedTccRegions] = useState<Set<TccRegionKey>>(new Set());
   const [confirmBucket, setConfirmBucket] = useState<string | null>(null);
   const [showExport, setShowExport] = useState(false);
@@ -1900,10 +2056,33 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const exportTriggerRef = useRef<HTMLButtonElement>(null);
+  const connectionsTriggerRef = useRef<HTMLButtonElement>(null);
+  const statsTriggerRef = useRef<HTMLButtonElement>(null);
+  const shareTriggerRef = useRef<HTMLButtonElement>(null);
+  const listTabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [sharedData, setSharedData] = useState<ShareData | null>(null);
   const [toast, setToast] = useState<{ message: string; kind: "success" | "warning" } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const closeExportModal = useCallback(() => {
+    setShowExport(false);
+    setShowProfileMenu(true);
+    requestAnimationFrame(() => exportTriggerRef.current?.focus());
+  }, []);
+  const closeConnectionsPanel = useCallback(() => {
+    setShowConnections(false);
+    setShowProfileMenu(true);
+    requestAnimationFrame(() => connectionsTriggerRef.current?.focus());
+  }, []);
+  const closeStatsDashboard = useCallback(() => {
+    setShowStats(false);
+    requestAnimationFrame(() => statsTriggerRef.current?.focus());
+  }, []);
+  const closeShareModal = useCallback(() => {
+    setShowShare(false);
+    requestAnimationFrame(() => shareTriggerRef.current?.focus());
+  }, []);
   const [rawVisitedCountries, setVisitedCountries] = useLocalStorageSet("wm_visited_countries");
   const [rawVisitedStates, setVisitedStates] = useLocalStorageSet("wm_visited_states");
   const [rawVisitedProvinces, setVisitedProvinces] = useLocalStorageSet("wm_visited_provinces");
@@ -1947,6 +2126,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
   });
   const setMapMode = useCallback((m: MapMode) => {
     setMapModeRaw(m);
+    setListTab(current => m === "tcc" ? "tcc" : current === "tcc" ? "countries" : current);
     try { localStorage.setItem("wm_map_mode", m); } catch { /* ignore */ }
   }, []);
 
@@ -2358,6 +2538,10 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
 
   return (
     <div className="flex flex-col bg-slate-950 text-white">
+      <div
+        inert={showExport || showStats || showShare || showConnections}
+        aria-hidden={showExport || showStats || showShare || showConnections ? "true" : undefined}
+      >
       {isReadOnly && (
         <div className="flex items-center justify-between gap-3 px-6 py-2.5 bg-blue-950/80 border-b border-blue-800/60 text-sm">
           <div className="flex items-center gap-2 text-blue-200">
@@ -2443,6 +2627,8 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
           <button onClick={() => { setZoom(1); setCenter([0, 20]); setSelected(null); }} className="px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors font-medium">Reset</button>
           <button
             onClick={() => setFilterExpanded(v => !v)}
+            aria-expanded={filterExpanded}
+            aria-controls="year-filter-panel"
             className={`px-3 py-2 text-sm rounded-lg transition-colors font-medium flex items-center gap-1.5 ${
               yearFilter.enabled
                 ? "bg-amber-600 hover:bg-amber-500 text-white"
@@ -2456,6 +2642,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
           </button>
           <button
             onClick={() => setShowStats(true)}
+            ref={statsTriggerRef}
             className="px-3 py-2 text-sm bg-fuchsia-700 hover:bg-fuchsia-600 rounded-lg transition-colors font-medium text-white flex items-center gap-1.5"
             title="View travel statistics dashboard"
           >
@@ -2463,6 +2650,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
           </button>
           <button
             onClick={() => setShowShare(true)}
+            ref={shareTriggerRef}
             className="px-3 py-2 text-sm bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors font-medium text-white flex items-center gap-1.5"
           >
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="10.5" cy="2.5" r="1.5" stroke="currentColor" strokeWidth="1.3"/><circle cx="10.5" cy="10.5" r="1.5" stroke="currentColor" strokeWidth="1.3"/><circle cx="2.5" cy="6.5" r="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M4 6l5-3M4 7l5 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
@@ -2473,6 +2661,9 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
             <div className="relative" ref={profileMenuRef}>
               <button
                 onClick={() => setShowProfileMenu(p => !p)}
+                aria-expanded={showProfileMenu}
+                aria-controls="profile-menu"
+                aria-label="Account menu"
                 className="flex items-center justify-center w-8 h-8 rounded-full overflow-hidden border-2 border-slate-600 hover:border-slate-400 transition-colors focus:outline-none"
                 title="Account settings"
               >
@@ -2485,7 +2676,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                 )}
               </button>
               {showProfileMenu && (
-                <div className="absolute right-0 top-full mt-2 w-52 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+                <div id="profile-menu" className="absolute right-0 top-full mt-2 w-52 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
                   <div className="px-4 py-3 border-b border-slate-700">
                     <p className="text-xs text-slate-400">Signed in as</p>
                     <p className="text-sm font-medium text-white truncate">
@@ -2501,6 +2692,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                       Profile settings
                     </button>
                     <button
+                      ref={connectionsTriggerRef}
                       onClick={() => { setShowConnections(true); setShowProfileMenu(false); }}
                       className="relative w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"
                     >
@@ -2526,6 +2718,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                           Import Excel
                         </button>
                         <button
+                          ref={exportTriggerRef}
                           onClick={() => { setShowExport(true); setShowProfileMenu(false); }}
                           className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"
                         >
@@ -2560,8 +2753,13 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
         </div>
       </header>
 
-      {filterExpanded && (
-        <div className="px-6 py-3 border-b border-slate-800 bg-slate-900/60 flex items-center gap-4 flex-wrap relative z-10">
+      <div
+        id="year-filter-panel"
+        role="region"
+        aria-label="Year filter"
+        hidden={!filterExpanded}
+        className="px-6 py-3 border-b border-slate-800 bg-slate-900/60 flex items-center gap-4 flex-wrap relative z-10"
+      >
           <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer select-none">
             <input
               type="checkbox"
@@ -2622,8 +2820,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
           >
             ✕
           </button>
-        </div>
-      )}
+      </div>
 
       <div className="flex overflow-hidden" style={{ height: "calc(100vh - 72px - 260px)", minHeight: "400px" }}>
         <div className="flex-1 relative overflow-hidden bg-slate-950">
@@ -3259,8 +3456,9 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
       <section className="border-t border-slate-800 bg-slate-900">
         {/* Tab bar + progress */}
         <div className="flex items-center justify-between px-6 pt-4 pb-0 border-b border-slate-800 flex-wrap gap-y-2">
-          <div className="flex items-center gap-1 flex-wrap">
-            {(mapMode === "tcc"
+          <div className="flex items-center gap-1 flex-wrap" role="tablist" aria-label="Destination lists">
+            {(() => {
+              const tabs = mapMode === "tcc"
               ? ([
                   { id: "tcc",         label: `TCC (${TCC_TOTAL})` },
                   { id: "bucket-list", label: "★ Bucket List" },
@@ -3270,20 +3468,40 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                   { id: "us-states",   label: "US States" },
                   { id: "ca-provinces", label: "CA Provinces" },
                   { id: "bucket-list", label: "★ Bucket List" },
-                ] as const)
-            ).map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setListTab(tab.id)}
-                className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
-                  listTab === tab.id
-                    ? "border-blue-500 text-white bg-slate-800/60"
-                    : "border-transparent text-slate-400 hover:text-white hover:bg-slate-800/30"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+                ] as const);
+              return tabs.map((tab, index) => (
+                <button
+                  key={tab.id}
+                  ref={(element) => { listTabRefs.current[tab.id] = element; }}
+                  id={`list-tab-${tab.id}`}
+                  role="tab"
+                  aria-selected={listTab === tab.id}
+                  aria-controls={`list-panel-${tab.id}`}
+                  tabIndex={listTab === tab.id ? 0 : -1}
+                  onClick={() => setListTab(tab.id)}
+                  onKeyDown={(event) => {
+                    let nextIndex: number | null = null;
+                    if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
+                    if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
+                    if (event.key === "Home") nextIndex = 0;
+                    if (event.key === "End") nextIndex = tabs.length - 1;
+                    if (nextIndex === null) return;
+
+                    event.preventDefault();
+                    const nextTab = tabs[nextIndex];
+                    setListTab(nextTab.id);
+                    requestAnimationFrame(() => listTabRefs.current[nextTab.id]?.focus());
+                  }}
+                  className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
+                    listTab === tab.id
+                      ? "border-blue-500 text-white bg-slate-800/60"
+                      : "border-transparent text-slate-400 hover:text-white hover:bg-slate-800/30"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ));
+            })()}
           </div>
           {/* Progress badges */}
           <div className="flex items-center gap-3 pb-2 flex-wrap">
@@ -3326,6 +3544,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
         </div>
 
         {/* Countries tab */}
+        <ListTabPanel tabId="countries" active={listTab === "countries"}>
         {listTab === "countries" && (
           <div className="px-6 py-4">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5">
@@ -3377,8 +3596,10 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
             </div>
           </div>
         )}
+        </ListTabPanel>
 
         {/* US States tab */}
+        <ListTabPanel tabId="us-states" active={listTab === "us-states"}>
         {listTab === "us-states" && (
           <div className="px-6 py-4">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5">
@@ -3430,8 +3651,10 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
             </div>
           </div>
         )}
+        </ListTabPanel>
 
         {/* CA Provinces tab */}
+        <ListTabPanel tabId="ca-provinces" active={listTab === "ca-provinces"}>
         {listTab === "ca-provinces" && (
           <div className="px-6 py-4">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5">
@@ -3483,8 +3706,10 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
             </div>
           </div>
         )}
+        </ListTabPanel>
 
         {/* TCC tab */}
+        <ListTabPanel tabId="tcc" active={listTab === "tcc"}>
         {listTab === "tcc" && (
           <div className="px-6 py-4">
             <div className="flex items-center gap-2 mb-3 flex-wrap">
@@ -3511,6 +3736,8 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                 return (
                   <div key={k} className="rounded-lg border border-slate-700/60 overflow-hidden">
                     <button
+                      aria-expanded={isExpanded}
+                      aria-controls={`tcc-region-${k}`}
                       onClick={() => {
                         setExpandedTccRegions(prev => {
                           const next = new Set(prev);
@@ -3522,6 +3749,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                       className="w-full flex items-center gap-2 px-3 py-2 bg-slate-800/60 hover:bg-slate-800 transition-colors text-left"
                     >
                       <span
+                        aria-hidden="true"
                         className={`text-slate-400 text-xs transition-transform flex-shrink-0 ${isExpanded ? "rotate-90" : ""}`}
                       >
                         ▶
@@ -3532,8 +3760,11 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                       </span>
                       <span className="text-xs text-slate-400 font-mono">{visitedInRegion}/{totalInRegion}</span>
                     </button>
-                    {isExpanded && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-1.5 p-2 bg-slate-900/40">
+                    <div
+                      id={`tcc-region-${k}`}
+                      hidden={!isExpanded}
+                      className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-1.5 p-2 bg-slate-900/40"
+                    >
                         {entriesInRegion.map((entry) => {
                           const isVisited = tccVisited.has(entry.name);
                           const isBucket = !isVisited && tccBucket.has(entry.name);
@@ -3587,16 +3818,17 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
                             </div>
                           );
                         })}
-                      </div>
-                    )}
+                    </div>
                   </div>
                 );
               })}
             </div>
           </div>
         )}
+        </ListTabPanel>
 
         {/* Bucket List tab */}
+        <ListTabPanel tabId="bucket-list" active={listTab === "bucket-list"}>
         {listTab === "bucket-list" && (() => {
           const bucketTotal = bucketCountries.size + bucketStates.size + bucketProvinces.size + tccBucket.size;
           if (bucketTotal === 0) {
@@ -3655,11 +3887,13 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
             </div>
           );
         })()}
+        </ListTabPanel>
       </section>
+      </div>
 
       {showExport && (
         <ExportModal
-          onClose={() => setShowExport(false)}
+          onClose={closeExportModal}
           visitedCountries={visitedCountries}
           visitedStates={visitedStates}
           visitedProvinces={visitedProvinces}
@@ -3673,18 +3907,10 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
 
       {showConnections && isAuthenticated && (
         <Suspense
-          fallback={
-            <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
-              <div className="min-h-full max-w-2xl mx-auto p-6 md:p-10">
-                <div className="flex justify-center py-24">
-                  <div className="w-8 h-8 rounded-full border-2 border-slate-600 border-t-slate-300 animate-spin" />
-                </div>
-              </div>
-            </div>
-          }
+          fallback={<ConnectionsLoadingDialog onClose={closeConnectionsPanel} />}
         >
           <ConnectionsPanel
-            onClose={() => setShowConnections(false)}
+            onClose={closeConnectionsPanel}
             showToast={showToast}
           />
         </Suspense>
@@ -3692,7 +3918,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
 
       {showStats && (
         <StatsDashboard
-          onClose={() => setShowStats(false)}
+          onClose={closeStatsDashboard}
           visitedCountries={baseVisitedCountries}
           visitedStates={baseVisitedStates}
           visitedProvinces={baseVisitedProvinces}
@@ -3709,7 +3935,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
       )}
       {showShare && (
         <ShareModal
-          onClose={() => setShowShare(false)}
+          onClose={closeShareModal}
           notesByKey={loadAllNotes()}
           visitedCountries={isReadOnly ? visitedCountries : rawVisitedCountries}
           visitedStates={isReadOnly ? visitedStates : rawVisitedStates}

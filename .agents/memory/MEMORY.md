@@ -9,3 +9,4 @@
 - [Playwright Chromium on Nix](playwright-chromium-nix.md) — downloaded Chromium needs explicit system libraries before browser tests can launch.
 - [Signed-in map hydration](signed-in-map-hydration.md) — block cloud writes until each authenticated traveler’s progress has hydrated successfully.
 - [Legacy photo ownership](legacy-photo-ownership.md) — bind ownerless browser photo migrations to a persisted account marker before uploading.
+- [Public share privacy](public-share-privacy.md) — stable share pages must hand browsers only opaque IDs, never snapshots or notes in URLs.

@@ -3,3 +3,4 @@ export * from "./user_photos";
 export * from "./user_destinations";
 export * from "./user_profiles";
 export * from "./user_connections";
+export * from "./map_shares";

@@ -85,6 +85,160 @@ export const SaveMapDataResponse = zod.object({
 });
 
 /**
+ * @summary Create an immutable, public travel-map snapshot link
+ */
+export const createMapShareBodySnapshotVcItemMax = 128;
+
+export const createMapShareBodySnapshotVcMax = 500;
+
+export const createMapShareBodySnapshotVsItemMax = 128;
+
+export const createMapShareBodySnapshotVsMax = 100;
+
+export const createMapShareBodySnapshotVpItemMax = 128;
+
+export const createMapShareBodySnapshotVpMax = 100;
+
+export const createMapShareBodySnapshotBcItemMax = 128;
+
+export const createMapShareBodySnapshotBcMax = 500;
+
+export const createMapShareBodySnapshotBsItemMax = 128;
+
+export const createMapShareBodySnapshotBsMax = 100;
+
+export const createMapShareBodySnapshotBpItemMax = 128;
+
+export const createMapShareBodySnapshotBpMax = 100;
+
+export const createMapShareBodySnapshotTvItemMax = 128;
+
+export const createMapShareBodySnapshotTvMax = 500;
+
+export const createMapShareBodySnapshotTbItemMax = 128;
+
+export const createMapShareBodySnapshotTbMax = 500;
+
+export const createMapShareBodySnapshotNMaxOne = 2000;
+
+export const CreateMapShareBody = zod.object({
+  snapshot: zod.object({
+    vc: zod
+      .array(zod.string().min(1).max(createMapShareBodySnapshotVcItemMax))
+      .max(createMapShareBodySnapshotVcMax),
+    vs: zod
+      .array(zod.string().min(1).max(createMapShareBodySnapshotVsItemMax))
+      .max(createMapShareBodySnapshotVsMax),
+    vp: zod
+      .array(zod.string().min(1).max(createMapShareBodySnapshotVpItemMax))
+      .max(createMapShareBodySnapshotVpMax),
+    bc: zod
+      .array(zod.string().min(1).max(createMapShareBodySnapshotBcItemMax))
+      .max(createMapShareBodySnapshotBcMax),
+    bs: zod
+      .array(zod.string().min(1).max(createMapShareBodySnapshotBsItemMax))
+      .max(createMapShareBodySnapshotBsMax),
+    bp: zod
+      .array(zod.string().min(1).max(createMapShareBodySnapshotBpItemMax))
+      .max(createMapShareBodySnapshotBpMax),
+    tv: zod
+      .array(zod.string().min(1).max(createMapShareBodySnapshotTvItemMax))
+      .max(createMapShareBodySnapshotTvMax)
+      .optional(),
+    tb: zod
+      .array(zod.string().min(1).max(createMapShareBodySnapshotTbItemMax))
+      .max(createMapShareBodySnapshotTbMax)
+      .optional(),
+    n: zod
+      .record(zod.string(), zod.string().max(createMapShareBodySnapshotNMaxOne))
+      .optional(),
+  }),
+});
+
+/**
+ * @summary Load the immutable public snapshot behind a share ID
+ */
+export const getMapSharePathIdMin = 32;
+export const getMapSharePathIdMax = 32;
+
+export const GetMapShareParams = zod.object({
+  id: zod.coerce.string().min(getMapSharePathIdMin).max(getMapSharePathIdMax),
+});
+
+export const getMapShareResponseSnapshotVcItemMax = 128;
+
+export const getMapShareResponseSnapshotVcMax = 500;
+
+export const getMapShareResponseSnapshotVsItemMax = 128;
+
+export const getMapShareResponseSnapshotVsMax = 100;
+
+export const getMapShareResponseSnapshotVpItemMax = 128;
+
+export const getMapShareResponseSnapshotVpMax = 100;
+
+export const getMapShareResponseSnapshotBcItemMax = 128;
+
+export const getMapShareResponseSnapshotBcMax = 500;
+
+export const getMapShareResponseSnapshotBsItemMax = 128;
+
+export const getMapShareResponseSnapshotBsMax = 100;
+
+export const getMapShareResponseSnapshotBpItemMax = 128;
+
+export const getMapShareResponseSnapshotBpMax = 100;
+
+export const getMapShareResponseSnapshotTvItemMax = 128;
+
+export const getMapShareResponseSnapshotTvMax = 500;
+
+export const getMapShareResponseSnapshotTbItemMax = 128;
+
+export const getMapShareResponseSnapshotTbMax = 500;
+
+export const getMapShareResponseSnapshotNMaxOne = 2000;
+
+export const GetMapShareResponse = zod.object({
+  snapshot: zod.object({
+    vc: zod
+      .array(zod.string().min(1).max(getMapShareResponseSnapshotVcItemMax))
+      .max(getMapShareResponseSnapshotVcMax),
+    vs: zod
+      .array(zod.string().min(1).max(getMapShareResponseSnapshotVsItemMax))
+      .max(getMapShareResponseSnapshotVsMax),
+    vp: zod
+      .array(zod.string().min(1).max(getMapShareResponseSnapshotVpItemMax))
+      .max(getMapShareResponseSnapshotVpMax),
+    bc: zod
+      .array(zod.string().min(1).max(getMapShareResponseSnapshotBcItemMax))
+      .max(getMapShareResponseSnapshotBcMax),
+    bs: zod
+      .array(zod.string().min(1).max(getMapShareResponseSnapshotBsItemMax))
+      .max(getMapShareResponseSnapshotBsMax),
+    bp: zod
+      .array(zod.string().min(1).max(getMapShareResponseSnapshotBpItemMax))
+      .max(getMapShareResponseSnapshotBpMax),
+    tv: zod
+      .array(zod.string().min(1).max(getMapShareResponseSnapshotTvItemMax))
+      .max(getMapShareResponseSnapshotTvMax)
+      .optional(),
+    tb: zod
+      .array(zod.string().min(1).max(getMapShareResponseSnapshotTbItemMax))
+      .max(getMapShareResponseSnapshotTbMax)
+      .optional(),
+    n: zod
+      .record(
+        zod.string(),
+        zod.string().max(getMapShareResponseSnapshotNMaxOne),
+      )
+      .optional(),
+  }),
+  visitedCount: zod.number(),
+  bucketCount: zod.number(),
+});
+
+/**
  * @summary List photos for a destination
  */
 export const ListPhotosQueryParams = zod.object({

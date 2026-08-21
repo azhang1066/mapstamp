@@ -60,6 +60,48 @@ export interface SaveMapDataResponse {
   ok: boolean;
 }
 
+export type MapShareSnapshotN = { [key: string]: string };
+
+export interface MapShareSnapshot {
+  /** @maxItems 500 */
+  vc: string[];
+  /** @maxItems 100 */
+  vs: string[];
+  /** @maxItems 100 */
+  vp: string[];
+  /** @maxItems 500 */
+  bc: string[];
+  /** @maxItems 100 */
+  bs: string[];
+  /** @maxItems 100 */
+  bp: string[];
+  /** @maxItems 500 */
+  tv?: string[];
+  /** @maxItems 500 */
+  tb?: string[];
+  n?: MapShareSnapshotN;
+}
+
+export interface MapShareInput {
+  snapshot: MapShareSnapshot;
+}
+
+export interface MapShareCreated {
+  /**
+   * @minLength 32
+   * @maxLength 32
+   */
+  id: string;
+  /** Stable public path for the shared map. */
+  sharePath: string;
+}
+
+export interface MapShareSnapshotResponse {
+  snapshot: MapShareSnapshot;
+  visitedCount: number;
+  bucketCount: number;
+}
+
 export interface PhotoRecord {
   /** UUID of the photo record. */
   id: string;

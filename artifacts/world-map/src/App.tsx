@@ -919,8 +919,6 @@ interface ShareData {
   n?: Record<string, string>;   // notes keyed by "category:id"
 }
 
-const SHARE_URL_BUDGET = 6000;
-
 function encodeShareData(data: ShareData): string {
   // Unicode-safe: convert UTF-8 bytes to a Latin1 string before btoa,
   // so notes containing emojis or accented characters don't throw.
@@ -942,10 +940,6 @@ function decodeShareData(encoded: string): ShareData | null {
     const json = new TextDecoder().decode(bytes);
     return JSON.parse(json) as ShareData;
   } catch { return null; }
-}
-
-function buildShareUrl(data: ShareData): string {
-  return `${window.location.origin}${window.location.pathname}?share=${encodeShareData(data)}`;
 }
 
 function useModalFocusTrap(
@@ -1006,6 +1000,8 @@ function ShareModal({
   notesByKey: Record<string, string>;
 }) {
   const [copied, setCopied] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [shareError, setShareError] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   useModalFocusTrap(dialogRef, closeButtonRef, onClose);
@@ -1016,19 +1012,41 @@ function ShareModal({
     bs: [...bucketStates],    bp: [...bucketProvinces],
     tv: [...tccVisited],      tb: [...tccBucket],
   };
-  const hasNotes = Object.keys(notesByKey).length > 0;
-  let url = buildShareUrl(baseData);
-  let notesOmitted = false;
-  if (hasNotes) {
-    const urlWith = buildShareUrl({ ...baseData, n: notesByKey });
-    if (urlWith.length <= SHARE_URL_BUDGET) url = urlWith;
-    else notesOmitted = true;
-  }
+  const shareData = useMemo<ShareData>(
+    () => Object.keys(notesByKey).length > 0 ? { ...baseData, n: notesByKey } : baseData,
+    [notesByKey, tccBucket, tccVisited, bucketCountries, bucketProvinces, bucketStates, visitedCountries, visitedProvinces, visitedStates],
+  );
   const totalVisited = visitedCountries.size + visitedStates.size + visitedProvinces.size + tccVisited.size;
   const totalBucket  = bucketCountries.size  + bucketStates.size  + bucketProvinces.size  + tccBucket.size;
 
+  useEffect(() => {
+    const controller = new AbortController();
+    async function createStableShare(): Promise<void> {
+      try {
+        const response = await fetch("/api/shares", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ snapshot: shareData }),
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("Share link could not be created");
+        const result = await response.json() as { sharePath?: string };
+        if (!result.sharePath) throw new Error("Share link could not be created");
+        setShareUrl(new URL(result.sharePath, window.location.origin).toString());
+      } catch (error) {
+        if ((error as Error).name !== "AbortError") {
+          setShareError("Could not create a share link. Please try again.");
+        }
+      }
+    }
+    void createStableShare();
+    return () => controller.abort();
+  }, [shareData]);
+
   function handleCopy() {
-    navigator.clipboard.writeText(url).then(() => {
+    if (!shareUrl) return;
+    navigator.clipboard.writeText(shareUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     });
@@ -1077,14 +1095,15 @@ function ShareModal({
             <div className="flex gap-2">
               <input
                 id="shareable-link"
-                type="text" value={url} readOnly
+                type="text" value={shareUrl ?? (shareError ?? "Preparing a stable share link…")} readOnly
                 className="flex-1 min-w-0 px-3 py-2 text-xs bg-slate-800 border border-slate-700 rounded-lg text-slate-300 font-mono"
                 onFocus={e => e.target.select()}
               />
               <button
                 onClick={handleCopy}
+                disabled={!shareUrl}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
-                  copied ? "bg-emerald-600 text-white" : "bg-blue-600 hover:bg-blue-500 text-white"
+                  copied ? "bg-emerald-600 text-white" : "bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed text-white"
                 }`}
               >
                 {copied ? "✓ Copied!" : "Copy Link"}
@@ -1093,9 +1112,7 @@ function ShareModal({
           </div>
 
           <p className="text-xs text-slate-500 italic">📷 Photos are not included in shared links</p>
-          {notesOmitted && (
-            <p className="text-xs text-slate-500 italic">📝 Notes are not included in shared links (link would exceed size limit)</p>
-          )}
+          <p className="text-xs text-slate-500 italic">📝 Notes included in a shared map are never used in its preview or social metadata</p>
 
           <div className="bg-slate-800/60 rounded-xl p-4 space-y-2.5">
             <p className="text-xs font-semibold text-slate-300 uppercase tracking-widest mb-1">How to post</p>
@@ -2145,6 +2162,32 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
       const decoded = decodeShareData(param);
       if (decoded) setSharedData(decoded);
     }
+
+    const shareId = new URLSearchParams(window.location.search).get("shareId");
+    if (!shareId || !/^[A-Za-z0-9_-]{32}$/.test(shareId)) return;
+
+    const controller = new AbortController();
+    async function loadStableShare(): Promise<void> {
+      try {
+        const response = await fetch(`/api/shares/${shareId}`, { signal: controller.signal });
+        if (!response.ok) return;
+        const result = await response.json() as { snapshot?: ShareData };
+        if (!result.snapshot) return;
+
+        setSharedData(result.snapshot);
+        try {
+          const stablePath = sessionStorage.getItem("wm_share_stable_path") ?? `/s/${shareId}`;
+          window.history.replaceState(null, "", stablePath);
+          sessionStorage.removeItem("wm_share_stable_path");
+        } catch {
+          window.history.replaceState(null, "", `/s/${shareId}`);
+        }
+      } catch {
+        // Keep the normal map available if a public share cannot be loaded.
+      }
+    }
+    void loadStableShare();
+    return () => controller.abort();
   }, []);
 
   // Close profile menu when clicking outside

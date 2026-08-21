@@ -8,6 +8,7 @@ import usersRouter from "./users";
 import connectionsRouter from "./connections";
 import compareRouter from "./compare";
 import leaderboardRouter from "./leaderboard";
+import sharesRouter from "./shares";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(usersRouter);
 router.use(connectionsRouter);
 router.use(compareRouter);
 router.use(leaderboardRouter);
+router.use(sharesRouter);
 
 export default router;

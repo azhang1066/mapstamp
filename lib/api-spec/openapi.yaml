@@ -71,6 +71,56 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /shares:
+    post:
+      tags: [map-data]
+      operationId: createMapShare
+      summary: Create an immutable, public travel-map snapshot link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MapShareInput'
+      responses:
+        '201':
+          description: Public share link created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MapShareCreated'
+        '400':
+          description: Invalid or oversized snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /shares/{id}:
+    get:
+      tags: [map-data]
+      operationId: getMapShare
+      summary: Load the immutable public snapshot behind a share ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 32
+            maxLength: 32
+      responses:
+        '200':
+          description: Public share snapshot returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MapShareSnapshotResponse'
+        '404':
+          description: Shared map not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /photos:
     get:
       tags: [photos]
@@ -702,6 +752,77 @@ components:
       properties:
         ok:
           type: boolean
+    MapShareSnapshot:
+      type: object
+      additionalProperties: false
+      required: [vc, vs, vp, bc, bs, bp]
+      properties:
+        vc:
+          type: array
+          maxItems: 500
+          items: { type: string, minLength: 1, maxLength: 128 }
+        vs:
+          type: array
+          maxItems: 100
+          items: { type: string, minLength: 1, maxLength: 128 }
+        vp:
+          type: array
+          maxItems: 100
+          items: { type: string, minLength: 1, maxLength: 128 }
+        bc:
+          type: array
+          maxItems: 500
+          items: { type: string, minLength: 1, maxLength: 128 }
+        bs:
+          type: array
+          maxItems: 100
+          items: { type: string, minLength: 1, maxLength: 128 }
+        bp:
+          type: array
+          maxItems: 100
+          items: { type: string, minLength: 1, maxLength: 128 }
+        tv:
+          type: array
+          maxItems: 500
+          items: { type: string, minLength: 1, maxLength: 128 }
+        tb:
+          type: array
+          maxItems: 500
+          items: { type: string, minLength: 1, maxLength: 128 }
+        n:
+          type: object
+          maxProperties: 500
+          additionalProperties:
+            type: string
+            maxLength: 2000
+    MapShareInput:
+      type: object
+      additionalProperties: false
+      required: [snapshot]
+      properties:
+        snapshot:
+          $ref: '#/components/schemas/MapShareSnapshot'
+    MapShareCreated:
+      type: object
+      required: [id, sharePath]
+      properties:
+        id:
+          type: string
+          minLength: 32
+          maxLength: 32
+        sharePath:
+          type: string
+          description: Stable public path for the shared map.
+    MapShareSnapshotResponse:
+      type: object
+      required: [snapshot, visitedCount, bucketCount]
+      properties:
+        snapshot:
+          $ref: '#/components/schemas/MapShareSnapshot'
+        visitedCount:
+          type: integer
+        bucketCount:
+          type: integer
     PhotoRecord:
       type: object
       required: [id, url, caption, position, createdAt]

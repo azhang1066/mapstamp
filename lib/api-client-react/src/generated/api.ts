@@ -31,6 +31,9 @@ import type {
   ListPhotosParams,
   MapDataEnvelope,
   MapDataPayload,
+  MapShareCreated,
+  MapShareInput,
+  MapShareSnapshotResponse,
   PhotoListResponse,
   PhotoRecord,
   SaveMapDataResponse,
@@ -288,6 +291,179 @@ export const useSaveMapData = <
 > => {
   return useMutation(getSaveMapDataMutationOptions(options));
 };
+
+/**
+ * @summary Create an immutable, public travel-map snapshot link
+ */
+export const getCreateMapShareUrl = () => {
+  return `/api/shares`;
+};
+
+export const createMapShare = async (
+  mapShareInput: MapShareInput,
+  options?: RequestInit,
+): Promise<MapShareCreated> => {
+  return customFetch<MapShareCreated>(getCreateMapShareUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(mapShareInput),
+  });
+};
+
+export const getCreateMapShareMutationOptions = <
+  TError = ErrorType<ErrorEnvelope>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createMapShare>>,
+    TError,
+    { data: BodyType<MapShareInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createMapShare>>,
+  TError,
+  { data: BodyType<MapShareInput> },
+  TContext
+> => {
+  const mutationKey = ["createMapShare"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createMapShare>>,
+    { data: BodyType<MapShareInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createMapShare(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateMapShareMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createMapShare>>
+>;
+export type CreateMapShareMutationBody = BodyType<MapShareInput>;
+export type CreateMapShareMutationError = ErrorType<ErrorEnvelope>;
+
+/**
+ * @summary Create an immutable, public travel-map snapshot link
+ */
+export const useCreateMapShare = <
+  TError = ErrorType<ErrorEnvelope>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createMapShare>>,
+    TError,
+    { data: BodyType<MapShareInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createMapShare>>,
+  TError,
+  { data: BodyType<MapShareInput> },
+  TContext
+> => {
+  return useMutation(getCreateMapShareMutationOptions(options));
+};
+
+/**
+ * @summary Load the immutable public snapshot behind a share ID
+ */
+export const getGetMapShareUrl = (id: string) => {
+  return `/api/shares/${id}`;
+};
+
+export const getMapShare = async (
+  id: string,
+  options?: RequestInit,
+): Promise<MapShareSnapshotResponse> => {
+  return customFetch<MapShareSnapshotResponse>(getGetMapShareUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetMapShareQueryKey = (id: string) => {
+  return [`/api/shares/${id}`] as const;
+};
+
+export const getGetMapShareQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMapShare>>,
+  TError = ErrorType<ErrorEnvelope>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getMapShare>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetMapShareQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getMapShare>>> = ({
+    signal,
+  }) => getMapShare(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMapShare>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetMapShareQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMapShare>>
+>;
+export type GetMapShareQueryError = ErrorType<ErrorEnvelope>;
+
+/**
+ * @summary Load the immutable public snapshot behind a share ID
+ */
+
+export function useGetMapShare<
+  TData = Awaited<ReturnType<typeof getMapShare>>,
+  TError = ErrorType<ErrorEnvelope>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getMapShare>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetMapShareQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary List photos for a destination

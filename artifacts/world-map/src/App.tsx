@@ -314,15 +314,19 @@ function PhotoLightbox({
           {isReadOnly ? (
             photo.caption ? <p className="text-sm text-slate-200 text-center">{photo.caption}</p> : null
           ) : (
-            <input
-              type="text"
-              maxLength={120}
-              placeholder="Add a caption…"
-              value={draftCaption}
-              onChange={(e) => setDraftCaption(e.target.value)}
-              onBlur={() => { if (draftCaption !== photo.caption) onCaptionChange(photo.id, draftCaption); }}
-              className="w-full bg-slate-800/80 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
+            <>
+              <label htmlFor="photo-caption" className="sr-only">Photo caption</label>
+              <input
+                id="photo-caption"
+                type="text"
+                maxLength={120}
+                placeholder="Add a caption…"
+                value={draftCaption}
+                onChange={(e) => setDraftCaption(e.target.value)}
+                onBlur={() => { if (draftCaption !== photo.caption) onCaptionChange(photo.id, draftCaption); }}
+                className="w-full bg-slate-800/80 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </>
           )}
           {photos.length > 1 && (
             <p className="text-xs text-slate-500 text-center mt-2">{index + 1} / {photos.length}</p>
@@ -1069,9 +1073,10 @@ function ShareModal({
           </div>
 
           <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Shareable Link</p>
+            <label htmlFor="shareable-link" className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2 block">Shareable Link</label>
             <div className="flex gap-2">
               <input
+                id="shareable-link"
                 type="text" value={url} readOnly
                 className="flex-1 min-w-0 px-3 py-2 text-xs bg-slate-800 border border-slate-700 rounded-lg text-slate-300 font-mono"
                 onFocus={e => e.target.select()}
@@ -1475,7 +1480,9 @@ function StatsDashboard(props: StatsDashboardProps) {
                 className="p-8 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-slate-700"
               >
                 <div className="flex items-baseline justify-between mb-6 flex-wrap gap-2">
+                  <label htmlFor="map-title" className="sr-only">Map title</label>
                   <input
+                    id="map-title"
                     type="text"
                     value={profileName}
                     onChange={e => updateProfileName(e.target.value)}
@@ -1929,10 +1936,11 @@ function SearchBar({ onSelect }: { onSelect: (item: SearchItem) => void }) {
         />
         {query && (
           <button
+            aria-label="Clear search"
             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
-            onMouseDown={e => { e.preventDefault(); setQuery(""); setOpen(false); }}
+            onClick={() => { setQuery(""); setOpen(false); }}
           >
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 2l9 9M11 2L2 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            <svg aria-hidden="true" width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 2l9 9M11 2L2 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
           </button>
         )}
       </div>

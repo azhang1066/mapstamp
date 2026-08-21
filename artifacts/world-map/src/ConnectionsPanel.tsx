@@ -484,6 +484,7 @@ export default function ConnectionsPanel({ onClose, showToast }: Props) {
             {tabs.map(t => (
               <button
                 key={t.id}
+                data-testid={`connections-tab-${t.id}`}
                 onClick={() => setTab(t.id)}
                 className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
                   tab === t.id

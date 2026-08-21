@@ -19,6 +19,9 @@ export default defineConfig({
   testDir: "./tests",
   timeout: 60_000,
   fullyParallel: false,
+  // One worker ensures authenticated spec files that share the same two Clerk
+  // test accounts never run concurrently and mutate each other's state.
+  workers: 1,
   reporter: "list",
   use: {
     baseURL,

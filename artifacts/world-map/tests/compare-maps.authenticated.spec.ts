@@ -279,14 +279,14 @@ test.describe("authenticated Compare Maps", () => {
       await expect(page.getByRole("slider", { name: /opacity/i })).toHaveCount(2);
 
       await page.getByTestId("button-mode-tcc").click();
-      await expect(page.getByTestId("button-mode-tcc")).toHaveAttribute("aria-checked", "true");
+      await expect(page.getByTestId("button-mode-tcc")).toHaveAttribute("aria-pressed", "true");
       await expect(page.getByTestId("geo-tcc:Albania")).toBeVisible();
       await expect(page.getByTestId("marker-tcc:Abkhazia")).toBeVisible();
       await expect(page.getByTestId("chart-regions")).toBeVisible();
       // TCC's U.S. layer uses TCC destination IDs, not world-mode state IDs.
       await expect(page.getByTestId("geo-tcc:United States (Contiguous)").first()).toBeVisible();
       await page.getByTestId("button-mode-world").click();
-      await expect(page.getByTestId("button-mode-world")).toHaveAttribute("aria-checked", "true");
+      await expect(page.getByTestId("button-mode-world")).toHaveAttribute("aria-pressed", "true");
       await expect(page.getByTestId("geo-us_state:06")).toBeVisible();
       await page.setViewportSize({ width: 390, height: 844 });
       await expect(page.getByTestId("button-open-stats")).toBeVisible();

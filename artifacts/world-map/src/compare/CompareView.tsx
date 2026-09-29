@@ -248,14 +248,6 @@ export default function CompareView({ username }: { username: string }) {
           </h1>
         </div>
         <div className="ml-auto flex items-center gap-1.5">
-          <div role="radiogroup" aria-label="Map mode" className="flex rounded-lg bg-slate-900 border border-slate-800 p-0.5">
-            {(["world", "tcc"] as const).map(m => (
-              <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} data-testid={`button-mode-${m}`}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium ${mode === m ? "bg-slate-700 text-white" : "text-slate-400 hover:text-slate-200"}`}>
-                {m === "world" ? "World" : "TCC"}
-              </button>
-            ))}
-          </div>
           <button type="button" onClick={() => {
             setSwapped(s => !s);
             setLayers(l => ({ ...l, showA: l.showB, showB: l.showA }));
@@ -279,6 +271,17 @@ export default function CompareView({ username }: { username: string }) {
 
       <div className="flex-1 flex min-h-0">
         <main className="flex-1 min-w-0 flex flex-col p-2 sm:p-4 gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm font-medium text-slate-300">Compare by</span>
+            <div role="group" aria-label="Map mode" className="flex flex-1 sm:flex-none rounded-xl bg-slate-900 border border-slate-700 p-1">
+              {(["world", "tcc"] as const).map(m => (
+                <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)} data-testid={`button-mode-${m}`}
+                  className={`min-h-11 flex-1 px-5 py-2 rounded-lg text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300 ${mode === m ? "bg-sky-600 text-white shadow-sm" : "text-slate-400 hover:bg-slate-800 hover:text-white"}`}>
+                  {m === "world" ? "World Map" : "TCC"}
+                </button>
+              ))}
+            </div>
+          </div>
           {/* Controls */}
           <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3 flex flex-col gap-3">
             <div className="flex flex-wrap gap-1.5" role="group" aria-label="Layers">

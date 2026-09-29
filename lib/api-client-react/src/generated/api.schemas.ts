@@ -209,9 +209,12 @@ export interface DestinationRow {
   destinationId: string;
   isVisited: boolean;
   isBucket: boolean;
-  firstVisitedYear?: number | null;
-  lastVisitedYear?: number | null;
-  timesVisited?: number | null;
+  /** @nullable */
+  firstVisitedYear: number | null;
+  /** @nullable */
+  lastVisitedYear: number | null;
+  /** @nullable */
+  timesVisited: number | null;
 }
 
 export interface CompareUserData {

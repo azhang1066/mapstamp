@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import UsernameOnboardingModal from "./UsernameOnboardingModal";
 import {
@@ -17,6 +17,8 @@ import { Switch, Route, useLocation, Router as WouterRouter } from "wouter";
 import App from "./App";
 import type { AuthUser } from "./auth-types";
 import NotFound from "./pages/not-found";
+
+const CompareView = lazy(() => import("./compare/CompareView"));
 
 const clerkPubKey = publishableKeyFromHost(
   window.location.hostname,
@@ -1095,6 +1097,35 @@ function AppWithSync() {
   );
 }
 
+function CompareRoute({ username }: { username: string }) {
+  const { isLoaded, isSignedIn, user } = useUser();
+  useEffect(() => {
+    const previousTitle = document.title;
+    document.title = "Compare maps | World Map Travel Tracker";
+    const robots = document.querySelector<HTMLMetaElement>('meta[name="robots"]');
+    const previousRobots = robots?.content;
+    const tag = robots ?? document.createElement("meta");
+    tag.name = "robots";
+    tag.content = "noindex, nofollow";
+    if (!robots) document.head.appendChild(tag);
+    return () => {
+      document.title = previousTitle;
+      if (robots) robots.content = previousRobots ?? "";
+      else tag.remove();
+    };
+  }, []);
+  const loading = <div role="status" className="min-h-screen bg-slate-950 p-8 text-slate-200">Loading comparison…</div>;
+  if (!isLoaded) return loading;
+  if (!isSignedIn) return (
+    <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-slate-950 p-4 text-white">
+      <h1 className="text-xl font-semibold">Sign in to compare maps</h1>
+      <SignIn routing="hash" forceRedirectUrl={`${basePath}/compare/${encodeURIComponent(username)}`} signUpUrl={`${basePath}/sign-up`} />
+    </main>
+  );
+  // Do not mount AppWithSync here: comparing must never hydrate or write map storage.
+  return <Suspense fallback={loading}><CompareView key={`${user.id}:${username}`} username={username} /></Suspense>;
+}
+
 function ClerkProviderWithRoutes() {
   return (
     <ClerkProvider
@@ -1108,6 +1139,7 @@ function ClerkProviderWithRoutes() {
         <Route path="/sign-in/*?" component={SignInPage} />
         <Route path="/sign-up/sso-callback" component={SignUpSSOCallbackPage} />
         <Route path="/sign-up/*?" component={SignUpPage} />
+        <Route path="/compare/:username">{({ username }) => <CompareRoute username={username} />}</Route>
         <Route path="/" component={AppWithSync} />
         <Route component={NotFound} />
       </Switch>

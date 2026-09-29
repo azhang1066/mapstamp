@@ -70,6 +70,18 @@ The main map has two modes:
 
 `ConnectionsPanel.tsx` is loaded on demand and provides user search, pending requests, and accepted-connection management. `UsernameOnboardingModal.tsx` blocks initial access until a user selects a valid username. `FavoritesTab.tsx` stores up to five favorite country/TCC destinations locally. The web artifact also includes static SEO metadata, a sitemap, and robots instructions.
 
+### Compare Maps
+
+Signed-in travelers open **Compare** in the main toolbar and choose one accepted connection, or use **Compare maps** on an accepted connection card. Wouter serves the lazy-loaded view at `/compare/:username`; the web artifact includes a production rewrite for direct navigation to that route.
+
+The view resolves the username against accepted connections, then calls the existing generated `useCompareWithUser` hook. A single map overlays both travelers using solid, dotted, and hatched styles; outlines distinguish bucket-list overlap and places one traveler visited on the other's bucket list. World and TCC modes reuse the main map's geography URLs, microstate markers, and destination tables through `mapGeography.ts`, including the TCC U.S. state layer.
+
+Controls include visibility and opacity per traveler, both-only and bucket-list toggles, swapping perspective, and a year filter. Hover/focus and the read-only destination panel show each traveler's status, first/latest year, and visit count. The separately lazy-loaded statistics panel is a desktop sidebar or mobile bottom sheet with overlaps, bucket-list recommendations, total visits, most-visited destinations, Jaccard similarity, a TCC regional chart, and a timeline. Image export includes the map, legend, and both usernames; there is no public comparison sharing.
+
+**Year semantics:** the database records only first and latest visit years. Comparison filtering matches either recorded endpoint exactly; it does not infer visits in intervening years. Buckets are not year-filtered. Visit counts are lifetime counts for the selected destinations, not counts of trips taken in that year. The timeline uses the first known year, falling back to the latest when no first year is recorded.
+
+**Privacy boundary:** the compare route is outside `AppWithSync`, so it never mounts the editable map, hydrates its browser storage, or triggers a map-data save. Pending edits are saved by the main map before navigating away. Friend data is kept in account-scoped React Query cache, not `localStorage`; the cache is discarded when the view unmounts, and the view is remounted on an account change. Connections and comparison data refetch on mount/focus and every 30 seconds while active. Authorization or fetch failures stop displaying the comparison. No friend notes, photos, favorites, storage keys, or JSONB map payload are returned or rendered.
+
 ### Backend
 
 `artifacts/api-server/src/index.ts` starts the Express server. `src/app.ts` configures Pino HTTP logging, Clerk middleware/proxying, credentialed CORS, JSON/url-encoded parsing, and mounts all routes beneath `/api`.
@@ -131,7 +143,7 @@ All routes below are mounted below `/api`.
 | `POST` | `/connections/:id/accept` | Clerk, addressee | Accepts a pending request. |
 | `POST` | `/connections/:id/decline` | Clerk, addressee | Declines a pending request. |
 | `DELETE` | `/connections/:id` | Clerk, connection party | Removes a connection/request. |
-| `GET` | `/compare/:otherUserId` | Clerk, accepted connection | Returns profile/destination comparison data for an accepted connection. |
+| `GET` | `/compare/:otherUserId` | Clerk, accepted connection | Returns allowlisted profile/destination comparison data with `Cache-Control: no-store`. Non-connections, pending requests, and declined requests receive 403. |
 | `GET` | `/leaderboard` | Clerk | Ranks the caller and accepted connections by normalized visited-destination counts. |
 | `GET` | `/stats/aggregate?category=&limit=` | No | Returns public aggregate counts for a normalized destination category. |
 | `GET` | `/stats/destination/:category/:id` | No | Returns public visited/bucket counts and percentages for one destination; 404 if no rows exist. |
@@ -141,6 +153,24 @@ All routes below are mounted below `/api`.
 Two public routes are served outside `/api`: `GET /s/:id` returns share HTML with Open Graph metadata and a browser handoff to the map, and `GET /s/:id/preview.svg` returns a generated visual summary. Shared pages are marked `noindex, nofollow`; their preview metadata exposes only summary counts, not notes.
 
 The OpenAPI contract is `lib/api-spec/openapi.yaml`. Orval generates React Query hooks into `lib/api-client-react/src/generated/` and Zod output into `lib/api-zod/src/generated/`.
+
+The compare response retains its existing envelope:
+
+```text
+{
+  me:    { userId, username, displayName, destinations: DestinationRow[] },
+  other: { userId, username, displayName, destinations: DestinationRow[] }
+}
+
+DestinationRow = {
+  userId, category, destinationId, isVisited, isBucket,
+  firstVisitedYear: number | null,
+  lastVisitedYear: number | null,
+  timesVisited: number | null
+}
+```
+
+Only normalized `user_destinations` fields are selected for destination rows. Both sides have the same explicit field allowlist and response validation; neither side includes `user_map_data`, notes, or photo metadata. No database schema change was required for comparison.
 
 ## 6. Environment & Configuration
 
@@ -206,6 +236,12 @@ pnpm --filter @workspace/world-map run test:e2e
 # Check that Connections remains split into a lazy-loaded build chunk
 pnpm --filter @workspace/world-map run test:connections-build
 
+# Check pure comparison calculations (no network or database)
+pnpm --filter @workspace/world-map exec tsx --test src/compare/compareModel.test.ts
+
+# Run the focused two-user comparison browser regression
+pnpm --filter @workspace/world-map exec playwright test compare-maps.authenticated.spec.ts --project=authenticated
+
 # Regenerate API client and Zod output after OpenAPI changes
 pnpm --filter @workspace/api-spec run codegen
 pnpm --filter @workspace/api-client-react exec tsc -b
@@ -227,4 +263,5 @@ There is no root `dev` script; application services run through their artifact w
 - Shared links are public snapshots. Anyone with the link can view the included destinations and optional notes; photos, visit details, years, favorites, and profile name are excluded. Sharing creates a stored snapshot rather than a live view of later edits.
 - Map data writes replace the caller's normalized destination rows in a transaction, so clients must send the complete visited/bucket state. Other legacy fields remain in JSONB.
 - Browser tests cover public and authenticated map-mode persistence, cloud hydration/account isolation, and connection request lifecycle; API integration tests cover map-data and connection authorization/round trips. This is not a claim of full UI coverage for profile or photos.
+- Compare-specific coverage includes API authorization/privacy, both users' visit years/counts, pure year/overlap/statistics calculations, and a two-user browser flow through the overlay, controls, details, World/TCC switching, forbidden state, and unchanged local map storage.
 - TCC source data identifies itself as the official list as of January 2022; verify currency before presenting it as a current external standard.

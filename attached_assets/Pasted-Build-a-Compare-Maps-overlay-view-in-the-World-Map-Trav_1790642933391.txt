@@ -1,0 +1,77 @@
+Build a "Compare Maps" overlay view in the World Map Travel Tracker. A signed-in user picks ONE accepted connection and sees both users' travel data overlaid on a single map. Read PROJECT.md first and follow its conventions.
+
+## What already exists (reuse it, don't rebuild it)
+- Connections: `ConnectionsPanel.tsx` (lazy-loaded), `user_connections` table, and `/api/connections` routes.
+- `GET /api/compare/:otherUserId` (Clerk auth, accepted connections only) already returns profile/destination comparison data. Inspect what it returns now and extend it if needed. Do not create a parallel endpoint.
+- Map rendering in `App.tsx` with `react-simple-maps` and TopoJSON. There are two modes: **World** (countries, U.S. states, Canadian provinces, microstate markers) and **TCC** (330 entries across 12 regions, drawn as country shapes, marker dots, and a U.S. states layer).
+- `user_destinations` is the source of truth for visited/bucket status, visit years, and visit count, per `category` + `destination_id`.
+- The year filter, statistics, and the details panel live in `App.tsx`.
+
+## Feature
+
+### 1. Entry points
+- A "Compare maps" button on each accepted connection in `ConnectionsPanel`.
+- A "Compare" control on the main map toolbar that opens a picker listing accepted connections (searchable, single-select).
+- Route: `/compare/:username` using Wouter. It requires sign-in, and a non-connection sees a friendly "You need to be connected to compare maps" state.
+
+### 2. Overlay map
+Render ONE map where each region's fill encodes both users' status:
+- **Only me visited**: color A
+- **Only friend visited**: color B
+- **Both visited**: a distinct combined style (for example a third color or a diagonal hatch of A and B using an SVG `<pattern>`)
+- **Bucket-list overlap** (both want to go) and **"friend visited, on my bucket list"** get outline or stripe styles, so visited fills stay primary.
+- Neither: the default unvisited fill.
+- Pick a color-blind-safe pair for A and B, and use patterns, not just color, so the states are distinguishable in grayscale.
+- Microstate markers and TCC dot markers use the same encoding: split two-tone dots, or a ring plus fill.
+- Support BOTH World and TCC modes with the existing mode toggle. The TCC U.S. states layer must work too.
+
+### 3. Layer controls
+- Toggles: "Me", "[friend username]", "Both only", "Show bucket lists".
+- An opacity slider per user so either layer can be faded.
+- A "Swap perspective" button that flips which user is A and which is B.
+- Reuse the existing year filter. When a year is selected, only count visits with that year for each user.
+
+### 4. Hover and details
+- Hover tooltip: destination name, plus each user's status (visited / bucket / none), visit years, and visit count.
+- Clicking opens the existing details panel in a read-only compare variant that shows both users side by side, including each user's visit years and visit count.
+- NEVER show the friend's notes or photos.
+
+### 5. Comparison stats panel
+A collapsible sidebar on desktop and a bottom sheet on mobile, built with the existing Recharts and Framer Motion setup:
+- Visited totals for each user, for the current mode (World or TCC)
+- Destinations in common, and destinations only one person has visited
+- Total visit counts for each user, and the destinations each person has visited most
+- A per-region breakdown in TCC mode (12 regions), for example a grouped bar chart
+- A travel timeline: new destinations per year for each user, as an overlaid line or bar chart built from visit years
+- "Your friend has been to N places on your bucket list" as a clickable list (and the reverse). This is the main hook of the feature.
+- A small "similarity score" (Jaccard index of visited sets)
+
+### 6. Export
+- A "Download image" button that uses the existing `html-to-image` to export the overlay map with its legend and both usernames.
+- Do NOT add comparisons to the public `/s/:id` share snapshots. Comparisons involve another user's data and stay behind auth.
+
+## Privacy and authorization (enforce on the server)
+- Only accepted connections can compare. The API already enforces this, so keep it and cover it with tests. Accepting a connection means agreeing to comparisons, so there is no separate opt-out setting.
+- The compare response includes only normalized `user_destinations` data: visited/bucket status, visit years, and visit counts. It must never include notes, photos, photo keys, favorites, or any JSONB `user_map_data` fields.
+- The compare view is read-only. It must never write to the local `localStorage` map state or trigger `PUT /api/map-data`. Keep friend data in React Query cache only, so it can't leak into the local-first travel state or the account-isolation logic.
+
+## Implementation conventions (from PROJECT.md)
+- API-first: update `lib/api-spec/openapi.yaml` for any compare response changes, then run:
+  `pnpm --filter @workspace/api-spec run codegen` and `pnpm --filter @workspace/api-client-react exec tsc -b`.
+  Use the generated React Query hook in the UI. Never hand-edit files in `generated/`.
+- No database schema changes should be needed. If one turns out to be necessary, edit `lib/db`, rebuild the db package, then run `pnpm --filter @workspace/db run push`.
+- Lazy-load the compare view and its stats panel (`React.lazy`), like `ConnectionsPanel`, so the main bundle doesn't grow. Keep `test:connections-build` passing.
+- Reuse existing map geography, destination IDs, and category strings. Don't duplicate the TopoJSON or the TCC data.
+- Styling: Tailwind 4 plus the existing Radix components and Lucide icons. Mobile-first, with no horizontal scroll at phone width.
+
+## Tests
+- Vitest + Supertest (`artifacts/api-server`):
+  - compare returns 403 for non-connections, pending requests, and declined requests
+  - the response includes visit years and visit counts for both users
+  - the response never contains notes or photo data
+  - visit-year filtering and bucket overlap are computed correctly
+- Playwright (`artifacts/world-map`): two test users connect, open the compare view, verify the overlay legend and the stats counts, confirm visit years and counts appear in the tooltip and details panel, toggle layers, switch between World and TCC, and confirm the user's own local map state is unchanged afterward.
+
+## Done when
+- `pnpm run typecheck`, `pnpm run build`, and `pnpm --filter @workspace/api-server run test` all pass.
+- PROJECT.md is updated with the new route, the compare response shape, and the privacy boundary.

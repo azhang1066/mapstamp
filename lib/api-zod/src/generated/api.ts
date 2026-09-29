@@ -533,6 +533,7 @@ export const DeleteConnectionResponse = zod.object({
 });
 
 /**
+ * Returns only normalized destination status, visit years and counts; excludes notes, photos, and map-data JSONB.
  * @summary Compare your destinations with a connected user's. Requires accepted connection.
  */
 export const CompareWithUserParams = zod.object({
@@ -551,9 +552,9 @@ export const CompareWithUserResponse = zod.object({
         destinationId: zod.string(),
         isVisited: zod.boolean(),
         isBucket: zod.boolean(),
-        firstVisitedYear: zod.number().nullish(),
-        lastVisitedYear: zod.number().nullish(),
-        timesVisited: zod.number().nullish(),
+        firstVisitedYear: zod.number().nullable(),
+        lastVisitedYear: zod.number().nullable(),
+        timesVisited: zod.number().nullable(),
       }),
     ),
   }),
@@ -568,9 +569,9 @@ export const CompareWithUserResponse = zod.object({
         destinationId: zod.string(),
         isVisited: zod.boolean(),
         isBucket: zod.boolean(),
-        firstVisitedYear: zod.number().nullish(),
-        lastVisitedYear: zod.number().nullish(),
-        timesVisited: zod.number().nullish(),
+        firstVisitedYear: zod.number().nullable(),
+        lastVisitedYear: zod.number().nullable(),
+        timesVisited: zod.number().nullable(),
       }),
     ),
   }),

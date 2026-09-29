@@ -42,6 +42,10 @@ to = "/index.html"
 from = "/sign-up/*"
 to = "/index.html"
 
+[[services.production.rewrites]]
+from = "/compare/*"
+to = "/index.html"
+
 [services.env]
 PORT = "25624"
 BASE_PATH = "/"

@@ -1,5 +1,6 @@
 import { lazy, Suspense, useState, useCallback, useEffect, useRef, useMemo, useId } from "react";
 import type { AuthProps } from "./auth-types";
+import { useLocation } from "wouter";
 import type * as XLSX from "xlsx";
 import {
   ComposableMap,
@@ -27,8 +28,13 @@ import {
   CA_PROVINCE_DATA,
   CONTINENT_COLORS,
 } from "./countryData";
+import {
+  WORLD_URL, US_STATES_URL, CA_PROVINCES_URL, MICROSTATE_MARKERS,
+  TCC_US_STATE_ENTRIES, FIPS_TO_TCC_NAME,
+} from "./mapGeography";
 
 const ConnectionsPanel = lazy(() => import("./ConnectionsPanel"));
+const CompareConnectionPicker = lazy(() => import("./CompareConnectionPicker"));
 
 type MapMode = "world" | "tcc";
 
@@ -113,36 +119,6 @@ function useLocalStorageRecord(key: string): [Record<string, VisitDetails>, (id:
   }, []);
   return [value, setEntry];
 }
-
-const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json";
-
-// TCC entries rendered via the US States geo-layer instead of world polygons or marker dots.
-// These three must be excluded from the world-polygon pass (to avoid the full-USA multi-polygon
-// swallowing Alaska & Hawaii) and from the marker-dot pass (the state shapes replace them).
-const TCC_US_STATE_ENTRIES = new Set([
-  "United States (Contiguous)",
-  "Alaska",
-  "Hawaiian Islands",
-]);
-// FIPS → TCC entry name for the state-level TCC layer
-const FIPS_TO_TCC_NAME: Record<string, string> = {
-  "02": "Alaska",
-  "15": "Hawaiian Islands",
-};
-const US_STATES_URL = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json";
-const CA_PROVINCES_URL = `${import.meta.env.BASE_URL}canada-provinces.geojson`;
-
-// Countries too small to appear as polygons even at 50m resolution — rendered as dot markers
-const MICROSTATE_MARKERS: { id: string; coordinates: [number, number] }[] = [
-  { id: "336", coordinates: [12.4534,  41.9022] }, // Vatican City
-  { id: "492", coordinates: [7.4333,   43.7333] }, // Monaco
-  { id: "674", coordinates: [12.4500,  43.9333] }, // San Marino
-  { id: "438", coordinates: [9.5333,   47.1667] }, // Liechtenstein
-  { id: "520", coordinates: [166.9315, -0.5228] }, // Nauru
-  { id: "798", coordinates: [179.1500, -8.5167] }, // Tuvalu
-  { id: "462", coordinates: [73.2207,  3.2028]  }, // Maldives
-];
-
 
 const US_STATE_COLOR = "#ef4444";
 const US_STATE_HOVER_COLOR = "#dc2626";
@@ -2059,6 +2035,30 @@ function ConnectionsLoadingDialog({ onClose }: { onClose: () => void }) {
 }
 
 export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOpenProfile }: AuthProps) {
+  const [, navigate] = useLocation();
+  const [showComparePicker, setShowComparePicker] = useState(false);
+  const compareTriggerRef = useRef<HTMLButtonElement>(null);
+  const syncBeforeCompareRef = useRef<() => Promise<boolean>>(async () => true);
+  const comparisonOpeningRef = useRef(false);
+  const closeComparePicker = useCallback(() => {
+    setShowComparePicker(false);
+    requestAnimationFrame(() => compareTriggerRef.current?.focus());
+  }, []);
+  const openComparison = useCallback(async (username: string) => {
+    if (comparisonOpeningRef.current) return;
+    comparisonOpeningRef.current = true;
+    // Complete the editable map's pending save before unmounting its debounce.
+    // The compare route itself never saves or hydrates local map state.
+    const saved = await syncBeforeCompareRef.current().catch(() => false);
+    comparisonOpeningRef.current = false;
+    if (!saved) {
+      setToast({ message: "Your latest map changes could not be saved. Please try again before comparing.", kind: "warning" });
+      return;
+    }
+    setShowComparePicker(false);
+    setShowConnections(false);
+    navigate(`/compare/${encodeURIComponent(username)}`);
+  }, [navigate]);
   const [selected, setSelected] = useState<{ key: string; info: RegionInfo } | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
@@ -2412,7 +2412,10 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
     const syncingUserId = authUser?.id;
     if (!isAuthenticated || !syncingUserId) return;
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
-    syncTimerRef.current = setTimeout(() => {
+    let pendingRequest: Promise<boolean> | null = null;
+    const save = (): Promise<boolean> => {
+      if (pendingRequest) return pendingRequest;
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
       // Clerk can change the active session before React unmounts this
       // account's map. Never let a pending save write one traveler's state
       // through another traveler's authenticated browser session.
@@ -2421,7 +2424,7 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
           Clerk?: { user?: { id?: string } | null };
         }
       ).Clerk?.user?.id;
-      if (activeClerkUserId !== syncingUserId) return;
+      if (activeClerkUserId !== syncingUserId) return Promise.resolve(false);
 
       const notesByKey: Record<string, string> = {};
       try {
@@ -2446,14 +2449,23 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
         notesByKey,
         profileName: localStorage.getItem("wm_profile_name") ?? undefined,
       };
-      fetch("/api/map-data", {
+      pendingRequest = fetch("/api/map-data", {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-      }).catch(() => {});
-    }, 3000);
-    return () => { if (syncTimerRef.current) clearTimeout(syncTimerRef.current); };
+      }).then((response) => response.ok).catch(() => false).then((ok) => {
+        if (!ok) pendingRequest = null;
+        return ok;
+      });
+      return pendingRequest;
+    };
+    syncBeforeCompareRef.current = save;
+    syncTimerRef.current = setTimeout(() => { void save(); }, 3000);
+    return () => {
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+      if (syncBeforeCompareRef.current === save) syncBeforeCompareRef.current = async () => false;
+    };
   }, [
     isAuthenticated, authUser?.id,
     rawVisitedCountries, rawVisitedStates, rawVisitedProvinces, rawTccVisited,
@@ -2676,6 +2688,13 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
           <button onClick={() => setZoom(z => Math.min(z * 1.5, 12))} className="px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors font-medium">+</button>
           <button onClick={() => setZoom(z => Math.max(z / 1.5, 0.5))} className="px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors font-medium">−</button>
           <button onClick={() => { setZoom(1); setCenter([0, 20]); setSelected(null); }} className="px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors font-medium">Reset</button>
+          {isAuthenticated && !isReadOnly && (
+            <button
+              ref={compareTriggerRef}
+              onClick={() => setShowComparePicker(true)}
+              className="rounded-lg bg-sky-700 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-sky-600"
+            >Compare</button>
+          )}
           <button
             onClick={() => setFilterExpanded(v => !v)}
             aria-expanded={filterExpanded}
@@ -3963,7 +3982,14 @@ export default function App({ authUser, isAuthenticated, onLogin, onLogout, onOp
           <ConnectionsPanel
             onClose={closeConnectionsPanel}
             showToast={showToast}
+            onCompare={openComparison}
           />
+        </Suspense>
+      )}
+
+      {showComparePicker && isAuthenticated && authUser && (
+        <Suspense fallback={<ConnectionsLoadingDialog onClose={closeComparePicker} />}>
+          <CompareConnectionPicker userId={authUser.id} onClose={closeComparePicker} onSelect={openComparison} />
         </Suspense>
       )}
 

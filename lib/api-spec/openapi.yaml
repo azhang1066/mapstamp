@@ -540,6 +540,7 @@ paths:
       tags: [social]
       operationId: compareWithUser
       summary: Compare your destinations with a connected user's. Requires accepted connection.
+      description: Returns only normalized destination status, visit years and counts; excludes notes, photos, and map-data JSONB.
       parameters:
         - name: otherUserId
           in: path
@@ -555,6 +556,12 @@ paths:
                 $ref: '#/components/schemas/CompareResponse'
         '401':
           description: Not authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '400':
+          description: Cannot compare with yourself or invalid user ID.
           content:
             application/json:
               schema:
@@ -968,7 +975,7 @@ components:
             $ref: '#/components/schemas/ConnectionRecord'
     DestinationRow:
       type: object
-      required: [userId, category, destinationId, isVisited, isBucket]
+      required: [userId, category, destinationId, isVisited, isBucket, firstVisitedYear, lastVisitedYear, timesVisited]
       properties:
         userId:
           type: string
@@ -981,14 +988,11 @@ components:
         isBucket:
           type: boolean
         firstVisitedYear:
-          type: integer
-          nullable: true
+          type: [integer, 'null']
         lastVisitedYear:
-          type: integer
-          nullable: true
+          type: [integer, 'null']
         timesVisited:
-          type: integer
-          nullable: true
+          type: [integer, 'null']
     CompareUserData:
       type: object
       required: [userId, destinations]

@@ -25,6 +25,7 @@ type Tab = "search" | "pending" | "connections";
 interface Props {
   onClose: () => void;
   showToast: (message: string, kind: "success" | "warning") => void;
+  onCompare: (username: string) => void;
 }
 
 // ── Small helpers ─────────────────────────────────────────────────────────────
@@ -343,9 +344,10 @@ interface ConnectionsTabProps {
   data: ConnectionsResponse | undefined;
   isLoading: boolean;
   showToast: Props["showToast"];
+  onCompare: Props["onCompare"];
 }
 
-function ConnectionsTab({ data, isLoading, showToast }: ConnectionsTabProps) {
+function ConnectionsTab({ data, isLoading, showToast, onCompare }: ConnectionsTabProps) {
   const qc = useQueryClient();
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
@@ -382,10 +384,16 @@ function ConnectionsTab({ data, isLoading, showToast }: ConnectionsTabProps) {
   return (
     <ul className="flex flex-col divide-y divide-slate-800">
       {accepted.map((c: ConnectionRecord) => (
-        <li key={c.id} className="flex items-center gap-3 py-3">
+        <li key={c.id} className="flex flex-wrap items-center gap-3 py-3">
           <Avatar username={c.otherUser?.username ?? null} displayName={c.otherUser?.displayName} />
           <UserLabel username={c.otherUser?.username ?? null} displayName={c.otherUser?.displayName} />
           <div className="ml-auto flex items-center gap-2">
+            {c.otherUser?.username && (
+              <button
+                onClick={() => onCompare(c.otherUser!.username!)}
+                className="rounded-lg bg-sky-800 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-sky-700"
+              >Compare maps</button>
+            )}
             {confirmId === c.id ? (
               <>
                 <span className="text-xs text-slate-400">Remove?</span>
@@ -437,7 +445,7 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(",");
 
-export default function ConnectionsPanel({ onClose, showToast }: Props) {
+export default function ConnectionsPanel({ onClose, showToast, onCompare }: Props) {
   const [tab, setTab] = useState<Tab>("search");
 
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -668,6 +676,7 @@ export default function ConnectionsPanel({ onClose, showToast }: Props) {
                   data={data}
                   isLoading={isLoading}
                   showToast={showToast}
+                  onCompare={onCompare}
                 />
               )}
             </div>

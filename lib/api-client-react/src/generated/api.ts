@@ -1583,6 +1583,7 @@ export const useDeleteConnection = <
 };
 
 /**
+ * Returns only normalized destination status, visit years and counts; excludes notes, photos, and map-data JSONB.
  * @summary Compare your destinations with a connected user's. Requires accepted connection.
  */
 export const getCompareWithUserUrl = (otherUserId: string) => {

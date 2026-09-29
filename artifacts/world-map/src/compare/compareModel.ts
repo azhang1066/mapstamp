@@ -62,14 +62,15 @@ export function buildIndex(rows: readonly DestRowLike[] | undefined): UserIndex 
 }
 
 /**
- * Selected-year rule: only first and latest visit years are recorded, so a
- * visit matches year Y only when firstYear === Y or lastYear === Y.
- * Intermediate years are never inferred. Null year = no filter.
+ * Cumulative cutoff: include destinations first known visited by year Y.
+ * Fall back to the latest year when the first is unknown. Undated visits
+ * appear only with the filter off. Null year = no filter.
  */
 export function visitMatchesYear(info: DestInfo | undefined, year: number | null): boolean {
   if (!info || !info.visited) return false;
   if (year === null) return true;
-  return info.firstYear === year || info.lastYear === year;
+  const earliest = newYear(info);
+  return earliest !== null && earliest <= year;
 }
 
 export function sideStatus(info: DestInfo | undefined, year: number | null): SideStatus {

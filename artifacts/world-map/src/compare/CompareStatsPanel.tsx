@@ -103,7 +103,7 @@ export default function CompareStatsPanel({ stats, mode, nameA, nameB, aIsMe, ye
             <div key={x.id} className="rounded-lg bg-slate-900/60 border border-slate-800 p-3">
               <div className="flex items-center gap-1.5 text-xs text-slate-400 truncate"><span className="w-2 h-2 rounded-full" style={{ background: x.c }} />{x.n}</div>
               <div className="text-2xl font-semibold tabular-nums mt-1" data-testid={`text-total-${x.id}`}>{x.v}</div>
-              <div className="text-[11px] text-slate-500">{unit}{year !== null ? ` in ${year}` : ""}</div>
+              <div className="text-[11px] text-slate-500">{unit}{year !== null ? ` through ${year}` : ""}</div>
             </div>
           ))}
         </div>

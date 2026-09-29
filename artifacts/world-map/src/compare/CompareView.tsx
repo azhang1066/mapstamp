@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import CompareMap, { COLOR_A, COLOR_B, BASE_FILL, BUCKET_BOTH_STROKE, BUCKET_HOOK_STROKE, PatternDefs, type HoverInfo } from "./CompareMap";
 import {
-  buildIndex, computeStats, overlayFor, nameForKey, parseKey, categoryLabel, recordedYears, formatYears, formatTimes,
+  buildIndex, computeStats, overlayFor, nameForKey, parseKey, categoryLabel, recordedYears, formatYears, formatTimes, visitMatchesYear,
   DEFAULT_LAYERS, type CompareMode, type LayerToggles, type SideStatus, type DestInfo,
 } from "./compareModel";
 
@@ -321,14 +321,14 @@ export default function CompareView({ username }: { username: string }) {
               )}
             </div>
             <p className="text-[11px] text-slate-500 flex gap-1.5"><Info className="w-3.5 h-3.5 shrink-0 mt-px" />
-              Only first and latest visit years are recorded. A year matches when it equals either one — years in between aren't inferred. Visit counts are lifetime totals for the destinations shown.</p>
+              Shows places visited from the earliest recorded visit through the selected year, inclusive. Uses the first visit year, or latest if first is unknown; undated visits are excluded. Visit counts remain lifetime totals.</p>
           </div>
 
           {/* Export region: map + legend + usernames */}
           <div ref={exportRef} className="relative flex-1 min-h-[300px] rounded-xl overflow-hidden border border-slate-800 bg-[#0c1524] flex flex-col" data-testid="region-compare-export">
             <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs border-b border-slate-800/80">
               <span className="min-w-0 break-all font-semibold"><span style={{ color: COLOR_A }}>{nameA}</span> vs <span style={{ color: COLOR_B }}>{nameB}</span></span>
-              <span className="text-slate-500 inline-flex items-center gap-1"><Globe2 className="w-3.5 h-3.5" />{mode === "world" ? "World" : "Travelers' Century Club"}{year ? ` · ${year}` : ""}</span>
+              <span className="text-slate-500 inline-flex items-center gap-1"><Globe2 className="w-3.5 h-3.5" />{mode === "world" ? "World" : "Travelers' Century Club"}{year ? ` · Through ${year}` : ""}</span>
             </div>
             <div className="flex-1 min-h-[240px]">
               <CompareMap mode={mode} overlayOf={overlayOf} opacityA={opacityA} opacityB={opacityB} selectedKey={selected} onHover={setHover} onSelect={onSelect} patternPrefix={patternPrefix} />
@@ -423,7 +423,7 @@ export default function CompareView({ username }: { username: string }) {
                 );
               })}
             </div>
-            {year !== null && <p className="mt-2 text-[11px] text-slate-500">Map shows {year} only; details show all recorded years.</p>}
+            {year !== null && <p className="mt-2 text-[11px] text-slate-500">Map shows visits through {year}; details show all recorded years.</p>}
           </motion.div>
         )}
       </AnimatePresence>
@@ -433,7 +433,7 @@ export default function CompareView({ username }: { username: string }) {
 
 function TooltipRow({ name, info, color, year }: { name: string; info: DestInfo | undefined; color: string; year: number | null }) {
   const s: SideStatus = info?.visited ? "visited" : info?.bucket ? "bucket" : "none";
-  const outOfYear = s === "visited" && year !== null && info!.firstYear !== year && info!.lastYear !== year;
+  const outOfYear = s === "visited" && year !== null && !visitMatchesYear(info, year);
   return (
     <div className="py-1 border-t border-slate-800 first-of-type:border-0">
       <div className="flex items-center justify-between gap-2">
@@ -441,7 +441,7 @@ function TooltipRow({ name, info, color, year }: { name: string; info: DestInfo 
         <StatusPill s={s} />
       </div>
       {s === "visited" && (
-        <p className="text-slate-400 mt-0.5">{formatYears(info)} · {formatTimes(info)}{outOfYear ? ` · not in ${year}` : ""}</p>
+        <p className="text-slate-400 mt-0.5">{formatYears(info)} · {formatTimes(info)}{outOfYear ? ` · no recorded visit by ${year}` : ""}</p>
       )}
     </div>
   );

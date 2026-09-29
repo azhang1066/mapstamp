@@ -10,13 +10,22 @@ const row = (category: string, destinationId: string, o: Partial<{ v: boolean; b
   firstVisitedYear: o.f ?? null, lastVisitedYear: o.l ?? null, timesVisited: o.t ?? null,
 });
 
-test("year filter matches only first or latest year, never intermediate", () => {
+test("year filter includes all destinations known visited by the inclusive cutoff", () => {
   const idx = buildIndex([row("country", "250", { v: true, f: 2010, l: 2020 })]);
   const i = idx.get(destKey("country", "250"));
   assert.equal(visitMatchesYear(i, null), true);
   assert.equal(visitMatchesYear(i, 2010), true);
   assert.equal(visitMatchesYear(i, 2020), true);
-  assert.equal(visitMatchesYear(i, 2015), false);
+  assert.equal(visitMatchesYear(i, 2015), true);
+  assert.equal(visitMatchesYear(i, 2025), true);
+  assert.equal(visitMatchesYear(i, 2009), false);
+  const latestOnly = { visited: true, bucket: false, firstYear: null, lastYear: 2012, times: null };
+  assert.equal(visitMatchesYear(latestOnly, 2011), false);
+  assert.equal(visitMatchesYear(latestOnly, 2012), true);
+  const undated = { ...latestOnly, lastYear: null };
+  assert.equal(visitMatchesYear(undated, 2026), false);
+  assert.equal(visitMatchesYear(undated, null), true);
+  assert.equal(visitMatchesYear(undefined, 2026), false);
 });
 
 test("greenland normalises to denmark and ids are padded", () => {
@@ -62,8 +71,14 @@ test("stats: totals, overlap, jaccard, bucket hooks, regions, timeline", () => {
   assert.equal(s.regions.find(r => r.region === "EUR")!.a, 1);
   assert.deepEqual(s.timeline.find(r => r.year === 2019), { year: 2019, a: 1, b: 1 });
   const y = computeStats("tcc", A, B, 2022);
-  assert.equal(y.totalA, 1);
-  assert.equal(y.totalB, 0);
+  assert.equal(y.totalA, 2);
+  assert.equal(y.totalB, 2);
+  const early = computeStats("tcc", A, B, 2018);
+  assert.equal(early.totalA, 1);
+  assert.equal(early.totalB, 1);
+  assert.equal(early.common.length, 1);
+  assert.equal(early.bVisitedOnABucket.length, 0);
+  assert.ok(early.timeline.every(r => r.year <= 2018));
 });
 
 test("jaccard edge cases", () => {

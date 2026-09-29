@@ -248,7 +248,7 @@ test.describe("authenticated Compare Maps", () => {
       // A recorded year must filter both people's visits, not just the owner.
       await page.getByTestId("select-recorded-year").selectOption("2018");
       await expect(page.getByTestId("text-total-a")).toHaveText("1");
-      await expect(page.getByTestId("text-total-b")).toHaveText("0");
+      await expect(page.getByTestId("text-total-b")).toHaveText("1");
       await expect(page.getByTestId("text-common-count")).toHaveText("0");
       await page.getByTestId("checkbox-year-filter").uncheck();
       await expect(page.getByTestId("text-total-a")).toHaveText("3");

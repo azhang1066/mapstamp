@@ -4,6 +4,7 @@ import { getAuth } from "@clerk/express";
 import { CreateMapShareBody } from "@workspace/api-zod";
 import { db, mapSharesTable, type MapShareSnapshot } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import sharp from "sharp";
 
 const apiRouter: IRouter = Router();
 export const publicShareRouter: IRouter = Router();
@@ -90,6 +91,7 @@ function renderShareHtml(
   const escapedCanonical = escapeHtml(canonicalUrl);
   const escapedImage = escapeHtml(imageUrl);
   const escapedHandoff = escapeHtml(handoffPath);
+  const imageAlt = `Travel map preview showing ${visitedCount} visited places`;
 
   return `<!doctype html>
 <html lang="en">
@@ -101,18 +103,20 @@ function renderShareHtml(
     <meta name="robots" content="noindex, nofollow">
     <link rel="canonical" href="${escapedCanonical}">
     <meta property="og:type" content="website">
+    <meta property="og:site_name" content="World Map">
     <meta property="og:title" content="${escapedTitle}">
     <meta property="og:description" content="${escapedDescription}">
     <meta property="og:url" content="${escapedCanonical}">
     <meta property="og:image" content="${escapedImage}">
-    <meta property="og:image:type" content="image/svg+xml">
+    <meta property="og:image:type" content="image/png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="Travel map preview showing ${visitedCount} visited places">
+    <meta property="og:image:alt" content="${imageAlt}">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="${escapedTitle}">
     <meta name="twitter:description" content="${escapedDescription}">
     <meta name="twitter:image" content="${escapedImage}">
+    <meta name="twitter:image:alt" content="${imageAlt}">
     <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebPage","name":${JSON.stringify(title)},"description":${JSON.stringify(description)},"url":${JSON.stringify(canonicalUrl)},"isPartOf":{"@type":"WebSite","name":"World Map Travel Tracker"}}</script>
   </head>
   <body>
@@ -276,7 +280,7 @@ publicShareRouter.get("/s/:id", async (req: Request, res: Response): Promise<voi
       .send(renderShareHtml(
         shareUrl,
         `/s/${id}`,
-        `${shareUrl}/preview.svg`,
+        `${shareUrl}/preview.png`,
         shareCounts(share.snapshot).visitedCount,
         shareCounts(share.snapshot).bucketCount,
       ));
@@ -286,7 +290,7 @@ publicShareRouter.get("/s/:id", async (req: Request, res: Response): Promise<voi
   }
 });
 
-publicShareRouter.get("/s/:id/preview.svg", async (req: Request, res: Response): Promise<void> => {
+publicShareRouter.get(["/s/:id/preview.svg", "/s/:id/preview.png"], async (req: Request, res: Response): Promise<void> => {
   const id = getShareId(req);
   if (!id) {
     res.status(404).send("Preview not found");
@@ -306,12 +310,16 @@ publicShareRouter.get("/s/:id/preview.svg", async (req: Request, res: Response):
       return;
     }
 
+    const { visitedCount, bucketCount } = shareCounts(share.snapshot);
+    const svg = renderSharePreview(id, visitedCount, bucketCount);
+    const png = req.path.endsWith(".png");
+    const image = png ? await sharp(Buffer.from(svg)).png().toBuffer() : svg;
     res
       .status(200)
       .set("Cache-Control", SHARE_CACHE_CONTROL)
       .set("X-Robots-Tag", "noindex, nofollow")
-      .type("image/svg+xml")
-      .send(renderSharePreview(id, shareCounts(share.snapshot).visitedCount, shareCounts(share.snapshot).bucketCount));
+      .type(png ? "png" : "image/svg+xml")
+      .send(image);
   } catch (err) {
     req.log.error({ err }, "Error serving shared map preview");
     res.status(500).send("Unable to load preview");

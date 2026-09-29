@@ -18,7 +18,6 @@ const CompareStatsPanel = lazy(() => import("./CompareStatsPanel"));
 
 const POLL_MS = 30_000;
 const CURRENT_YEAR = new Date().getFullYear();
-const MIN_YEAR = 1950;
 
 function errStatus(e: unknown): number | undefined {
   return typeof e === "object" && e !== null && "status" in e ? Number((e as { status: unknown }).status) : undefined;
@@ -171,6 +170,12 @@ export default function CompareView({ username }: { username: string }) {
   const overlayOf = useCallback((key: string) => overlayFor(A.get(key), B.get(key), year, layers), [A, B, year, layers]);
   const stats = useMemo(() => computeStats(mode, A, B, year), [mode, A, B, year]);
   const years = useMemo(() => recordedYears(meIdx, friendIdx), [meIdx, friendIdx]);
+  const earliestYear = years.at(-1) ?? CURRENT_YEAR;
+  useEffect(() => {
+    // Only clamp after comparison data loads; empty loading indexes must not
+    // reset an existing selection during a refetch.
+    if (valid) setYearVal(y => Math.max(earliestYear, y));
+  }, [earliestYear, valid]);
 
   useEffect(() => { setSelected(null); setHover(null); }, [mode]);
 
@@ -307,8 +312,8 @@ export default function CompareView({ username }: { username: string }) {
                 <input type="checkbox" checked={yearOn} onChange={e => setYearOn(e.target.checked)} className="accent-sky-400" data-testid="checkbox-year-filter" />
                 Filter by year
               </label>
-              <button type="button" disabled={!yearOn || yearVal <= MIN_YEAR} onClick={() => setYearVal(y => y - 1)} className="w-6 h-6 rounded bg-slate-800 disabled:opacity-40" aria-label="Previous year" data-testid="button-year-prev">‹</button>
-              <input type="range" min={MIN_YEAR} max={CURRENT_YEAR} value={yearVal} disabled={!yearOn} onChange={e => setYearVal(Number(e.target.value))}
+              <button type="button" disabled={!yearOn || yearVal <= earliestYear} onClick={() => setYearVal(y => Math.max(earliestYear, y - 1))} className="w-6 h-6 rounded bg-slate-800 disabled:opacity-40" aria-label="Previous year" data-testid="button-year-prev">‹</button>
+              <input type="range" min={earliestYear} max={CURRENT_YEAR} value={yearVal} disabled={!yearOn} onChange={e => setYearVal(Number(e.target.value))}
                 className="flex-1 min-w-[120px] accent-sky-400 disabled:opacity-40" aria-label="Selected year" data-testid="slider-year" />
               <button type="button" disabled={!yearOn || yearVal >= CURRENT_YEAR} onClick={() => setYearVal(y => y + 1)} className="w-6 h-6 rounded bg-slate-800 disabled:opacity-40" aria-label="Next year" data-testid="button-year-next">›</button>
               <span className={`font-mono tabular-nums text-sm w-12 ${yearOn ? "text-white" : "text-slate-600"}`} data-testid="text-selected-year">{yearVal}</span>

@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  buildIndex, visitMatchesYear, overlayFor, computeStats, jaccard, DEFAULT_LAYERS, destKey,
+  buildIndex, visitMatchesYear, overlayFor, computeStats, jaccard, DEFAULT_LAYERS, destKey, recordedYears,
 } from "./compareModel";
 
 const row = (category: string, destinationId: string, o: Partial<{ v: boolean; b: boolean; f: number; l: number; t: number }> = {}) => ({
@@ -84,4 +84,18 @@ test("stats: totals, overlap, jaccard, bucket hooks, regions, timeline", () => {
 test("jaccard edge cases", () => {
   assert.equal(jaccard(new Set(), new Set()), 0);
   assert.equal(jaccard(new Set(["a"]), new Set(["a"])), 1);
+});
+
+test("selectable years start with the earliest dated visit from either traveler", () => {
+  const a = buildIndex([row("country", "250", { v: true, f: 2001, l: 2020 })]);
+  const b = buildIndex([
+    row("tcc", "Japan", { v: true, f: 1983, l: 2019 }),
+    row("country", "392", { b: true, f: 1960 }),
+  ]);
+  assert.equal(recordedYears(a, b).at(-1), 1983);
+  assert.equal(recordedYears(b, a).at(-1), 1983);
+  assert.equal(recordedYears(a, new Map()).at(-1), 2001);
+  assert.deepEqual(recordedYears(new Map(), new Map()), []);
+  const latestOnly = buildIndex([row("country", "392", { v: true, l: 1975 })]);
+  assert.equal(recordedYears(a, latestOnly).at(-1), 1975);
 });

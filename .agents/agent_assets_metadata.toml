@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "HlGwyz4nP1mEfO-_jucP5"
+uri = "file://PROJECT.md"
+type = "text"
+title = "Project & Technical Design"
+description = "Current product overview, architecture, data model, API, configuration, and verification guide."
+logical_id = "2d2ef437-f376-4d6d-9f02-aa9482f4518a"
+content_hash = "sha256:59f05850e39ef842c970f60137517c54b398617704f75c1238489ad226d76154"
+size = 16262
+mtime_ms = 1790642680271
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:c5c19a94-bf7b-4722-924a-8fdc45946356/2d2ef437-f376-4d6d-9f02-aa9482f4518a/c22a11b1-b88a-4801-af51-3ce31d07d74f"
+storage_version_token = "1790642684689331"
+content_type = "text/markdown"

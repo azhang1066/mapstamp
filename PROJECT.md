@@ -6,12 +6,12 @@ World Map Travel Tracker is a full-stack travel-recording application. It lets p
 
 The primary flow is:
 
-1. A visitor signs in with Clerk and chooses a username on first use.
+1. A visitor can use the map locally as a guest, or sign in with Clerk and choose a username on first use.
 2. They interact with the World or TCC map, or the destination lists, to record travel.
 3. The browser saves interaction state locally and, when signed in, synchronizes it to the API.
 4. They can filter the map by a year, review statistics, manage a profile/favorites, upload photos, or use Connections to find other users and manage requests.
 
-Shared map links are client-side, read-only snapshots intended for viewing rather than collaboration.
+Shared map links are server-stored, read-only snapshots intended for viewing rather than collaboration. The share page has preview metadata for social platforms, while the interactive map loads the snapshot from the API.
 
 ## 2. Tech Stack
 
@@ -27,15 +27,15 @@ Shared map links are client-side, read-only snapshots intended for viewing rathe
 | Database | PostgreSQL, accessed through Drizzle ORM and `pg` |
 | API contract/codegen | OpenAPI, Orval, generated React Query client, generated Zod package |
 | Uploads | Multer; Replit Object Storage through Google Cloud Storage libraries and the Replit sidecar |
-| Other notable UI/data tools | SheetJS/XLSX, `html-to-image`, Recharts, Wouter, Radix UI components, React Hook Form, Framer Motion, Lucide |
-| Testing | Vitest and Supertest for the API |
+| Other notable UI/data tools | SheetJS/XLSX (loaded on demand), `html-to-image`, Recharts, Wouter, Radix UI components, React Hook Form, Framer Motion, Lucide |
+| Testing | Vitest and Supertest for the API; Playwright browser tests for map persistence and connection flows |
 
 ### Hosting and deployment
 
 The Replit configuration uses an application router with an autoscale deployment target.
 
-- The `world-map` artifact is a static web artifact, served at `/`; production output is `artifacts/world-map/dist/public` with SPA fallback to `index.html`.
-- The `api-server` artifact is a Node/Express API, served at `/api`; it is built with esbuild and runs `dist/index.mjs`.
+- The `world-map` artifact is a static web artifact, served at `/`; production output is `artifacts/world-map/dist/public` with SPA rewrites for the main page and sign-in/sign-up.
+- The `api-server` artifact is a Node/Express service, served at `/api` and `/s`; it is built with esbuild and runs `dist/index.mjs`.
 - The `mockup-sandbox` artifact is a development/design preview service at `/__mockup`; no production service is configured for it.
 
 No production hostname or external hosting provider is specified in the repository. That is managed by the Replit deployment environment.
@@ -56,6 +56,7 @@ lib/
   db/                 Drizzle client, schemas, and database scripts
 scripts/
   post-merge.sh       Post-merge reconciliation script
+PROJECT.md            This project and technical-design overview
 ```
 
 ### Frontend
@@ -67,7 +68,7 @@ The main map has two modes:
 - **World**: countries, U.S. states, Canadian provinces, and microstate markers.
 - **TCC**: 330 Travelers' Century Club entries across 12 regions. Entries use country shapes where available, marker dots for other entries, and a separate U.S. states layer for contiguous U.S., Alaska, and Hawaiian Islands.
 
-`ConnectionsPanel.tsx` provides user search, pending requests, and accepted-connection management. `UsernameOnboardingModal.tsx` blocks initial access until a user selects a valid username. `FavoritesTab.tsx` stores up to five favorite country/TCC destinations locally.
+`ConnectionsPanel.tsx` is loaded on demand and provides user search, pending requests, and accepted-connection management. `UsernameOnboardingModal.tsx` blocks initial access until a user selects a valid username. `FavoritesTab.tsx` stores up to five favorite country/TCC destinations locally. The web artifact also includes static SEO metadata, a sitemap, and robots instructions.
 
 ### Backend
 
@@ -79,7 +80,8 @@ API route modules use Clerk's `getAuth(req)` to obtain the caller where required
 
 - The frontend uses same-origin `/api/...` requests. Generated API hooks use `@workspace/api-client-react`; some map/profile/photo synchronization is implemented with direct `fetch`.
 - Authenticated travel data is local-first: the map writes browser state immediately, then sends a debounced `PUT /api/map-data` after relevant changes.
-- On authenticated startup, `AuthRoot` fetches `/api/map-data`, `/api/profile/me`, and handles any legacy local photo migration.
+- On authenticated startup, `AuthRoot` loads `/api/map-data` and `/api/profile/me`, handles legacy local photo migration, and blocks the editable map until cloud hydration succeeds. Account changes clear account-scoped local travel data to prevent cross-user leakage.
+- Sharing creates a persisted snapshot with `POST /api/shares`; `/s/:id` returns crawler-readable HTML and an SVG preview, then hands off to the React app, which fetches `/api/shares/:id`. The URL contains only an opaque share ID; the snapshot may include travel notes but never photos, visit years, or private profile data.
 - Clerk provides browser identity; the API validates the Clerk session for protected routes.
 - There are no WebSocket or background-worker implementations in the application source.
 
@@ -101,6 +103,7 @@ PostgreSQL is accessed through Drizzle. The schema declares no database foreign 
 | `user_photos` | UUID `id`, `user_id`, category, destination ID, storage key, caption, position, `created_at` | Metadata for up to three private photos per destination. Photo bytes are not stored in PostgreSQL. |
 | `user_profiles` | `user_id` (PK), `username`, `display_name`, `username_set`, `created_at` | User profile and username-onboarding state. Username is indexed uniquely, including a case-insensitive expression index. |
 | `user_connections` | UUID `id`, requester/addressee IDs, `status`, timestamps | Directed connection requests. Status is stored as `pending`, `accepted`, or `declined`; requester/addressee pairs are unique. |
+| `map_shares` | Opaque `id` (PK), optional owner ID, `snapshot` JSONB, visited/bucket counts, creation time | Stable public read-only snapshots and preview totals. |
 
 `PUT /api/map-data` replaces the caller's normalized `user_destinations` rows within a transaction and upserts the caller's JSONB map-data record. `GET /api/map-data` assembles both storage forms into the map-data response.
 
@@ -132,6 +135,10 @@ All routes below are mounted below `/api`.
 | `GET` | `/leaderboard` | Clerk | Ranks the caller and accepted connections by normalized visited-destination counts. |
 | `GET` | `/stats/aggregate?category=&limit=` | No | Returns public aggregate counts for a normalized destination category. |
 | `GET` | `/stats/destination/:category/:id` | No | Returns public visited/bucket counts and percentages for one destination; 404 if no rows exist. |
+| `POST` | `/shares` | No | Creates a stable, public map snapshot; stores an owner ID if signed in. |
+| `GET` | `/shares/:id` | No | Returns the public snapshot and summary counts for the interactive map. |
+
+Two public routes are served outside `/api`: `GET /s/:id` returns share HTML with Open Graph metadata and a browser handoff to the map, and `GET /s/:id/preview.svg` returns a generated visual summary. Shared pages are marked `noindex, nofollow`; their preview metadata exposes only summary counts, not notes.
 
 The OpenAPI contract is `lib/api-spec/openapi.yaml`. Orval generates React Query hooks into `lib/api-client-react/src/generated/` and Zod output into `lib/api-zod/src/generated/`.
 
@@ -148,6 +155,7 @@ Never commit values for the following variables or secrets.
 | `DATABASE_URL` | `@workspace/db` / API server | Required PostgreSQL connection string. |
 | `PORT` | World Map and API server | Injected by Replit service configuration; both services expect a port. |
 | `BASE_PATH` | World Map | Path-based artifact base URL; configured as `/` for the web artifact. |
+| `API_PROXY_TARGET` | World Map dev server | Optional local API target used by isolated browser tests; normal artifact routing handles `/api` and `/s`. |
 | `PRIVATE_OBJECT_DIR` | API server | Required Object Storage directory for private photo objects. |
 | `PUBLIC_OBJECT_SEARCH_PATHS` | Object storage helper | Comma-separated public Object Storage search paths; required only by helper methods that search public objects. |
 | `NODE_ENV` | API server | Set to `production` in the API artifact's production configuration. |
@@ -166,14 +174,12 @@ This project expects Node.js 24 and pnpm. The root `preinstall` script rejects n
 # Install workspace dependencies
 pnpm install
 
-# Start the web artifact (Vite)
-pnpm --filter @workspace/world-map run dev
-
-# In another terminal, build and start the API server
-pnpm --filter @workspace/api-server run dev
+# Start the two services through their configured Replit artifact workflows:
+# artifacts/world-map: web
+# artifacts/api-server: API Server
 ```
 
-For a functional authenticated/local environment, configure the required Clerk, database, and Object Storage variables listed above. The API requires `DATABASE_URL`; the frontend requires a Clerk publishable key.
+For a functional authenticated environment, configure the required Clerk, database, and Object Storage variables listed above. The API requires `DATABASE_URL`; the frontend requires a Clerk publishable key. Replit workflows inject the web service's `PORT` and `BASE_PATH`; running its `dev` or `build` command manually requires those variables too.
 
 Useful commands:
 
@@ -190,9 +196,15 @@ pnpm --filter @workspace/world-map run typecheck
 pnpm --filter @workspace/api-server run build
 pnpm --filter @workspace/api-server run typecheck
 
-# Run API tests
+# Run API integration tests
 pnpm --filter @workspace/api-server run test
 pnpm --filter @workspace/api-server run test:watch
+
+# Run browser tests (requires the test environment and Clerk test setup)
+pnpm --filter @workspace/world-map run test:e2e
+
+# Check that Connections remains split into a lazy-loaded build chunk
+pnpm --filter @workspace/world-map run test:connections-build
 
 # Regenerate API client and Zod output after OpenAPI changes
 pnpm --filter @workspace/api-spec run codegen
@@ -208,15 +220,11 @@ The configured Replit validation workflow runs:
 pnpm --filter @workspace/api-server run test
 ```
 
-There is no root `dev` script and the Replit `Project` run-button workflow only invokes the validation workflow; start application services through their artifact commands/workflows.
+There is no root `dev` script; application services run through their artifact workflows. The post-merge script installs dependencies, builds the database package, and pushes the current development schema.
 
-## 8. Known Gaps / TODOs
+## 8. Design Boundaries and Test Coverage
 
-- The frontend typecheck currently reports implicit-`any` errors around `react-simple-maps` callback parameters in `App.tsx`. These are existing TypeScript errors, not a clean full frontend typecheck.
-- API tests currently cover map-data behavior. No committed browser/UI test suite was found for the map, profile, photos, or social-connection flows.
-- The map is local-first and several storage/network paths intentionally catch errors without surfacing them to the user. A failed background map-data sync can therefore be silent.
-- Map-data hydration only writes non-empty server values to browser storage. Empty server data does not clear existing local values; logout explicitly clears local travel data to mitigate stale data across sessions.
-- Shared map links include visited/bucket sets and optional notes, but omit visit details, years, photos, favorites, and profile name. They are not server-persisted and can become long; note sharing is omitted once the URL budget is exceeded.
-- TCC source data identifies itself as the official list as of January 2022. Its present-day accuracy needs confirmation before treating it as current.
-- The API artifact configuration contains a TODO noting that `/api` preview handling should be excluded from preview; no resolution is present in the configuration.
-- Port mappings for several ports in `.replit` do not correspond to the current web/API/mockup artifact service definitions. Their purpose is unclear/needs confirmation.
+- Shared links are public snapshots. Anyone with the link can view the included destinations and optional notes; photos, visit details, years, favorites, and profile name are excluded. Sharing creates a stored snapshot rather than a live view of later edits.
+- Map data writes replace the caller's normalized destination rows in a transaction, so clients must send the complete visited/bucket state. Other legacy fields remain in JSONB.
+- Browser tests cover public and authenticated map-mode persistence, cloud hydration/account isolation, and connection request lifecycle; API integration tests cover map-data and connection authorization/round trips. This is not a claim of full UI coverage for profile or photos.
+- TCC source data identifies itself as the official list as of January 2022; verify currency before presenting it as a current external standard.

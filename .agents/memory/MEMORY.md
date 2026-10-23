@@ -11,3 +11,4 @@
 - [Legacy photo ownership](legacy-photo-ownership.md) — bind ownerless browser photo migrations to a persisted account marker before uploading.
 - [Public share privacy](public-share-privacy.md) — stable share pages must hand browsers only opaque IDs, never snapshots or notes in URLs.
 - [Scoped pnpm installs](scoped-pnpm-installs.md) — the package installer cannot target a pnpm workspace leaf; add dependencies with a package filter.
+- [Map dependency compatibility](map-dependency-compatibility.md) — verify region colors and interaction styles visually after map-library upgrades, not only builds.

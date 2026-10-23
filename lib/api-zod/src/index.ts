@@ -1,4 +1,6 @@
 export * from "./generated/api";
+// Prefer the runtime schema over the same-named generated TypeScript interface.
+export { SaveMapDataResponse } from "./generated/api";
 // Re-export TS interfaces, excluding SaveMapDataResponse which collides with the Zod schema
 export type {
   AggregateStatsResponse,
@@ -41,3 +43,4 @@ export type {
   UploadPhotoBody,
   UserProfile,
 } from "./generated/types";
+export * from './generated/types';
